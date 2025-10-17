@@ -1,0 +1,33 @@
+apiVersion: k3d.io/v1alpha3
+kind: Simple
+name: halo
+
+# Master Node
+servers: 1
+# Worker Node
+agents: 1   # edit if more resource is required
+
+kubeAPI:
+  host: "0.0.0.0"   # use default localhost ip
+  hostPort: "6445"
+
+ports:
+  - port: 80:80   # map kubernetes port to vm
+  - port: 443:443 # map kubernetes port to vm
+
+# Create local registry for docker image
+registries:
+  create: 
+    name: halo-registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5000"
+
+# Kubernetes runtime options
+options:
+  k3d:
+    wait: true
+    timeout: "60s"  # wait timeout before aborting
+  
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
