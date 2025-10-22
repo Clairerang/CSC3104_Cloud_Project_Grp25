@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ThemeProvider, CssBaseline, BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
+import { ThemeProvider, CssBaseline, Paper, Box, Typography } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import GroupIcon from "@mui/icons-material/Group";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -11,7 +11,6 @@ import CheckInScreen from "./components/checkin/CheckInScreen";
 import CircleScreen from "./components/circle/CircleScreen";
 import ActivitiesScreen from "./components/activities/ActivitiesScreen";
 import ProgressScreen from "./components/progress/ProgressScreen";
-import Layout from "./components/common/Layout";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
@@ -37,31 +36,87 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Layout>
+      <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
         {activeTab === "check-in" && <CheckInScreen onCheckIn={(m) => console.log("Checked in:", m)} />}
         {activeTab === "circle" && <CircleScreen contacts={contacts} />}
         {activeTab === "activities" && <ActivitiesScreen activities={activities} />}
         {activeTab === "progress" && <ProgressScreen weekDays={weekDays} checkIns={checkIns} />}
-      </Layout>
 
-      <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0 }} elevation={3}>
-        <BottomNavigation
-          value={activeTab}
-          onChange={(_, newValue: Tab) => setActiveTab(newValue)}
-          showLabels
-          sx={{
-            '& .MuiBottomNavigationAction-label': {
-              fontSize: '0.8rem',
-              fontWeight: 600,
-            },
-          }}
-        >
-          <BottomNavigationAction label="Check-In" value="check-in" icon={<HomeIcon />} />
-          <BottomNavigationAction label="My Circle" value="circle" icon={<GroupIcon />} />
-          <BottomNavigationAction label="Activities" value="activities" icon={<EmojiEventsIcon />} />
-          <BottomNavigationAction label="Progress" value="progress" icon={<TrendingUpIcon />} />
-        </BottomNavigation>
-      </Paper>
+        {/* Bottom Navigation */}
+        <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, borderTop: '1px solid #e5e7eb' }} elevation={0}>
+          <Box sx={{ px: 4, py: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', maxWidth: '672px', mx: 'auto' }}>
+              <Box
+                onClick={() => setActiveTab('check-in')}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  color: activeTab === 'check-in' ? '#ea580c' : '#9ca3af',
+                }}
+              >
+                <HomeIcon sx={{ width: 28, height: 28 }} />
+                <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
+                  Check-In
+                </Typography>
+              </Box>
+
+              <Box
+                onClick={() => setActiveTab('circle')}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  color: activeTab === 'circle' ? '#2563eb' : '#9ca3af',
+                }}
+              >
+                <GroupIcon sx={{ width: 28, height: 28 }} />
+                <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
+                  My Circle
+                </Typography>
+              </Box>
+
+              <Box
+                onClick={() => setActiveTab('activities')}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  color: activeTab === 'activities' ? '#7c3aed' : '#9ca3af',
+                }}
+              >
+                <EmojiEventsIcon sx={{ width: 28, height: 28 }} />
+                <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
+                  Activities
+                </Typography>
+              </Box>
+
+              <Box
+                onClick={() => setActiveTab('progress')}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  color: activeTab === 'progress' ? '#0d9488' : '#9ca3af',
+                }}
+              >
+                <TrendingUpIcon sx={{ width: 28, height: 28 }} />
+                <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
+                  Progress
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
     </ThemeProvider>
   );
 };
