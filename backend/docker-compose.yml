@@ -1,0 +1,117 @@
+# CSC3104 Cloud Project - Group 25
+# Backend Microservices Stack
+# Run with:  docker-compose up --build
+
+services:
+  # --------------------------------------
+  # ZOOKEEPER (required by Apache Kafka)
+  # --------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------
+  # APACHE KAFKA BROKER
+  # --------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-topics --bootstrap-server kafka:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # --------------------------------------
+  # MONGODB DATABASE
+  # --------------------------------------
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------
+  # GAMIFICATION SERVICE (Jerald)
+  # --------------------------------------
+  gamification:
+    build: ./gamification-service
+    container_name: gamification
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/gamification
+      - KAFKA_BROKER=kafka:9092
+    ports:
+      - "4001:4001"
+    restart: unless-stopped
+
+  # --------------------------------------
+  # NOTIFICATION SERVICE
+  # --------------------------------------
+  notification:
+    build: ./notification-service
+    container_name: notification
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - EMAIL_USER=cloudproject6769@gmail.com
+      - EMAIL_PASS=QWERasdf!234
+    ports:
+      - "4002:4002"
+    restart: unless-stopped
+
+  # --------------------------------------
+  # (Optional) Kafka UI Dashboard (Kafdrop)
+  # --------------------------------------
+  kafdrop:
+    image: obsidiandynamics/kafdrop
+    container_name: kafdrop
+    ports:
+      - "9100:9000"
+    environment:
+      - KAFKA_BROKERCONNECT=kafka:9092
+      - JVM_OPTS=-Xms32M -Xmx64M
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+# --------------------------------------
+# DATA VOLUMES
+# --------------------------------------
+volumes:
+  mongo-data:
