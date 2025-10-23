@@ -1,29 +1,60 @@
-import React from "react";
+import React, { useState } from "react";
 import { Box, Typography, Card, Stack, Button } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import PhoneIcon from "@mui/icons-material/Phone";
 import StarIcon from "@mui/icons-material/Star";
 import type { Contact } from "../../types";
+import ContactDetailModal from "./ContactDetailModal";
 
 interface Props {
   contacts: Contact[];
 }
 
 const CircleScreen: React.FC<Props> = ({ contacts }) => {
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const handleContactClick = (contact: Contact) => {
+    setSelectedContact(contact);
+    setModalOpen(true);
+  };
+
+  const handleDirectCall = (contact: Contact, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent modal from opening
+    console.log("Direct calling:", contact.name);
+    // Add your direct call logic here
+  };
+
+  const handleVoiceCall = (contact: Contact) => {
+    console.log("Voice calling:", contact.name);
+    setModalOpen(false);
+    // Add your voice call logic here
+  };
+
+  const handleVideoCall = (contact: Contact) => {
+    console.log("Video calling:", contact.name);
+    setModalOpen(false);
+    // Add your video call logic here
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedContact(null);
+  };
+
   return (
     <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
       <Box sx={{ p: 6 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 6 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4 }}>
           <Box sx={{
             width: 48,
             height: 48,
-            bgcolor: '#ec4899',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 24,
+            fontSize: 36,
           }}>
             ❤️
           </Box>
@@ -32,20 +63,20 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
           </Typography>
         </Box>
 
-        <Typography sx={{ color: '#6b7280', mb: 6 }}>
+        {/* <Typography sx={{ color: '#6b7280', mb: 3, fontSize: 20 }}>
           Tap anyone to connect
-        </Typography>
+        </Typography> */}
 
         {/* Voice Search Card */}
         <Card sx={{
           background: 'linear-gradient(135deg, #dbeafe 0%, #fce7f3 100%)',
-          borderRadius: 4,
+          borderRadius: 2,
           p: 6,
           mb: 6,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 2 }}>
             <Typography sx={{ fontSize: 24 }}>🔍</Typography>
-            <Typography sx={{ color: '#6b7280' }}>Say a name to call</Typography>
+            <Typography sx={{ color: '#6b7280', fontSize: 20 }}>Say a name to call</Typography>
           </Box>
           <Button sx={{
             ml: 'auto',
@@ -72,14 +103,25 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
             {contacts.filter(c => c.isFavorite).map(contact => (
-              <Button key={contact.id} sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 2,
-                p: 0,
-                textTransform: 'none',
-              }}>
+              <Button 
+                key={contact.id} 
+                onClick={() => handleContactClick(contact)}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                  p: 0,
+                  textTransform: 'none',
+                  bgcolor: 'white',
+                  boxShadow: 1,
+                  '&:hover': { 
+                    boxShadow: 3,
+                    transform: 'translateY(-2px)',
+                    transition: 'all 0.2s',
+                  },
+                }}
+              >
                 <Box sx={{
                   width: 80,
                   height: 80,
@@ -89,15 +131,16 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 20,
-                  color: '#9ca3af',
+                  color: '#000000ff',
+                  mt: 3,
                 }}>
                   {contact.initials}
                 </Box>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography sx={{ fontWeight: 600 }}>
+                <Box sx={{ textAlign: 'center', mb: 3 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 18 }}>
                     {contact.name}
                   </Typography>
-                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
+                  <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
                     {contact.relationship}
                   </Typography>
                 </Box>
@@ -113,14 +156,23 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
           </Typography>
           <Stack spacing={3}>
             {contacts.filter(c => !c.isFavorite).map(contact => (
-              <Card key={contact.id} sx={{
-                bgcolor: 'white',
-                borderRadius: 4,
-                p: 4,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}>
+              <Card 
+                key={contact.id} 
+                onClick={() => handleContactClick(contact)}
+                sx={{
+                  bgcolor: 'white',
+                  borderRadius: 4,
+                  p: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    boxShadow: 3,
+                    transition: 'all 0.2s',
+                  },
+                }}
+              >
                 <Box sx={{
                   width: 56,
                   height: 56,
@@ -129,8 +181,8 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 18,
-                  color: '#9ca3af',
+                  fontSize: 20,
+                  color: '#000000ff',
                 }}>
                   {contact.initials}
                 </Box>
@@ -138,23 +190,27 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
                   <Typography sx={{ fontWeight: 600, fontSize: 18 }}>
                     {contact.name}
                   </Typography>
-                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
+                  <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
                     {contact.relationship}
                   </Typography>
                   <Typography sx={{ fontSize: 14, color: '#9ca3af' }}>
                     Last call: {contact.lastCall}
                   </Typography>
                 </Box>
-                <Button sx={{
-                  width: 48,
-                  height: 48,
-                  bgcolor: '#f3f4f6',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  '&:hover': { bgcolor: '#e5e7eb' },
-                }}>
+                <Button 
+                  onClick={(e) => handleDirectCall(contact, e)}
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    bgcolor: '#f3f4f6',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    '&:hover': { bgcolor: '#22c55e' },
+                    '&:hover .MuiSvgIcon-root': { color: 'white' },
+                  }}
+                >
                   <PhoneIcon sx={{ width: 24, height: 24, color: '#6b7280' }} />
                 </Button>
               </Card>
@@ -163,7 +219,7 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
         </Box>
 
         {/* Emergency Button */}
-        <Button sx={{
+        {/* <Button sx={{
           width: '100%',
           mt: 6,
           bgcolor: '#dc2626',
@@ -180,8 +236,17 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
         }}>
           <PhoneIcon sx={{ width: 24, height: 24 }} />
           Emergency: 911
-        </Button>
+        </Button> */}
       </Box>
+
+      {/* Contact Detail Modal */}
+      <ContactDetailModal
+        open={modalOpen}
+        contact={selectedContact}
+        onClose={handleCloseModal}
+        onVoiceCall={handleVoiceCall}
+        onVideoCall={handleVideoCall}
+      />
     </Box>
   );
 };

@@ -7,7 +7,7 @@ export interface Contact {
   isFavorite?: boolean;
 }
 
-export type Tab = "check-in" | "circle" | "activities" | "progress";
+export type Tab = "check-in" | "circle" | "activities";
 export type Mood = "great" | "okay" | "not-well" | null;
 
 export interface Activity {
@@ -15,6 +15,6 @@ export interface Activity {
   title: string;
   description: string;
   points: number;
-  category: "Exercise" | "Mental" | "Social";
+  category: "Exercise" | "Mental" | "Learning" | "Social";
   completed?: boolean;
 }

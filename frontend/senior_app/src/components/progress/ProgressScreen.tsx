@@ -141,35 +141,156 @@ const ProgressScreen: React.FC<Props> = ({ weekDays, checkIns }) => {
           </Card>
         </Box>
 
-        {/* Achievements Card */}
-        <Card sx={{ bgcolor: '#faf5ff', borderRadius: 4, p: 6 }}>
+        {/* Daily Check-ins Card */}
+        <Card sx={{ bgcolor: '#fef3c7', borderRadius: 4, p: 6, mb: 6 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
-            Achievements
+            Daily Check-ins
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4 }}>
-            <Card sx={{
-              bgcolor: 'white',
-              borderRadius: 3,
-              p: 4,
-              textAlign: 'center',
-              border: '2px solid #eab308',
-            }}>
-              <Typography sx={{ fontSize: 36, mb: 2 }}>🔥</Typography>
-              <Typography sx={{ fontWeight: 600 }}>
-                7 Day Streak
-              </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Card sx={{ bgcolor: 'white', borderRadius: 3, p: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography sx={{ fontSize: 24 }}>🍽️</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>Have you eaten today?</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Box sx={{
+                    px: 3,
+                    py: 1,
+                    bgcolor: '#dcfce7',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#bbf7d0' }
+                  }}>
+                    <Typography sx={{ fontWeight: 600, color: '#166534' }}>Yes</Typography>
+                  </Box>
+                  <Box sx={{
+                    px: 3,
+                    py: 1,
+                    bgcolor: '#fee2e2',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#fecaca' }
+                  }}>
+                    <Typography sx={{ fontWeight: 600, color: '#991b1b' }}>No</Typography>
+                  </Box>
+                </Box>
+              </Box>
             </Card>
-            <Card sx={{
-              bgcolor: 'white',
-              borderRadius: 3,
-              p: 4,
-              textAlign: 'center',
-              border: '2px solid #eab308',
-            }}>
-              <Typography sx={{ fontSize: 36, mb: 2 }}>🎯</Typography>
-              <Typography sx={{ fontWeight: 600 }}>
-                Goal Achiever
-              </Typography>
+
+            <Card sx={{ bgcolor: 'white', borderRadius: 3, p: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography sx={{ fontSize: 24 }}>💊</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>Have you taken your medications?</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Box sx={{
+                    px: 3,
+                    py: 1,
+                    bgcolor: '#dcfce7',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#bbf7d0' }
+                  }}>
+                    <Typography sx={{ fontWeight: 600, color: '#166534' }}>Yes</Typography>
+                  </Box>
+                  <Box sx={{
+                    px: 3,
+                    py: 1,
+                    bgcolor: '#fee2e2',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: '#fecaca' }
+                  }}>
+                    <Typography sx={{ fontWeight: 600, color: '#991b1b' }}>No</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Card>
+          </Box>
+        </Card>
+
+        {/* Activity Invitations Card */}
+        <Card sx={{ bgcolor: '#e0f2fe', borderRadius: 4, p: 6 }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
+            Activity Invitations
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Card sx={{ bgcolor: 'white', borderRadius: 3, p: 4 }}>
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Typography sx={{ fontSize: 24 }}>👨‍👩‍👧</Typography>
+                  <Typography sx={{ fontWeight: 600, fontSize: 16 }}>
+                    Family Lunch - Sunday
+                  </Typography>
+                </Box>
+                <Typography sx={{ color: '#6b7280', fontSize: 14 }}>
+                  From: Sarah (Daughter) • 12:00 PM at home
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{
+                  flex: 1,
+                  py: 2,
+                  bgcolor: '#16a34a',
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: '#15803d' }
+                }}>
+                  <Typography sx={{ fontWeight: 600, color: 'white' }}>Accept</Typography>
+                </Box>
+                <Box sx={{
+                  flex: 1,
+                  py: 2,
+                  bgcolor: '#e5e7eb',
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: '#d1d5db' }
+                }}>
+                  <Typography sx={{ fontWeight: 600, color: '#374151' }}>Decline</Typography>
+                </Box>
+              </Box>
+            </Card>
+
+            <Card sx={{ bgcolor: 'white', borderRadius: 3, p: 4 }}>
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Typography sx={{ fontSize: 24 }}>🎬</Typography>
+                  <Typography sx={{ fontWeight: 600, fontSize: 16 }}>
+                    Movie Night - Friday
+                  </Typography>
+                </Box>
+                <Typography sx={{ color: '#6b7280', fontSize: 14 }}>
+                  From: Michael (Son) • 7:00 PM at cinema
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{
+                  flex: 1,
+                  py: 2,
+                  bgcolor: '#16a34a',
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: '#15803d' }
+                }}>
+                  <Typography sx={{ fontWeight: 600, color: 'white' }}>Accept</Typography>
+                </Box>
+                <Box sx={{
+                  flex: 1,
+                  py: 2,
+                  bgcolor: '#e5e7eb',
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: '#d1d5db' }
+                }}>
+                  <Typography sx={{ fontWeight: 600, color: '#374151' }}>Decline</Typography>
+                </Box>
+              </Box>
             </Card>
           </Box>
         </Card>

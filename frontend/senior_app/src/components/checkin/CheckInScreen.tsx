@@ -16,27 +16,28 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
     <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
       <Box sx={{ p: 6 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 8 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <WbSunnyIcon sx={{ width: 40, height: 40, color: '#f97316' }} />
             <Box>
               <Typography variant="h3" sx={{ fontWeight: 700, color: '#ea580c' }}>
                 Good Morning!
               </Typography>
-              <Typography sx={{ color: '#6b7280' }}>
-                How are you feeling today?
-              </Typography>
             </Box>
           </Box>
-          <CoffeeIcon sx={{ width: 40, height: 40, color: '#f97316' }} />
+          {/* <CoffeeIcon sx={{ width: 40, height: 40, color: '#f97316' }} /> */}
         </Box>
+        
+        <Typography sx={{ color: '#000000ff', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', mb: 2 }}>
+          How are you feeling today?
+        </Typography>
 
         {/* Microphone Card */}
         <Card sx={{ bgcolor: 'white', borderRadius: 4, boxShadow: 1, p: 8, mb: 6 }}>
-          <Typography align="center" sx={{ color: '#6b7280', mb: 6 }}>
-            Tap the microphone and tell me how you're doing
+          <Typography align="center" sx={{ color: '#6b7280', mb: 6, fontSize: 20 }}>
+            Press and hold the microphone and tell me how you're doing
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
             <Button
               sx={{
                 width: 96,
@@ -52,7 +53,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
           </Box>
         </Card>
 
-        <Typography align="center" sx={{ color: '#6b7280', mb: 4 }}>
+        <Typography align="center" sx={{ color: '#6b7280', mb: 4, fontSize: 20 }}>
           Or tap one below:
         </Typography>
 
@@ -68,10 +69,10 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
               alignItems: 'center',
               gap: 4,
               transition: 'all 0.2s',
-              bgcolor: selectedMood === 'great' ? '#dcfce7' : '#f0fdf4',
+              bgcolor: selectedMood === 'great' ? '#abfec8ff' : '#b1f8c7ff',
               border: selectedMood === 'great' ? '2px solid #16a34a' : 'none',
               '&:hover': {
-                bgcolor: selectedMood === 'great' ? '#dcfce7' : '#f0fdf4',
+                bgcolor: selectedMood === 'great' ? '#abfec8ff' : '#e1fae9ff',
               },
             }}
           >
@@ -102,10 +103,10 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
               alignItems: 'center',
               gap: 4,
               transition: 'all 0.2s',
-              bgcolor: selectedMood === 'okay' ? '#fef3c7' : '#fffbeb',
+              bgcolor: selectedMood === 'okay' ? '#fee478ff' : '#fdeca8ff',
               border: selectedMood === 'okay' ? '2px solid #eab308' : 'none',
               '&:hover': {
-                bgcolor: selectedMood === 'okay' ? '#fef3c7' : '#fffbeb',
+                bgcolor: selectedMood === 'okay' ? '#fee478ff' : '#fff8dbff',
               },
             }}
           >
@@ -136,10 +137,10 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
               alignItems: 'center',
               gap: 4,
               transition: 'all 0.2s',
-              bgcolor: selectedMood === 'not-well' ? '#fed7aa' : '#fff7ed',
-              border: selectedMood === 'not-well' ? '2px solid #ea580c' : 'none',
+              bgcolor: selectedMood === 'not-well' ? '#fdcdcdff' : '#ffb0b0ff',
+              border: selectedMood === 'not-well' ? '2px solid #ea0c0cff' : 'none',
               '&:hover': {
-                bgcolor: selectedMood === 'not-well' ? '#fed7aa' : '#fff7ed',
+                bgcolor: selectedMood === 'not-well' ? '#fdcdcdff' : '#ffe4e4ff',
               },
             }}
           >

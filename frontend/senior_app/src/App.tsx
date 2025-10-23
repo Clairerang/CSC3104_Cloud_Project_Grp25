@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { ThemeProvider, CssBaseline, Paper, Box, Typography } from "@mui/material";
+import { ThemeProvider, CssBaseline, Paper, Box, Typography, Button } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import GroupIcon from "@mui/icons-material/Group";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import PhoneIcon from "@mui/icons-material/Phone";
 
 import theme from "./theme/theme";
 import { Tab, Contact, Activity } from "./types";
 import CheckInScreen from "./components/checkin/CheckInScreen";
 import CircleScreen from "./components/circle/CircleScreen";
 import ActivitiesScreen from "./components/activities/ActivitiesScreen";
-import ProgressScreen from "./components/progress/ProgressScreen";
+// import ProgressScreen from "./components/progress/ProgressScreen";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
@@ -27,11 +29,17 @@ const App: React.FC = () => {
   const activities: Activity[] = [
     { id: "1", title: "Morning Stretch", description: "5 minutes of gentle stretching exercises", points: 10, category: "Exercise" },
     { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
-    { id: "3", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
+    { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning"},
+    { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
   ];
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const checkIns = [true, true, true, true, true, false, false];
+  const handleEmergencyCall = () => {
+    console.log("Emergency call initiated");
+    // Add your emergency call logic here
+  };
+
+  // const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  // const checkIns = [true, true, true, true, true, false, false];
 
   return (
     <ThemeProvider theme={theme}>
@@ -40,7 +48,36 @@ const App: React.FC = () => {
         {activeTab === "check-in" && <CheckInScreen onCheckIn={(m) => console.log("Checked in:", m)} />}
         {activeTab === "circle" && <CircleScreen contacts={contacts} />}
         {activeTab === "activities" && <ActivitiesScreen activities={activities} />}
-        {activeTab === "progress" && <ProgressScreen weekDays={weekDays} checkIns={checkIns} />}
+        {/* {activeTab === "progress" && <ProgressScreen weekDays={weekDays} checkIns={checkIns} />} */}
+
+        {/* Floating Emergency Button */}
+          <Button
+            onClick={handleEmergencyCall}
+            sx={{
+              position: 'fixed',
+              top: 24,
+              right: 24,
+              bgcolor: '#dc2626',
+              color: 'white',
+              px: 4,
+              py: 2,
+              borderRadius: 3,
+              fontSize: 16,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              zIndex: 1000,
+              '&:hover': { 
+                bgcolor: '#b91c1c',
+                boxShadow: '0 6px 8px rgba(0, 0, 0, 0.15)',
+              },
+            }}
+          >
+            <PhoneIcon sx={{ width: 20, height: 20 }} />
+            Emergency: 911
+          </Button>
 
         {/* Bottom Navigation */}
         <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, borderTop: '1px solid #e5e7eb' }} elevation={0}>
@@ -97,7 +134,7 @@ const App: React.FC = () => {
                 </Typography>
               </Box>
 
-              <Box
+              {/* <Box
                 onClick={() => setActiveTab('progress')}
                 sx={{
                   display: 'flex',
@@ -112,7 +149,7 @@ const App: React.FC = () => {
                 <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
                   Progress
                 </Typography>
-              </Box>
+              </Box> */}
             </Box>
           </Box>
         </Paper>
