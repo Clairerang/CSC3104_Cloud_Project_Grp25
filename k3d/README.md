@@ -32,6 +32,30 @@ The VM ova can be found in the OneDrive, the file name is `csc3104-cloud-proj.ov
 
 Note: To code and push your codes to github using Visual Studio Code in this VM, you will need to download `code` package.
 
+## VM Installation for Apple Users
+
+1. brew install qemu
+
+2. Convert the VDI to QCOW2
+```bash
+qemu-img convert -f vdi -O qcow2 /path/to/your/file.vdi /path/to/output/file.qcow2
+```
+3. Import to UTM (Install the UTM from the website)
+
+4. Select Create New VM > Emulate > Others
+
+5. Under Hardware, Default Configurations > CPU Core (set to 8)
+
+6. Under Others, Boot Device (Drive Image) > Import the converted file > Uncheck UEFI Boot
+
+7. Press Continue and Start Up
+
+8. Loading should take no more than 3mins under a 8 core set up. There will be slight lags here and there it is normal for Mac Users
+
+
+
+
+
 ## Quick Start
 1. Clone the repository
 ```bash
