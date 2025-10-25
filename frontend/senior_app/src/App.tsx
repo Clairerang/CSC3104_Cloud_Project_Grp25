@@ -3,8 +3,8 @@ import { ThemeProvider, CssBaseline, Paper, Box, Typography, Button } from "@mui
 import HomeIcon from "@mui/icons-material/Home";
 import GroupIcon from "@mui/icons-material/Group";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import PhoneIcon from "@mui/icons-material/Phone";
 
 import theme from "./theme/theme";
@@ -13,9 +13,14 @@ import CheckInScreen from "./components/checkin/CheckInScreen";
 import CircleScreen from "./components/circle/CircleScreen";
 import ActivitiesScreen from "./components/activities/ActivitiesScreen";
 // import ProgressScreen from "./components/progress/ProgressScreen";
+import { MorningStretch } from "./components/games/MorningStretch";
+import { MemoryQuiz } from "./components/games/MemoryQuiz";
+import { CulturalTrivia } from "./components/games/CulturalTrivia";
+import { ShareRecipe } from "./components/games/ShareRecipe";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
+  const [activeGame, setActiveGame] = useState<string | null>(null);
 
   const contacts: Contact[] = [
     { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true },
@@ -29,17 +34,59 @@ const App: React.FC = () => {
   const activities: Activity[] = [
     { id: "1", title: "Morning Stretch", description: "5 minutes of gentle stretching exercises", points: 10, category: "Exercise" },
     { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
-    { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning"},
+    { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning" },
     { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
   ];
 
-  const handleEmergencyCall = () => {
-    console.log("Emergency call initiated");
-    // Add your emergency call logic here
-  };
-
   // const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   // const checkIns = [true, true, true, true, true, false, false];
+
+  const handleEmergencyCall = () => {
+    console.log("Emergency call initiated");
+  };
+
+  const handlePlayGame = (activityId: string) => {
+    setActiveGame(activityId);
+    console.log("Playing game:", activityId);
+  };
+
+  const handleBackToActivities = () => {
+    setActiveGame(null);
+  };
+
+  const handleGameComplete = () => {
+  setActiveGame(null);
+  setActiveTab("activities");
+  console.log("Game completed!");
+};
+
+  // If a game is active, show the game screen
+  if (activeGame) {
+    // Map activity IDs to game components
+    const getGameComponent = () => {
+      switch (activeGame) {
+        case "1":
+          return <MorningStretch onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+        case "2":
+          return <MemoryQuiz onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+        case "3":
+          return <CulturalTrivia onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+        case "4":
+          return <ShareRecipe onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
+          {getGameComponent()}
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -47,37 +94,36 @@ const App: React.FC = () => {
       <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
         {activeTab === "check-in" && <CheckInScreen onCheckIn={(m) => console.log("Checked in:", m)} />}
         {activeTab === "circle" && <CircleScreen contacts={contacts} />}
-        {activeTab === "activities" && <ActivitiesScreen activities={activities} />}
-        {/* {activeTab === "progress" && <ProgressScreen weekDays={weekDays} checkIns={checkIns} />} */}
+        {activeTab === "activities" && <ActivitiesScreen activities={activities} onPlayGame={handlePlayGame} />}
 
         {/* Floating Emergency Button */}
-          <Button
-            onClick={handleEmergencyCall}
-            sx={{
-              position: 'fixed',
-              top: 24,
-              right: 24,
-              bgcolor: '#dc2626',
-              color: 'white',
-              px: 4,
-              py: 2,
-              borderRadius: 3,
-              fontSize: 16,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-              zIndex: 1000,
-              '&:hover': { 
-                bgcolor: '#b91c1c',
-                boxShadow: '0 6px 8px rgba(0, 0, 0, 0.15)',
-              },
-            }}
-          >
-            <PhoneIcon sx={{ width: 20, height: 20 }} />
-            Emergency: 911
-          </Button>
+        <Button
+          onClick={handleEmergencyCall}
+          sx={{
+            position: 'fixed',
+            top: 24,
+            right: 24,
+            bgcolor: '#dc2626',
+            color: 'white',
+            px: 4,
+            py: 2,
+            borderRadius: 3,
+            fontSize: 16,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            zIndex: 1000,
+            '&:hover': { 
+              bgcolor: '#b91c1c',
+              boxShadow: '0 6px 8px rgba(0, 0, 0, 0.15)',
+            },
+          }}
+        >
+          <PhoneIcon sx={{ width: 20, height: 20 }} />
+          Emergency: 911
+        </Button>
 
         {/* Bottom Navigation */}
         <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, borderTop: '1px solid #e5e7eb' }} elevation={0}>
@@ -133,23 +179,6 @@ const App: React.FC = () => {
                   Activities
                 </Typography>
               </Box>
-
-              {/* <Box
-                onClick={() => setActiveTab('progress')}
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 1,
-                  cursor: 'pointer',
-                  color: activeTab === 'progress' ? '#0d9488' : '#9ca3af',
-                }}
-              >
-                <TrendingUpIcon sx={{ width: 28, height: 28 }} />
-                <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
-                  Progress
-                </Typography>
-              </Box> */}
             </Box>
           </Box>
         </Paper>

@@ -9,6 +9,7 @@ import type { Activity } from "../../types";
 
 interface Props {
   activities: Activity[];
+  onPlayGame: (activityId: string) => void; // Add this prop
 }
 
 interface Invitation {
@@ -21,7 +22,7 @@ interface Invitation {
   status: 'pending' | 'accepted' | 'declined';
 }
 
-const ActivitiesScreen: React.FC<Props> = ({ activities }) => {
+const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame }) => {
   const [invitations, setInvitations] = useState<Invitation[]>([
     {
       id: "1",
@@ -73,9 +74,6 @@ const ActivitiesScreen: React.FC<Props> = ({ activities }) => {
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#7c3aed' }}>
               Activities
             </Typography>
-            {/* <Typography sx={{ color: '#6b7280', fontSize: 20 }}>
-              Stay active and connected
-            </Typography> */}
           </Box>
         </Box>
 
@@ -339,16 +337,19 @@ const ActivitiesScreen: React.FC<Props> = ({ activities }) => {
                   ⚡ {activity.points}
                 </Box>
               </Box>
-              <Button sx={{
-                width: '100%',
-                bgcolor: '#49bd74ff',
-                color: 'white',
-                py: 1,
-                borderRadius: 3,
-                fontWeight: 600,
-                '&:hover': { bgcolor: '#15803d' },
-                fontSize: 20,
-              }}>
+              <Button 
+                onClick={() => onPlayGame(activity.id)}
+                sx={{
+                  width: '100%',
+                  bgcolor: '#49bd74ff',
+                  color: 'white',
+                  py: 1,
+                  borderRadius: 3,
+                  fontWeight: 600,
+                  '&:hover': { bgcolor: '#15803d' },
+                  fontSize: 20,
+                }}
+              >
                 Play Game
               </Button>
             </Card>
