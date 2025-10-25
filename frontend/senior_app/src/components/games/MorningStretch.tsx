@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -26,6 +26,7 @@ const stretches = [
     description: 'Slowly roll your head in a circle, first clockwise, then counter-clockwise',
     duration: 30,
     image: '🙆',
+    videoUrl: '/videos/neck-rolls.mp4',
   },
   {
     id: 2,
@@ -33,6 +34,7 @@ const stretches = [
     description: 'Lift your shoulders up towards your ears, hold for 3 seconds, then release',
     duration: 30,
     image: '💪',
+    videoUrl: '/videos/shoulder-shrugs.mp4',
   },
   {
     id: 3,
@@ -40,6 +42,7 @@ const stretches = [
     description: 'Extend your arms out to the sides and make small circles',
     duration: 30,
     image: '🤸',
+    videoUrl: '/videos/arm-circles.mp4',
   },
   {
     id: 4,
@@ -47,6 +50,7 @@ const stretches = [
     description: 'Sit up straight and gently twist your torso to the left, then to the right',
     duration: 30,
     image: '🧘',
+    videoUrl: '/videos/seated-twist.mp4',
   },
   {
     id: 5,
@@ -54,6 +58,7 @@ const stretches = [
     description: 'Lift one foot and rotate your ankle in circles, then switch feet',
     duration: 30,
     image: '🦶',
+    videoUrl: '/videos/ankle-rolls.mp4',
   },
 ];
 
@@ -63,27 +68,43 @@ export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
   const [timeLeft, setTimeLeft] = useState(stretches[0].duration);
   const [isPaused, setIsPaused] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    if (!started || isPaused || completed) return;
+useEffect(() => {
+  if (!started || isPaused || completed) return;
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (currentStep < stretches.length - 1) {
-            setCurrentStep((step) => step + 1);
-            return stretches[currentStep + 1].duration;
-          } else {
-            setCompleted(true);
-            return 0;
-          }
+  const timer = setInterval(() => {
+    setTimeLeft((prev) => {
+      if (prev <= 1) {
+        if (currentStep < stretches.length - 1) {
+          // Move to next step
+          const nextStep = currentStep + 1;
+          setCurrentStep(nextStep);
+          return stretches[nextStep].duration;
+        } else {
+          setCompleted(true);
+          return 0;
         }
-        return prev - 1;
-      });
-    }, 1000);
+      }
+      return prev - 1;
+    });
+  }, 1000);
 
-    return () => clearInterval(timer);
-  }, [started, isPaused, currentStep, completed]);
+  return () => clearInterval(timer);
+}, [started, isPaused, currentStep, completed]);
+
+  // Play video when exercise changes or paused state changes
+  useEffect(() => {
+    if (videoRef.current && started && !completed) {
+      if (isPaused) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play().catch(err => {
+          console.log('Video play failed:', err);
+        });
+      }
+    }
+  }, [currentStep, isPaused, started, completed]);
 
   const handleStart = () => {
     setStarted(true);
@@ -249,7 +270,7 @@ export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        minHeight: '120vh',
         background: 'linear-gradient(to bottom, #c8e6c9, #ffffff)',
         p: 3,
       }}
@@ -276,19 +297,65 @@ export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
           </CardContent>
         </Card>
 
-        {/* Current Exercise */}
+        {/* Current Exercise with Video */}
         <Card sx={{ mb: 3, bgcolor: '#e8f5e9', border: 2, borderColor: '#66bb6a' }}>
           <CardContent>
             <Box sx={{ textAlign: 'center', py: 2 }}>
-              <Typography sx={{ fontSize: '5rem', mb: 1 }}>
-                {currentStretch.image}
-              </Typography>
               <Typography variant="h3" gutterBottom sx={{ color: '#2e7d32' }}>
                 {currentStretch.name}
               </Typography>
-              <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
+              <Typography variant="h5" color="text.secondary" sx={{ mb: 2 }}>
                 {currentStretch.description}
               </Typography>
+
+              {/* Video Player */}
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: 400,
+                  mx: 'auto',
+                  mb: 3,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  boxShadow: 3,
+                  bgcolor: 'black',
+                }}
+              >
+                <video
+                  ref={videoRef}
+                  key={currentStretch.id}
+                  width="100%"
+                  loop
+                  muted
+                  playsInline
+                  autoPlay
+                  style={{
+                    display: 'block',
+                    maxHeight: '300px',
+                    objectFit: 'contain',
+                  }}
+                  onError={(e) => {
+                    console.error('Video failed to load:', currentStretch.videoUrl);
+                    // Fallback: show emoji if video fails to load
+                    e.currentTarget.style.display = 'none';
+                  }}
+                >
+                  <source src={currentStretch.videoUrl} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+                
+                {/* Fallback emoji if video doesn't load */}
+                <Typography 
+                  sx={{ 
+                    fontSize: '5rem', 
+                    py: 4,
+                    display: 'none',
+                    '.video-error &': { display: 'block' }
+                  }}
+                >
+                  {currentStretch.image}
+                </Typography>
+              </Box>
 
               {/* Timer */}
               <Box

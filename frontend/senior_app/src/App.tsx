@@ -30,7 +30,7 @@ const App: React.FC = () => {
   ];
 
   const activities: Activity[] = [
-    { id: "1", title: "Morning Stretch", description: "5 minutes of gentle stretching exercises", points: 10, category: "Exercise" },
+    { id: "1", title: "Morning Stretch", description: "5 gentle stretching exercises", points: 10, category: "Exercise" },
     { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
     { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning" },
     { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
