@@ -3,8 +3,6 @@ import { ThemeProvider, CssBaseline, Paper, Box, Typography, Button } from "@mui
 import HomeIcon from "@mui/icons-material/Home";
 import GroupIcon from "@mui/icons-material/Group";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import PhoneIcon from "@mui/icons-material/Phone";
 
 import theme from "./theme/theme";
@@ -12,7 +10,6 @@ import { Tab, Contact, Activity } from "./types";
 import CheckInScreen from "./components/checkin/CheckInScreen";
 import CircleScreen from "./components/circle/CircleScreen";
 import ActivitiesScreen from "./components/activities/ActivitiesScreen";
-// import ProgressScreen from "./components/progress/ProgressScreen";
 import { MorningStretch } from "./components/games/MorningStretch";
 import { MemoryQuiz } from "./components/games/MemoryQuiz";
 import { CulturalTrivia } from "./components/games/CulturalTrivia";
@@ -21,6 +18,7 @@ import { ShareRecipe } from "./components/games/ShareRecipe";
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
   const [activeGame, setActiveGame] = useState<string | null>(null);
+  const [totalPoints, setTotalPoints] = useState<number>(850); // Initialize with starting points
 
   const contacts: Contact[] = [
     { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true },
@@ -38,9 +36,6 @@ const App: React.FC = () => {
     { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
   ];
 
-  // const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  // const checkIns = [true, true, true, true, true, false, false];
-
   const handleEmergencyCall = () => {
     console.log("Emergency call initiated");
   };
@@ -55,14 +50,19 @@ const App: React.FC = () => {
   };
 
   const handleGameComplete = () => {
-  setActiveGame(null);
-  setActiveTab("activities");
-  console.log("Game completed!");
-};
+    // Find the completed activity and add its points
+    const completedActivity = activities.find(a => a.id === activeGame);
+    if (completedActivity) {
+      setTotalPoints(prevPoints => prevPoints + completedActivity.points);
+      console.log(`Game completed! Added ${completedActivity.points} points`);
+    }
+    
+    setActiveGame(null);
+    setActiveTab("activities");
+  };
 
   // If a game is active, show the game screen
   if (activeGame) {
-    // Map activity IDs to game components
     const getGameComponent = () => {
       switch (activeGame) {
         case "1":
@@ -94,7 +94,13 @@ const App: React.FC = () => {
       <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
         {activeTab === "check-in" && <CheckInScreen onCheckIn={(m) => console.log("Checked in:", m)} />}
         {activeTab === "circle" && <CircleScreen contacts={contacts} />}
-        {activeTab === "activities" && <ActivitiesScreen activities={activities} onPlayGame={handlePlayGame} />}
+        {activeTab === "activities" && (
+          <ActivitiesScreen 
+            activities={activities} 
+            onPlayGame={handlePlayGame}
+            totalPoints={totalPoints}
+          />
+        )}
 
         {/* Floating Emergency Button */}
         <Button

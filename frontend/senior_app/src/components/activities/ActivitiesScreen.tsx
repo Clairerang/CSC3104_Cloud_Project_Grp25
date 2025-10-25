@@ -9,7 +9,8 @@ import type { Activity } from "../../types";
 
 interface Props {
   activities: Activity[];
-  onPlayGame: (activityId: string) => void; // Add this prop
+  onPlayGame: (activityId: string) => void;
+  totalPoints: number; // Add this prop
 }
 
 interface Invitation {
@@ -22,7 +23,7 @@ interface Invitation {
   status: 'pending' | 'accepted' | 'declined';
 }
 
-const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame }) => {
+const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints }) => {
   const [invitations, setInvitations] = useState<Invitation[]>([
     {
       id: "1",
@@ -224,7 +225,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame }) => {
           )}
         </Card>
 
-        {/* Points Card */}
+        {/* Points Card - Now uses totalPoints prop */}
         <Card sx={{
           background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
           borderRadius: 2,
@@ -233,13 +234,13 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame }) => {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
             <Box>
-              <Typography sx={{ color: '#374151', mb: 2 }}>
+              <Typography sx={{ color: '#374151', mb: 2, fontSize: 20 }}>
                 Your Total Points
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <StarIcon sx={{ width: 32, height: 32, color: '#ea580c' }} />
                 <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                  850
+                  {totalPoints}
                 </Typography>
               </Box>
             </Box>
@@ -250,11 +251,11 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame }) => {
                 px: 4,
                 py: 1,
                 borderRadius: '20px',
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: 600,
                 mb: 2,
               }}>
-                Level 12
+                Level {Math.floor(totalPoints / 100) + 1}
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ea580c' }}>
                 <Typography sx={{ fontSize: 24 }}>🔥</Typography>
@@ -266,8 +267,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame }) => {
           </Box>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography sx={{ fontSize: 14 }}>Today's Progress</Typography>
-              <Typography sx={{ fontSize: 14 }}>0/60 points</Typography>
+              <Typography sx={{ fontSize: 18 }}>Today's Progress</Typography>
             </Box>
             <Box sx={{
               width: '100%',

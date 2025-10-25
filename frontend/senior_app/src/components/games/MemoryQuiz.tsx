@@ -92,19 +92,19 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
       >
         <Box sx={{ maxWidth: 600, width: '100%', textAlign: 'center' }}>
           <CheckCircleIcon sx={{ fontSize: 120, color: '#9c27b0', mb: 3 }} />
-          <Typography variant="h1" gutterBottom sx={{ color: '#7b1fa2' }}>
+          <Typography variant="h3" gutterBottom sx={{ color: '#7b1fa2' }}>
             Excellent Memory!
           </Typography>
-          <Typography variant="h3" color="text.secondary" sx={{ mb: 4 }}>
+          <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
             You matched all pairs in {moves} moves!
           </Typography>
 
           <Card sx={{ mb: 3, bgcolor: '#f3e5f5' }}>
             <CardContent>
-              <Typography variant="h2" sx={{ color: '#9c27b0', mb: 1 }}>
+              <Typography variant="h3" sx={{ color: '#9c27b0', mb: 1 }}>
                 +15 Points Earned!
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography variant="h5" color="text.secondary">
                 Your memory skills are impressive!
               </Typography>
             </CardContent>
@@ -115,7 +115,7 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
               variant="contained"
               size="large"
               onClick={onComplete}
-              sx={{ minHeight: 70, bgcolor: '#9c27b0', '&:hover': { bgcolor: '#7b1fa2' } }}
+              sx={{ minHeight: 70, bgcolor: '#9c27b0', fontSize: 20, '&:hover': { bgcolor: '#7b1fa2' } }}
             >
               Done
             </Button>
