@@ -1,0 +1,13 @@
+services:
+  notification:
+    volumes:
+      - ./firebase-sa.json:/run/secrets/firebase-sa.json:ro
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/firebase-sa.json
+      FIREBASE_API_KEY: 'AIzaSyAcodRNqbwCmmttG3k-YJarIY2cq0qQEtM'
+      FIREBASE_AUTH_DOMAIN: 'cloudproject-5c828.firebaseapp.com'
+      FIREBASE_PROJECT_ID: 'cloudproject-5c828'
+      FIREBASE_MESSAGING_SENDER_ID: '786219561651'
+      FIREBASE_APP_ID: '1:786219561651:web:2c1b7f4aea806120e836c6'
+      FIREBASE_VAPID_KEY: 'BGO_B8LHmWXPlofrwCK66yiGSxCocC5W7dNNhrthODwHknDGMaxmTF18lkkt-0cBSgqb-iy-aG8zTw81CEdYYeI'
+      FCM_FALLBACK_V1: 'true'

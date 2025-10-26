@@ -92,6 +92,11 @@ services:
       - KAFKA_BROKER=kafka:9092
       - EMAIL_USER=cloudproject6769@gmail.com
       - EMAIL_PASS=QWERasdf!234
+      # Allow optional environment interpolation without causing compose warnings.
+      # If not provided, default FIREBASE_SERVICE_ACCOUNT_JSON to empty and
+      # FIREBASE_SERVICE_ACCOUNT_PATH to the common secrets mount path.
+      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-/run/secrets/firebase-sa.json}
     ports:
       - "4002:4002"
     restart: unless-stopped

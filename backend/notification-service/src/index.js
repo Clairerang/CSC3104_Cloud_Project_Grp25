@@ -168,6 +168,32 @@ async function start() {
     }
   });
 
+  // Expose FCM/Web client config for the testing UI and service worker
+  app.get('/fcm/config', (req, res) => {
+    const cfg = {
+        apiKey: process.env.FIREBASE_API_KEY || process.env.FCM_API_KEY || null,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN || null,
+        projectId: process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT || null,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.FCM_SENDER_ID || null,
+        appId: process.env.FIREBASE_APP_ID || null,
+        vapidKey: process.env.FIREBASE_VAPID_KEY || process.env.FCM_VAPID_KEY || null
+    };
+    // Some Docker/YAML setups may pass quoted strings (e.g. "value") which end up
+    // embedded in the env value. Strip a single surrounding pair of single or
+    // double quotes so the client receives the raw key/token.
+    function stripQuotes(v) {
+      if (typeof v !== 'string') return v;
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+        return v.slice(1, -1);
+      }
+      return v;
+    }
+    Object.keys(cfg).forEach(k => { cfg[k] = stripQuotes(cfg[k]); });
+    // only return if at least apiKey and messagingSenderId exist
+    if (!cfg.apiKey || !cfg.messagingSenderId) return res.status(404).json({ error: 'FCM client config not set' });
+    res.json(cfg);
+  });
+
   app.listen(PORT, () => {
     console.log(`🔔 Notification Service running on port ${PORT}`);
     console.log(`📁 Serving testing frontend at http://localhost:${PORT}/testing-notification`);
