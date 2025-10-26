@@ -81,7 +81,9 @@ services:
   # NOTIFICATION SERVICE
   # --------------------------------------
   notification:
-    build: ./notification-service
+    build:
+      context: .
+      dockerfile: ./notification-service/Dockerfile
     container_name: notification
     depends_on:
       kafka:

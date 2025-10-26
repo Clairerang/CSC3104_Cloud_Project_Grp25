@@ -1,8 +1,5 @@
 const { Kafka } = require("kafkajs");
-const nodemailer = require("nodemailer");
-
-// Initialize transporter when the module loads
-let initializationPromise = null;
+const { connectMongo } = require('./models');
 
 const kafka = new Kafka({
   clientId: "notification-service",
@@ -10,70 +7,60 @@ const kafka = new Kafka({
 });
 
 const consumer = kafka.consumer({ groupId: "notification-group" });
-
-let transporter;
-
-async function initTransporter() {
-  // Create Ethereal test account - no real emails will be sent
-  const testAccount = await nodemailer.createTestAccount();
-  
-  transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    secure: false,
-    auth: {
-      user: testAccount.user,
-      pass: testAccount.pass
-    }
-  });
-  
-  console.log('📧 Using Ethereal test account for email testing');
-  console.log(`📨 Ethereal account: ${testAccount.user}`);
-}
-
-async function sendEmail(to, subject, text) {
-  try {
-    if (!transporter) {
-      await initTransporter();
-    }
-    const info = await transporter.sendMail({
-      from: '"Notification Service" <test@example.com>',
-      to,
-      subject,
-      text
-    });
-    console.log(`📧 Email sent to ${to}: ${subject}`);
-    // Get preview URL and log it
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    console.log(`🔎 Preview URL: ${previewUrl}`);
-  } catch (err) {
-    console.error("❌ Email error:", err);
-  }
-}
+const producer = kafka.producer();
 
 async function startKafkaConsumer() {
-  // Initialize email transporter
-  await initTransporter();
-  
+  // Ensure Mongo is connected (models may be used elsewhere)
+  try {
+    await connectMongo();
+  } catch (e) {
+    console.warn('⚠️ models connectMongo warning:', e && e.message ? e.message : e);
+  }
+
+  // Connect producer & consumer
+  await producer.connect();
   await consumer.connect();
+
+  // Subscribe to gamification events (existing behaviour)
   await consumer.subscribe({ topic: "gamification.events" });
 
   console.log("🎧 Notification Service listening to gamification.events...");
 
   await consumer.run({
     eachMessage: async ({ message }) => {
-      const event = JSON.parse(message.value.toString());
+      let event = null;
+      try {
+        event = JSON.parse(message.value.toString());
+      } catch (err) {
+        console.warn('⚠️ Received non-JSON event in gamification.events');
+        return;
+      }
+
       console.log("📨 Received event:", event);
 
+      // Example: forward badge events as internal notification events
       if (event.type === "badge_awarded") {
-        await sendEmail(
-          "user@example.com", // Replace with actual user email lookup later
-          "🎉 New Badge Earned!",
-          `Congrats! You earned the "${event.badge}" badge.`
-        );
+        await publishEvent({
+          type: 'badge_notification',
+          userId: event.userId,
+          badge: event.badge,
+          source: 'gamification'
+        });
       }
     }
   });
 }
 
-module.exports = { startKafkaConsumer };
+// Publish a generic event to notification.events
+async function publishEvent(payload) {
+  try {
+    if (!producer) throw new Error('Producer not initialized');
+    const msg = { value: JSON.stringify(payload) };
+    await producer.send({ topic: 'notification.events', messages: [msg] });
+    console.log('📣 Published event to notification.events:', payload.type || '(no type)');
+  } catch (e) {
+    console.error('❌ publishEvent error:', e && e.message ? e.message : e);
+  }
+}
+
+module.exports = { startKafkaConsumer, publishEvent };

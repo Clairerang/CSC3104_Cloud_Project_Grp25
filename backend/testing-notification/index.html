@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Testing Notification — Daily Login</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      body { font-family: Arial, Helvetica, sans-serif; padding: 24px; }
+      .card { max-width: 480px; margin: 24px auto; padding: 18px; border: 1px solid #ddd; border-radius: 8px; }
+      button { padding: 12px 18px; font-size: 16px; }
+      input { padding: 8px; font-size: 14px; margin-bottom: 8px; width:100%; }
+      .log { margin-top:12px; background:#f7f7f7; padding:10px; height:140px; overflow:auto; font-family:monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Daily "I'm Okay" Check-In</h2>
+      <p>Simple test frontend to trigger a check-in event. This page posts to the backend `/checkin` endpoint which persists the check-in and publishes a notification event.</p>
+
+      <label>userId</label>
+      <input id="userId" placeholder="e.g. senior-1" />
+      <label>name (optional)</label>
+      <input id="name" placeholder="e.g. Alice" />
+      <label>mood (optional)</label>
+      <input id="mood" placeholder="e.g. okay" />
+  <label>device token (optional)</label>
+  <input id="deviceToken" placeholder="paste FCM device token here" />
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+  <button id="dailyLogin" style="background:#2b8aef;color:#fff">Daily Login</button>
+  <button id="saveUser">Register User</button>
+  <button id="checkin">Do Daily Check-In</button>
+  <button id="saveDevice" style="background:#3b7;color:#fff">Save Device Token</button>
+      </div>
+
+      <div class="log" id="log"></div>
+    </div>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+      // Lightweight behavior without bundling — simple DOM usage
+      const logEl = document.getElementById('log');
+      function log(msg){ logEl.innerText = new Date().toLocaleTimeString() + ' - ' + msg + '\n' + logEl.innerText }
+
+      document.getElementById('saveUser').addEventListener('click', async () => {
+        const userId = document.getElementById('userId').value.trim();
+        const name = document.getElementById('name').value.trim();
+        if (!userId) return alert('please provide userId');
+        try{
+          const res = await fetch('/register-user', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ userId, name }) });
+          const j = await res.json();
+          log('register-user -> ' + JSON.stringify(j));
+          if (j && j.user && j.user.userId) {
+            localStorage.setItem('testing_userId', j.user.userId);
+            log('Saved userId to localStorage: ' + j.user.userId);
+          }
+        }catch(e){ log('register-user error: ' + e.message) }
+      });
+
+      document.getElementById('checkin').addEventListener('click', doCheckin);
+
+      // Single-click daily login: registers the user (if needed) then performs checkin
+      document.getElementById('dailyLogin').addEventListener('click', async () => {
+        let userId = document.getElementById('userId').value.trim() || localStorage.getItem('testing_userId');
+        const name = document.getElementById('name').value.trim();
+        const mood = document.getElementById('mood').value.trim() || 'okay';
+        if (!userId) return alert('please provide a userId or register first');
+
+        // ensure user exists
+        try {
+          const resUser = await fetch('/register-user', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ userId, name }) });
+          const ju = await resUser.json();
+          log('register-user -> ' + JSON.stringify(ju));
+          if (ju && ju.user && ju.user.userId) {
+            localStorage.setItem('testing_userId', ju.user.userId);
+            document.getElementById('userId').value = ju.user.userId;
+          }
+        } catch (e) { log('register-user error: ' + e.message); }
+
+        // do checkin
+        await doCheckin();
+      });
+
+      async function doCheckin() {
+        let userId = document.getElementById('userId').value.trim() || localStorage.getItem('testing_userId');
+        const mood = document.getElementById('mood').value.trim() || 'okay';
+        if (!userId) return alert('please set or register a userId first');
+        const payload = { userId, mood };
+        try{
+          const res = await fetch('/checkin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          const j = await res.json();
+          log('checkin -> ' + JSON.stringify(j));
+        }catch(e){ log('checkin error: ' + e.message) }
+      }
+
+      // Save device token (manual paste) to backend for FCM testing
+      document.getElementById('saveDevice').addEventListener('click', async () => {
+        const userId = document.getElementById('userId').value.trim() || localStorage.getItem('testing_userId');
+        const token = document.getElementById('deviceToken').value.trim();
+        if (!userId || !token) return alert('provide userId and token');
+        try {
+          const res = await fetch('/save-device-token', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ userId, token, platform: 'web' }) });
+          const j = await res.json();
+          log('save-device -> ' + JSON.stringify(j));
+        } catch (e) { log('save-device error: ' + e.message) }
+      });
+
+      // prefill from localStorage
+      const stored = localStorage.getItem('testing_userId');
+      if (stored) document.getElementById('userId').value = stored;
+    </script>
+  </body>
+</html>
