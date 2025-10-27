@@ -20,7 +20,7 @@ async function createSampleData() {
     username: 'senior1',
     passwordHash,
     role: 'senior',
-    profile: { name: 'Bob', age: 75, contact: '84119824' },
+    profile: { name: 'Bob', age: 75, email: 'bob@gmail.com', contact: '84119824' },
   });
 
   const family1 = new User({
@@ -28,7 +28,7 @@ async function createSampleData() {
     username: 'family1',
     passwordHash,
     role: 'family',
-    profile: { name: 'Amos', age: 45, contact: '91356698' },
+    profile: { name: 'Amos', age: 45, email: 'amos@gmail.com', contact: '91356698' },
   });
 
   const family2 = new User({
@@ -36,7 +36,7 @@ async function createSampleData() {
     username: 'family2',
     passwordHash,
     role: 'family',
-    profile: { name: 'John', age: 50, contact: '97587131' },
+    profile: { name: 'John', age: 50, email: 'john@gmail.com', contact: '97587131' },
   });
 
   await senior.save();

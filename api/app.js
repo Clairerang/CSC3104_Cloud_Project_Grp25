@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema({
   profile: {
     name: String,
     age: Number,
+    email: String,
     contact: String
   },
   createdAt: { type: Date, default: Date.now },
@@ -112,6 +113,7 @@ app.post('/register', async (req, res) => {
       profile: {
         name: profile?.name || "",
         age: profile?.age || null,
+        email: profile?.email || "",
         contact: profile?.contact || ""
       },
     });
