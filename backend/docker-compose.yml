@@ -1,42 +1,35 @@
 # CSC3104 Cloud Project - Group 25
-# Backend Microservices Stack
-# Run with:  docker-compose up --build
+# Backend Microservices Stack (KRaft mode - no ZooKeeper)
+# Run with: docker-compose up --build
 
 services:
   # --------------------------------------
-  # ZOOKEEPER (required by Apache Kafka)
-  # --------------------------------------
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # --------------------------------------
-  # APACHE KAFKA BROKER
+  # APACHE KAFKA BROKER (KRaft mode - no ZooKeeper)
   # --------------------------------------
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
     ports:
       - "9092:9092"
+      - "9093:9093"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      TZ: "Asia/Singapore"
+      # KRaft (ZooKeeper-less) configuration
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: "1"
+      CLUSTER_ID: "OmZ3M1wlTKTiCRO5Xpo7QA"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    depends_on:
-      - zookeeper
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     healthcheck:
       test: ["CMD", "bash", "-c", "kafka-topics --bootstrap-server kafka:9092 --list || exit 1"]
       interval: 15s
@@ -49,6 +42,8 @@ services:
   mongo:
     image: mongo:7
     container_name: mongo
+    environment:
+      TZ: "Asia/Singapore"
     ports:
       - "27017:27017"
     volumes:
@@ -71,6 +66,7 @@ services:
       mongo:
         condition: service_healthy
     environment:
+      - TZ=Asia/Singapore
       - MONGO_URL=mongodb://mongo:27017/gamification
       - KAFKA_BROKER=kafka:9092
     ports:
@@ -88,13 +84,13 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     environment:
+      - TZ=Asia/Singapore
       - KAFKA_BROKER=kafka:9092
-      - EMAIL_USER=cloudproject6769@gmail.com
-      - EMAIL_PASS=QWERasdf!234
-      # Allow optional environment interpolation without causing compose warnings.
-      # If not provided, default FIREBASE_SERVICE_ACCOUNT_JSON to empty and
-      # FIREBASE_SERVICE_ACCOUNT_PATH to the common secrets mount path.
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
       - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
       - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-/run/secrets/firebase-sa.json}
     ports:
@@ -102,7 +98,7 @@ services:
     restart: unless-stopped
 
   # --------------------------------------
-  # (Optional) Kafka UI Dashboard (Kafdrop)
+  # Kafka UI Dashboard (Kafdrop)
   # --------------------------------------
   kafdrop:
     image: obsidiandynamics/kafdrop
@@ -110,6 +106,7 @@ services:
     ports:
       - "9100:9000"
     environment:
+      - TZ=Asia/Singapore
       - KAFKA_BROKERCONNECT=kafka:9092
       - JVM_OPTS=-Xms32M -Xmx64M
     depends_on:
@@ -122,3 +119,4 @@ services:
 # --------------------------------------
 volumes:
   mongo-data:
+  kafka-data:
