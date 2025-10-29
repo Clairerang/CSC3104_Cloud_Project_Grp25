@@ -10,6 +10,19 @@ export interface Contact {
 export type Tab = "check-in" | "circle" | "activities";
 export type Mood = "great" | "okay" | "not-well" | null;
 
+export interface CheckIn {
+  id: string;
+  timestamp: string;
+  mood: Mood;
+  session: "morning" | "afternoon" | "evening";
+}
+
+export interface DailyProgress {
+  date: string;
+  checkIns: CheckIn[];
+  totalCheckIns: number;
+}
+
 export interface Activity {
   id: string;
   title: string;
