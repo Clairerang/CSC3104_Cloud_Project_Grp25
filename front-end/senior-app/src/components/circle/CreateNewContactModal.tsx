@@ -25,13 +25,13 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: "",
     relationship: "",
-    number: "",
+    phoneNumber: "",
     isFavorite: false,
   });
 
   const [errors, setErrors] = useState({
     name: "",
-    number: "",
+    phoneNumber: "",
   });
 
   const handleChange = (field: string, value: string | boolean) => {
@@ -51,21 +51,21 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
   const validateForm = () => {
     const newErrors = {
       name: "",
-      number: "",
+      phoneNumber: "",
     };
 
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     }
 
-    if (!formData.number.trim()) {
-      newErrors.number = "Phone number is required";
-    } else if (!/^\+?[\d\s\-()]+$/.test(formData.number)) {
-      newErrors.number = "Please enter a valid phone number";
+    if (!formData.phoneNumber.trim()) {
+      newErrors.phoneNumber = "Phone number is required";
+    } else if (!/^\+?[\d\s\-()]+$/.test(formData.phoneNumber)) {
+      newErrors.phoneNumber = "Please enter a valid phone number";
     }
 
     setErrors(newErrors);
-    return !newErrors.name && !newErrors.number;
+    return !newErrors.name && !newErrors.phoneNumber;
   };
 
   const handleSave = () => {
@@ -79,7 +79,7 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
       const newContact: Omit<Contact, "id"> = {
         name: formData.name.trim(),
         relationship: formData.relationship.trim() || "Contact",
-        number: formData.number.trim(),
+        phoneNumber: formData.phoneNumber.trim(),
         initials,
         lastCall: "Never",
         isFavorite: formData.isFavorite,
@@ -94,12 +94,12 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
     setFormData({
       name: "",
       relationship: "",
-      number: "",
+      phoneNumber: "",
       isFavorite: false,
     });
     setErrors({
       name: "",
-      number: "",
+      phoneNumber: "",
     });
     onClose();
   };
@@ -166,10 +166,10 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
             label="Phone Number"
             fullWidth
             required
-            value={formData.number}
-            onChange={(e) => handleChange("number", e.target.value)}
-            error={!!errors.number}
-            helperText={errors.number}
+            value={formData.phoneNumber}
+            onChange={(e) => handleChange("phoneNumber", e.target.value)}
+            error={!!errors.phoneNumber}
+            helperText={errors.phoneNumber}
             placeholder="e.g., +1 234 567 8900"
             sx={{
               "& .MuiOutlinedInput-root": {

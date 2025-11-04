@@ -22,19 +22,19 @@ const App: React.FC = () => {
   const [totalPoints, setTotalPoints] = useState<number>(850); // Initialize with starting points
 
   const [contacts, setContacts] = useState<Contact[]>([
-    { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true, number: '+65 12345678' },
-    { id: "2", name: "Michael", initials: "MJ", relationship: "Son", lastCall: "1 week ago", isFavorite: true, number: '+65 78945612' },
-    { id: "3", name: "Emma", initials: "EJ", relationship: "Granddaughter", lastCall: "2 weeks ago", isFavorite: true, number: '+65 98765421' },
-    { id: "4", name: "Robert", initials: "RM", relationship: "Friend", lastCall: "1 week ago", number: '+65 36925814' },
-    { id: "5", name: "Mary", initials: "MS", relationship: "Friend", lastCall: "1 week ago", number: '+65 85274163' },
-    { id: "6", name: "David", initials: "DJ", relationship: "Brother", lastCall: "3 days ago", number: '+65 65498721' },
+    { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true, phoneNumber: '+65 12345678' },
+    { id: "2", name: "Michael", initials: "MJ", relationship: "Son", lastCall: "1 week ago", isFavorite: true, phoneNumber: '+65 78945612' },
+    { id: "3", name: "Emma", initials: "EJ", relationship: "Granddaughter", lastCall: "2 weeks ago", isFavorite: true, phoneNumber: '+65 98765421' },
+    { id: "4", name: "Robert", initials: "RM", relationship: "Friend", lastCall: "1 week ago", phoneNumber: '+65 36925814' },
+    { id: "5", name: "Mary", initials: "MS", relationship: "Friend", lastCall: "1 week ago", phoneNumber: '+65 85274163' },
+    { id: "6", name: "David", initials: "DJ", relationship: "Brother", lastCall: "3 days ago", phoneNumber: '+65 65498721' },
   ]);
 
   const activities: Activity[] = [
     { id: "1", title: "Morning Stretch", description: "5 gentle stretching exercises", points: 10, category: "Exercise" },
     { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
     { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning" },
-    { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
+    // { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
     { id: "5", title: "Stack Tower", description: "Stack blocks perfectly to build a tall tower!", points: 20, category: "Casual"},
   ];
 

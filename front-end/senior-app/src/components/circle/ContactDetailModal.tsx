@@ -104,7 +104,7 @@ const ContactDetailModal: React.FC<Props> = ({
           color: '#6b7280',
           mb: 4,
         }}>
-          {contact.number}
+          {contact.phoneNumber}
         </Typography>
 
         {/* Voice Call Button */}

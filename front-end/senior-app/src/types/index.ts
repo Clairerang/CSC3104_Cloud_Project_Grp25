@@ -5,7 +5,7 @@ export interface Contact {
   relationship: string;
   lastCall: string;
   isFavorite?: boolean;
-  number: string;
+  phoneNumber: string;
 }
 
 export type Tab = "check-in" | "circle" | "activities";

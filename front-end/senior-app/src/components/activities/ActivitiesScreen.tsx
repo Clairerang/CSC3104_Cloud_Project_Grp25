@@ -310,8 +310,8 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                     <FitnessCenterIcon sx={{ width: 24, height: 24, color: '#16a34a' }} />
                   ) : activity.category === 'Mental' ? (
                     <PsychologyIcon sx={{ width: 24, height: 24, color: '#7c3aed' }} />
-                  ) : activity.category === 'Social' ? (
-                    <PeopleIcon sx={{ width: 24, height: 24, color: '#cab202ff' }} />
+                  // ) : activity.category === 'Social' ? (
+                  //   <PeopleIcon sx={{ width: 24, height: 24, color: '#cab202ff' }} />
                   ) : activity.category === 'Learning' ? (
                     <TriviaIcon sx={{ width: 24, height: 24, color: '#ea580c' }} />
                   ) : (
