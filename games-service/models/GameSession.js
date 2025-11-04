@@ -18,7 +18,7 @@ const gameSessionSchema = new mongoose.Schema({
   gameType: {
     type: String,
     required: true,
-    enum: ['trivia', 'memory', 'stretch']
+    enum: ['trivia', 'memory', 'stretch', 'stacktower']
   },
   startedAt: {
     type: Date,
@@ -47,6 +47,12 @@ const gameSessionSchema = new mongoose.Schema({
   isCompleted: {
     type: Boolean,
     default: false
+  },
+  blocksStacked: {
+    type: Number
+  },
+  highScore: {
+    type: Number
   },
   metadata: {
     type: mongoose.Schema.Types.Mixed,

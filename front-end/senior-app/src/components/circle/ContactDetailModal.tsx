@@ -1,7 +1,9 @@
 import React from "react";
-import { Box, Typography, Button, Modal } from "@mui/material";
+import { Box, Typography, Button, Modal, IconButton } from "@mui/material";
 import PhoneIcon from "@mui/icons-material/Phone";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import EditIcon from "@mui/icons-material/Edit";
+import CloseIcon from "@mui/icons-material/Close";
 import type { Contact } from "../../types";
 
 interface Props {
@@ -10,6 +12,7 @@ interface Props {
   onClose: () => void;
   onVoiceCall: (contact: Contact) => void;
   onVideoCall: (contact: Contact) => void;
+  onEdit: (contact: Contact) => void;
 }
 
 const ContactDetailModal: React.FC<Props> = ({ 
@@ -17,7 +20,8 @@ const ContactDetailModal: React.FC<Props> = ({
   contact, 
   onClose, 
   onVoiceCall, 
-  onVideoCall 
+  onVideoCall,
+  onEdit,
 }) => {
   if (!contact) return null;
 
@@ -33,7 +37,7 @@ const ContactDetailModal: React.FC<Props> = ({
     >
       <Box sx={{
         bgcolor: '#f3f4f6',
-        borderRadius: 4,
+        borderRadius: 6,
         p: 8,
         width: '90%',
         maxWidth: 500,
@@ -41,7 +45,24 @@ const ContactDetailModal: React.FC<Props> = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        position: 'relative',
       }}>
+        {/* Close Button - Top Right */}
+        <IconButton
+          onClick={onClose}
+          sx={{
+            position: 'absolute',
+            right: 40,
+            top: 40,
+            color: '#6b7280',
+            '&:hover': {
+              bgcolor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
+        >
+          <CloseIcon sx={{ width: 32, height: 32 }} />
+        </IconButton>
+
         {/* Profile Circle */}
         <Box sx={{
           width: 160,
@@ -51,10 +72,11 @@ const ContactDetailModal: React.FC<Props> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 56,
+          fontSize: 46,
           fontWeight: 600,
           color: '#000000',
           mb: 4,
+          mt: 2,
           border: '6px solid white',
           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
         }}>
@@ -71,11 +93,18 @@ const ContactDetailModal: React.FC<Props> = ({
           {contact.name}
         </Typography>
         <Typography sx={{ 
-          fontSize: 18, 
+          fontSize: 20, 
           color: '#6b7280',
-          mb: 6,
+          mb: 1,
         }}>
           {contact.relationship}
+        </Typography>
+        <Typography sx={{ 
+          fontSize: 20, 
+          color: '#6b7280',
+          mb: 4,
+        }}>
+          {contact.number}
         </Typography>
 
         {/* Voice Call Button */}
@@ -87,7 +116,7 @@ const ContactDetailModal: React.FC<Props> = ({
             color: 'white',
             py: 3,
             borderRadius: 3,
-            fontSize: 18,
+            fontSize: 22,
             fontWeight: 600,
             mb: 3,
             display: 'flex',
@@ -97,7 +126,7 @@ const ContactDetailModal: React.FC<Props> = ({
             '&:hover': { bgcolor: '#16a34a' },
           }}
         >
-          <PhoneIcon sx={{ width: 24, height: 24 }} />
+          <PhoneIcon sx={{ width: 28, height: 28 }} />
           Voice Call
         </Button>
 
@@ -110,7 +139,7 @@ const ContactDetailModal: React.FC<Props> = ({
             color: 'white',
             py: 3,
             borderRadius: 3,
-            fontSize: 18,
+            fontSize: 22,
             fontWeight: 600,
             mb: 3,
             display: 'flex',
@@ -120,25 +149,30 @@ const ContactDetailModal: React.FC<Props> = ({
             '&:hover': { bgcolor: '#2563eb' },
           }}
         >
-          <VideocamIcon sx={{ width: 24, height: 24 }} />
+          <VideocamIcon sx={{ width: 28, height: 28 }} />
           Video Call
         </Button>
 
-        {/* Back Button */}
+        {/* Edit Contact Button */}
         <Button
-          onClick={onClose}
+          onClick={() => onEdit(contact)}
           sx={{
             width: '100%',
-            bgcolor: '#e5e7eb',
-            color: '#374151',
+            bgcolor: '#939393ff',
+            color: 'white',
             py: 3,
             borderRadius: 3,
-            fontSize: 18,
+            fontSize: 22,
             fontWeight: 600,
-            '&:hover': { bgcolor: '#d1d5db' },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 2,
+            '&:hover': { bgcolor: '#717171ff' },
           }}
         >
-          Back
+          <EditIcon sx={{ width: 28, height: 28 }} />
+          Edit Contact
         </Button>
       </Box>
     </Modal>

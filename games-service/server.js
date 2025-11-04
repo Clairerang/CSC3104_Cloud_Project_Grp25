@@ -9,6 +9,7 @@ const Game = require('./models/Game');
 const TriviaQuestion = require('./models/TriviaQuestion');
 const Exercise = require('./models/Exercise');
 const MemorySet = require('./models/MemorySet');
+const StackTower = require('./models/StackTower');
 const GameSession = require('./models/GameSession');
 
 // Import MQTT handlers
@@ -44,6 +45,7 @@ mqttClient.on('connect', () => {
     'games/request/trivia',
     'games/request/memory',
     'games/request/stretch',
+    'games/request/stacktower',
     'games/session/start',
     'games/session/complete',
     'games/history/request/#'
