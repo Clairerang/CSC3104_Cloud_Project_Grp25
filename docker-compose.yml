@@ -8,18 +8,18 @@ services:
     ports:
       - "1883:1883"      # MQTT
       - "8000:8000"      # WebSocket
-      - "8080:8080"      # Control Center UI
+      - "8082:8080"      # Control Center UI (mapped to 8082 to avoid conflict)
     volumes:
       - hivemq-data:/opt/hivemq/data
       - hivemq-log:/opt/hivemq/log
     networks:
       - senior-care-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/1883' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # MongoDB for Main API
   mongodb-main:
@@ -111,7 +111,7 @@ services:
       - senior-care-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8081/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
