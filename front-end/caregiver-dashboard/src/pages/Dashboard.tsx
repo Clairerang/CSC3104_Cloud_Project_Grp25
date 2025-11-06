@@ -30,7 +30,7 @@ import {
   CheckCircle,
   Schedule,
 } from '@mui/icons-material';
-import { mockApi, Senior, Alert, Reminder } from '../../api/mockData';
+import { mockApi, Senior, Alert, Reminder } from '../api/mockData';
 
 const Dashboard: React.FC = () => {
   const [seniors, setSeniors] = useState<Senior[]>([]);

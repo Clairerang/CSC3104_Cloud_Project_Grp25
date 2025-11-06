@@ -23,8 +23,8 @@ import {
   EmojiEvents,
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { api } from '../../services/api';
-import { User, UserEngagement } from '../../types';
+import { api } from '../services/api';
+import { User, UserEngagement } from '../types';
 
 const UserDetail: React.FC = () => {
   const { id } = useParams();

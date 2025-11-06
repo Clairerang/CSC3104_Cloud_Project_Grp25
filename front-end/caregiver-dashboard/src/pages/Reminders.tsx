@@ -30,7 +30,7 @@ import {
   Person,
   Group,
 } from '@mui/icons-material';
-import { mockApi, ReminderItem, getSeniorsList } from '../../api/mockData';
+import { mockApi, ReminderItem, getSeniorsList } from '../api/mockData';
 
 const Reminders: React.FC = () => {
   const [reminders, setReminders] = useState<ReminderItem[]>([]);

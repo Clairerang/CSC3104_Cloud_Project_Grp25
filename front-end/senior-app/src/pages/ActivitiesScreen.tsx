@@ -5,7 +5,7 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import TriviaIcon from "@mui/icons-material/Quiz";
 import PeopleIcon from "@mui/icons-material/People";
-import type { Activity } from "../../types";
+import type { Activity } from "../types";
 
 interface Props {
   activities: Activity[];

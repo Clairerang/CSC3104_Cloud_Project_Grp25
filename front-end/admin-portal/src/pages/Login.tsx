@@ -13,7 +13,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { Visibility, VisibilityOff, AdminPanelSettings } from '@mui/icons-material';
-import { api } from '../../services/api';
+import { api } from '../services/api';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();

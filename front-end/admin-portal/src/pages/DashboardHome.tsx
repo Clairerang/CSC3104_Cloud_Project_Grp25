@@ -20,10 +20,10 @@ import {
   NotificationsActive,
 } from '@mui/icons-material';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { api } from '../../services/api';
-import { DashboardStats } from '../../types';
-import SystemHealth from './SystemHealth';
-import RecentActivity from './RecentActivity';
+import { api } from '../services/api';
+import { DashboardStats } from '../types';
+import SystemHealth from '../components/SystemHealth';
+import RecentActivity from '../components/RecentActivity';
 
 const DashboardHome: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);

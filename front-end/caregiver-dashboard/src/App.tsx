@@ -7,11 +7,11 @@ import ReminderIcon from "@mui/icons-material/Notifications";
 import SettingsIcon from "@mui/icons-material/Settings";
 
 import theme from "./theme/theme";
-import Dashboard from "./components/dashboard/Dashboard";
-import Analytics from "./components/analytics/Analytics";
-import Activities from "./components/activities/Activities";
-import Reminders from "./components/reminders/Reminders";
-import Settings from "./components/settings/Settings";
+import Dashboard from "./pages/Dashboard";
+import Analytics from "./pages/Analytics";
+import Activities from "./pages/Activities";
+import Reminders from "./pages/Reminders";
+import Settings from "./pages/Settings";
 
 type Tab = "dashboard" | "analytics" | "activities" | "reminders" | "settings";
 

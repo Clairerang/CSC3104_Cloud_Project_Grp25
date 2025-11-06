@@ -31,7 +31,7 @@ import {
   Favorite,
   Medication,
 } from '@mui/icons-material';
-import { mockApi, Senior, AnalyticsData } from '../../api/mockData';
+import { mockApi, Senior, AnalyticsData } from '../api/mockData';
 
 const Analytics: React.FC = () => {
   const [timeframe, setTimeframe] = useState('weekly');

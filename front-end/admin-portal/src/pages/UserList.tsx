@@ -32,8 +32,8 @@ import {
   Delete,
   MoreVert,
 } from '@mui/icons-material';
-import { api } from '../../services/api';
-import { User } from '../../types';
+import { api } from '../services/api';
+import { User } from '../types';
 
 const UserList: React.FC = () => {
   const navigate = useNavigate();

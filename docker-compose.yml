@@ -1,49 +1,30 @@
-version: '3.8'
+name: seniorcare
 
 services:
-  # HiveMQ MQTT Broker
-  hivemq:
-    image: hivemq/hivemq-ce:latest
-    container_name: hivemq-broker
-    ports:
-      - "1883:1883"      # MQTT
-      - "8000:8000"      # WebSocket
-      - "8080:8080"      # Control Center UI
-    volumes:
-      - hivemq-data:/opt/hivemq/data
-      - hivemq-log:/opt/hivemq/log
-    networks:
-      - senior-care-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # MongoDB for Main API
+  # MongoDB for main API service
   mongodb-main:
-    image: mongo:7.0
+    image: mongo:latest
     container_name: mongodb-main
+    restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: cloud
+      MONGO_INITDB_DATABASE: seniorcare
     volumes:
       - mongodb-main-data:/data/db
     networks:
-      - senior-care-network
+      - seniorcare-network
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
 
-  # MongoDB for Games Service
+  # MongoDB for games service
   mongodb-games:
-    image: mongo:7.0
+    image: mongo:latest
     container_name: mongodb-games
+    restart: unless-stopped
     ports:
       - "27018:27017"
     environment:
@@ -51,40 +32,60 @@ services:
     volumes:
       - mongodb-games-data:/data/db
     networks:
-      - senior-care-network
+      - seniorcare-network
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
 
-  # API Gateway (Main API with MQTT)
+  # HiveMQ MQTT Broker
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: hivemq
+    restart: unless-stopped
+    ports:
+      - "1883:1883"    # MQTT
+      - "8000:8000"    # Control Center
+    volumes:
+      - hivemq-data:/opt/hivemq/data
+      - hivemq-log:/opt/hivemq/log
+    networks:
+      - seniorcare-network
+    healthcheck:
+      test: ["CMD", "timeout", "5", "bash", "-c", "</dev/tcp/localhost/1883"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # API Gateway Service
   api-gateway:
     build:
       context: ./api
       dockerfile: Dockerfile
+    image: seniorcare-api:v2
     container_name: api-gateway
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      PORT: 8080
-      MONGODB_URI: mongodb://mongodb-main:27017/cloud
-      MQTT_BROKER_URL: mqtt://hivemq:1883
-      JWT_SECRET: secret1234@
-      SERVICE_NAME: api-gateway
+      - NODE_ENV=production
+      - PORT=8080
+      - MONGODB_URI=mongodb://mongodb-main:27017/seniorcare
+      - MQTT_BROKER_URL=mqtt://hivemq:1883
+      - JWT_SECRET=your-secret-key-change-in-production
     depends_on:
       mongodb-main:
         condition: service_healthy
       hivemq:
         condition: service_healthy
     networks:
-      - senior-care-network
-    restart: unless-stopped
+      - seniorcare-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s
-      timeout: 10s
+      timeout: 3s
       retries: 3
       start_period: 40s
 
@@ -93,36 +94,104 @@ services:
     build:
       context: ./games-service
       dockerfile: Dockerfile
+    image: seniorcare-games:v2
     container_name: games-service
+    restart: unless-stopped
     ports:
       - "8081:8081"
     environment:
-      PORT: 8081
-      MONGODB_URI: mongodb://mongodb-games:27017/games
-      MQTT_BROKER_URL: mqtt://hivemq:1883
-      JWT_SECRET: secret1234@
-      SERVICE_NAME: games-service
+      - NODE_ENV=production
+      - PORT=8081
+      - MONGODB_URI=mongodb://mongodb-games:27017/games
+      - MQTT_BROKER_URL=mqtt://hivemq:1883
     depends_on:
       mongodb-games:
         condition: service_healthy
       hivemq:
         condition: service_healthy
     networks:
-      - senior-care-network
-    restart: unless-stopped
+      - seniorcare-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 3s
       retries: 3
       start_period: 40s
 
+  # Senior App Frontend
+  senior-app:
+    build:
+      context: ./front-end/senior-app
+      dockerfile: Dockerfile
+    image: seniorcare-senior-app:v2
+    container_name: senior-app
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+      - games-service
+    networks:
+      - seniorcare-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Admin Portal Frontend
+  admin-portal:
+    build:
+      context: ./front-end/admin-portal
+      dockerfile: Dockerfile
+    image: seniorcare-admin-portal:v2
+    container_name: admin-portal
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - seniorcare-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Caregiver Dashboard Frontend
+  caregiver-dashboard:
+    build:
+      context: ./front-end/caregiver-dashboard
+      dockerfile: Dockerfile
+    image: seniorcare-caregiver-dashboard:v2
+    container_name: caregiver-dashboard
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - seniorcare-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
 networks:
-  senior-care-network:
+  seniorcare-network:
     driver: bridge
 
 volumes:
-  hivemq-data:
-  hivemq-log:
   mongodb-main-data:
+    driver: local
   mongodb-games-data:
+    driver: local
+  hivemq-data:
+    driver: local
+  hivemq-log:
+    driver: local

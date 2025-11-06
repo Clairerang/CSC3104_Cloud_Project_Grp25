@@ -5,7 +5,7 @@ import CoffeeIcon from "@mui/icons-material/Coffee";
 import NightlightIcon from "@mui/icons-material/Nightlight";
 import MicIcon from "@mui/icons-material/Mic";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import type { Mood, CheckIn, DailyProgress } from "../../types";
+import type { Mood, CheckIn, DailyProgress } from "../types";
 
 interface Props {
   onCheckIn: (mood: Mood) => void;

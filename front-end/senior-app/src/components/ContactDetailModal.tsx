@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Typography, Button, Modal } from "@mui/material";
 import PhoneIcon from "@mui/icons-material/Phone";
 import VideocamIcon from "@mui/icons-material/Videocam";
-import type { Contact } from "../../types";
+import type { Contact } from "../types";
 
 interface Props {
   open: boolean;

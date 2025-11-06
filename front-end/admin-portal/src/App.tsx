@@ -1,15 +1,15 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import Login from './components/auth/Login';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import Layout from './components/common/Layout';
-import DashboardHome from './components/dashboard/DashboardHome';
-import UserList from './components/users/UserList';
-import UserDetail from './components/users/UserDetail';
-import ServiceMonitor from './components/services/ServiceMonitor';
-import Analytics from './components/analytics/Analytics';
-import Settings from './components/settings/Settings';
+import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout';
+import DashboardHome from './pages/DashboardHome';
+import UserList from './pages/UserList';
+import UserDetail from './pages/UserDetail';
+import ServiceMonitor from './pages/ServiceMonitor';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 
 // Create Material-UI theme
 const theme = createTheme({

@@ -32,7 +32,7 @@ import {
   Delete,
   CheckCircle,
 } from '@mui/icons-material';
-import { mockApi, Activity, getSeniorsList } from '../../api/mockData';
+import { mockApi, Activity, getSeniorsList } from '../api/mockData';
 
 const Activities: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);

@@ -26,8 +26,8 @@ import {
   Speed,
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { api } from '../../services/api';
-import { ServiceHealth, SystemMetrics } from '../../types';
+import { api } from '../services/api';
+import { ServiceHealth, SystemMetrics } from '../types';
 
 const ServiceMonitor: React.FC = () => {
   const [services, setServices] = useState<ServiceHealth[]>([]);

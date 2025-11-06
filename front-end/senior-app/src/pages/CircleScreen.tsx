@@ -3,8 +3,8 @@ import { Box, Typography, Card, Stack, Button } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import PhoneIcon from "@mui/icons-material/Phone";
 import StarIcon from "@mui/icons-material/Star";
-import type { Contact } from "../../types";
-import ContactDetailModal from "./ContactDetailModal";
+import type { Contact } from "../types";
+import ContactDetailModal from "../components/ContactDetailModal";
 
 interface Props {
   contacts: Contact[];

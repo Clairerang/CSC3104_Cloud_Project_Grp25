@@ -7,13 +7,13 @@ import PhoneIcon from "@mui/icons-material/Phone";
 
 import theme from "./theme/theme";
 import { Tab, Contact, Activity } from "./types";
-import CheckInScreen from "./components/checkin/CheckInScreen";
-import CircleScreen from "./components/circle/CircleScreen";
-import ActivitiesScreen from "./components/activities/ActivitiesScreen";
-import { MorningStretch } from "./components/games/MorningStretch";
-import { MemoryQuiz } from "./components/games/MemoryQuiz";
-import { CulturalTrivia } from "./components/games/CulturalTrivia";
-import { ShareRecipe } from "./components/games/ShareRecipe";
+import CheckInScreen from "./pages/CheckInScreen";
+import CircleScreen from "./pages/CircleScreen";
+import ActivitiesScreen from "./pages/ActivitiesScreen";
+import { MorningStretch } from "./pages/MorningStretch";
+import { MemoryQuiz } from "./pages/MemoryQuiz";
+import { CulturalTrivia } from "./pages/CulturalTrivia";
+import { ShareRecipe } from "./pages/ShareRecipe";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("check-in");

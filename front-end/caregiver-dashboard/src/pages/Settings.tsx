@@ -22,7 +22,7 @@ import {
   Delete,
   Save,
 } from '@mui/icons-material';
-import { getSeniorsList } from '../../api/mockData';
+import { getSeniorsList } from '../api/mockData';
 
 const Settings: React.FC = () => {
   const [profile, setProfile] = useState({

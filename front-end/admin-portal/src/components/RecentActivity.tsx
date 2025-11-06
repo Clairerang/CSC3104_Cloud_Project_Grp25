@@ -17,8 +17,8 @@ import {
   Person,
   Notifications,
 } from '@mui/icons-material';
-import { api } from '../../services/api';
-import { ActivityLog } from '../../types';
+import { api } from '../services/api';
+import { ActivityLog } from '../types';
 
 const RecentActivity: React.FC = () => {
   const [activities, setActivities] = useState<ActivityLog[]>([]);

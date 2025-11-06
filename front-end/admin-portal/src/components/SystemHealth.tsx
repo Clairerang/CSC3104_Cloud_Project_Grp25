@@ -13,8 +13,8 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { CheckCircle, Error, Warning } from '@mui/icons-material';
-import { api } from '../../services/api';
-import { ServiceHealth } from '../../types';
+import { api } from '../services/api';
+import { ServiceHealth } from '../types';
 
 const SystemHealth: React.FC = () => {
   const [services, setServices] = useState<ServiceHealth[]>([]);
