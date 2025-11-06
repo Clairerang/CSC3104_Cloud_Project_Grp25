@@ -1,0 +1,344 @@
+================================================================================
+AUTHENTICATION & ROUTING ARCHITECTURE - VISUAL DIAGRAMS
+================================================================================
+
+1. SYSTEM ARCHITECTURE OVERVIEW
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          USER ACCESS LAYERS                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    FRONTEND APPLICATIONS
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │                                                                      │
+    │  ┌────────────────────┐  ┌─────────────────┐  ┌────────────────────┐
+    │  │  Senior App        │  │  Caregiver      │  │  Admin Portal      │
+    │  │                    │  │  Dashboard      │  │                    │
+    │  │ ❌ NO AUTH         │  │ ❌ NO AUTH       │  │  ✅ JWT AUTH       │
+    │  │ Port: 3000         │  │ Port: 3001      │  │ Port: 3002         │
+    │  │                    │  │                 │  │                    │
+    │  │ Roles: senior      │  │ Roles: family   │  │ Roles: admin       │
+    │  │                    │  │                 │  │                    │
+    │  │ Routes: Tabs       │  │ Routes: Tabs    │  │ Routes: React      │
+    │  │ (state-based)      │  │ (state-based)   │  │ Router             │
+    │  │                    │  │                 │  │ /login             │
+    │  └─────────┬──────────┘  └────────┬────────┘  │ /dashboard         │
+    │            │                      │           │ /users             │
+    │            └──────────────────────┴────────┬──┤ /analytics         │
+    │                                            │  └────────┬───────────┘
+    │                                            │           │
+    └────────────────────────────────────────────┼───────────┘
+                                                 │ HTTP/REST
+                                    ┌────────────▼─────────────┐
+                                    │   API Gateway            │
+                                    │   Port: 8080             │
+                                    │                          │
+                                    │ ✅ JWT Verification      │
+                                    │ ✅ User Management       │
+                                    │ ✅ Check-in Tracking     │
+                                    │ ✅ Games API             │
+                                    │                         │
+                                    └────────┬────────────────┘
+                                             │
+                                    MQTT Pub/Sub
+                                             │
+                                    ┌────────▼──────────────┐
+                                    │   Games Service       │
+                                    │   Port: 8081          │
+                                    │                       │
+                                    │ ✅ Trivia Game        │
+                                    │ ✅ Memory Game        │
+                                    │ ✅ Stretch Exercise   │
+                                    │ ✅ Recipe Sharing     │
+                                    └───────────────────────┘
+
+
+2. ADMIN PORTAL ROUTING STRUCTURE (React Router)
+================================================================================
+
+                          BrowserRouter
+                                │
+                    ┌───────────┴──────────────┐
+                    │                          │
+            Public Route                Protected Routes
+                │                              │
+            /login                    <ProtectedRoute>
+                │                              │
+              Login                      <Layout>
+            Component                        │
+                                    ┌───────┬┬┬─┬───────┐
+                                    │   │   │ │ │       │
+                                  /     │   │ │ │     /settings
+                               redirect  │   │ │ │
+                              to /       │   │ │ │
+                             dashboard   │   │ │ │
+                                    /dashboard /users /services /analytics
+
+
+3. SENIOR APP ROUTING STRUCTURE (State-based Navigation)
+================================================================================
+
+                              App Component
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+               activeGame      activeTab         UI Elements
+               null or "1-4"    check-in|        ├─ Bottom
+                    │           circle|         │  Navigation
+                    │         activities         │
+                    │              │             ├─ Emergency
+                    │              │             │  Button
+        ┌───────────┴──────┐      │             │
+        │ Show Game Screen │      │             └─ Tab Content
+        │                  │      │
+      Is ┌────────────────────────┘
+     activeGame ├─ Check-In Screen
+      set? │    ├─ Circle Screen
+        No │    └─ Activities Screen
+           │
+        Yes├─ MorningStretch (gameId: "1")
+           ├─ MemoryQuiz (gameId: "2")
+           ├─ CulturalTrivia (gameId: "3")
+           └─ ShareRecipe (gameId: "4")
+
+
+4. CAREGIVER DASHBOARD ROUTING STRUCTURE (State-based)
+================================================================================
+
+                         App Component
+                              │
+                    ┌─────────┼─────────┐
+                    │         │         │
+                 Sidebar    Main      Navigation
+                Content     Content    Items
+                    │         │           │
+          ┌─────────┴────┐    │      ┌────┴─────────┐
+          │              │    │      │              │
+      Brand    Nav Items │    │  Sidebar    Content
+      Logo    ┌──────────┤    │  Switcher   Renderer
+              │          │    │    │
+              │  Labels  │    │    │
+              │ & Icons  │    │    │
+              │          │    │    │
+              ├─ Dashboard ───┤────┴─> Dashboard Page
+              ├─ Analytics ───┤────┰─> Analytics Page
+              ├─ Activities ──┤    ├─> Activities Page
+              ├─ Reminders ───┤    ├─> Reminders Page
+              └─ Settings ────┤────┰─> Settings Page
+                               │
+                        Active Tab: string
+
+
+5. JWT AUTHENTICATION FLOW
+================================================================================
+
+    USER BROWSER                API GATEWAY                  MONGODB
+        │                            │                          │
+        │  POST /login               │                          │
+        ├───────────────────────────>│                          │
+        │  { username, password }    │                          │
+        │                            │                          │
+        │                            │  Find user in DB         │
+        │                            ├─────────────────────────>│
+        │                            │<─────────────────────────┤
+        │                            │  User record + passHash   │
+        │                            │                          │
+        │                            │  bcrypt.compare()        │
+        │                            │  (verify password)       │
+        │                            │                          │
+        │                            │  Generate JWT            │
+        │                            │  jwt.sign({              │
+        │                            │    userId,               │
+        │                            │    username,             │
+        │                            │    role                  │
+        │                            │  }, SECRET, 7d)          │
+        │                            │                          │
+        │  200 OK + Token            │                          │
+        │<───────────────────────────┤                          │
+        │  { token, user, ... }      │                          │
+        │                            │                          │
+        │  Store in localStorage     │                          │
+        │  adminToken = token        │                          │
+        │  adminUser = JSON.stringify│                          │
+        │                            │                          │
+        │  GET /api/v1/users         │                          │
+        ├──────────────────────────>│                          │
+        │  Authorization: Bearer ... │                          │
+        │                            │  Verify token            │
+        │                            │  jwt.verify(token)       │
+        │                            │                          │
+        │                            │  req.user = decoded      │
+        │                            │                          │
+        │                            │  Query DB using          │
+        │                            ├─────────────────────────>│
+        │                            │<─────────────────────────┤
+        │                            │  Users array             │
+        │                            │                          │
+        │  200 OK + Users Array      │                          │
+        │<───────────────────────────┤                          │
+
+
+6. ROLE-BASED ACCESS MATRIX
+================================================================================
+
+┌────────────────────┬─────────────────────────────────────────────────────┐
+│ Feature/Resource   │ Senior (elderly)  │ Family (caregiver) │ Admin      │
+├────────────────────┼──────────────────┼────────────────────┼────────────┤
+│ Check-in           │ ✅ Create own    │ ✅ View assigned   │ ✅ View all│
+│ Games/Activities   │ ✅ Play          │ ✅ Monitor         │ ✅ Manage  │
+│ Relationships      │ ✅ Add family    │ ✅ View linked     │ ✅ View all│
+│ User Management    │ ❌ No access     │ ❌ No access       │ ✅ Full    │
+│ Analytics/Reports  │ ❌ No access     │ ✅ Own dashboard   │ ✅ Full    │
+│ System Settings    │ ❌ No access     │ ❌ No access       │ ✅ Full    │
+│ Service Monitor    │ ❌ No access     │ ❌ No access       │ ✅ Full    │
+│ User Profiles      │ ✅ Own profile   │ ✅ Own profile     │ ✅ All     │
+└────────────────────┴──────────────────┴────────────────────┴────────────┘
+
+
+7. PROTECTED ROUTE GUARD (Admin Portal)
+================================================================================
+
+    Browser Route Request
+            │
+            ▼
+    <ProtectedRoute /> Component
+            │
+    ┌───────┴──────────┐
+    │                  │
+  Check localStorage   Check localStorage
+   adminToken?       adminUser?
+    │                  │
+    YES        Combined NO
+    │                  │
+   YES-----------NO
+    │            │
+    ▼            ▼
+  Parse User  Navigate to
+  userData    /login
+    │
+    │
+  Check userData.role
+    │
+    ├─ role === 'admin' ────> ✅ Allow access
+    │                         Render <Outlet />
+    │
+    └─ role !== 'admin' -----> ❌ Navigate to /login
+
+
+8. API ARCHITECTURE BY ROLE
+================================================================================
+
+SENIOR APP                      CAREGIVER DASHBOARD         ADMIN PORTAL
+├─ No Auth                      ├─ No Auth                  ├─ Auth Required
+│                               │                           │
+├─ Games API Endpoints:         ├─ Dashboard Data:          ├─ /api/v1/auth
+│  ├─ GET /games                │  ├─ GET /engagement       │  ├─ /login
+│  ├─ GET /games/trivia         │  └─ GET /analytics        │  └─ /logout
+│  ├─ GET /games/memory         │                           │
+│  ├─ GET /games/stretch        ├─ Activity Tracking:       ├─ /api/v1/users
+│  ├─ POST /games/session/*     │  ├─ GET /activities       │  ├─ /get-all
+│  └─ GET /games/history        │  ├─ GET /reminders        │  ├─ /:id
+│                               │  └─ POST /activities      │  ├─ /create
+├─ Check-in:                    │                           │  └─ /update
+│  └─ POST /checkin             │ ├─ Analytics:             │
+│                               │  └─ GET /analytics/*      ├─ /api/v1/engagement
+├─ Relationships:               │                           │  ├─ /stats
+│  └─ POST /add-relation        │                           │  ├─ /user/:id
+│                               │                           │  └─ /trends
+└─ Tasks:                       │                           │
+   └─ POST /add-task            │                           ├─ /api/v1/analytics
+                                │                           │  └─ /dashboard
+                                │                           │
+                                │                           ├─ /health/*
+                                │                           │  (service health)
+                                │                           │
+                                │                           └─ /api/v1/settings
+
+
+9. TOKEN STORAGE & MANAGEMENT
+================================================================================
+
+                          localStorage (Client-side)
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+               ADMIN PORTAL            NOT USED IN:
+                    │                         │
+        ┌───────────┴──────────┐        ├─ Senior App
+        │                      │        │
+    adminToken          adminUser       ├─ Caregiver
+    │                   │               │  Dashboard
+    │ Format:           │ Format:       │
+    │ String            │ JSON.stringify()
+    │ "jwt-token-..."   │ {
+    │                   │   id: "...",
+    │ Used in:          │   name: "...",
+    │ • API headers     │   email: "...",
+    │ • Axios           │   role: "admin"
+    │   interceptors    │ }
+    │ • Protected       │
+    │   routes          │ Used in:
+    │ • Logout          │ • Protected Route
+    │                   │ • Layout
+    │                   │ • User display
+    │                   │
+
+    Clear On:
+    • Logout (manual)
+    • 401 Unauthorized (automatic)
+    • 403 Forbidden (if needed)
+
+
+10. DATABASE SCHEMA - USER COLLECTION
+================================================================================
+
+User Document (MongoDB)
+{
+  "_id": ObjectId("..."),
+  
+  "userId": "550e8400-e29b-41d4-a716-446655440000",  ← UUID
+  "username": "john_doe",                              ← Unique
+  "passwordHash": "$2b$10$...",                        ← bcrypt hash
+  
+  "role": "senior" | "family" | "admin",              ← Enum field
+  
+  "profile": {
+    "name": "John Doe",
+    "age": 75,
+    "email": "john@example.com",
+    "contact": "+1-555-0123"
+  },
+  
+  "createdAt": ISODate("2024-11-06T..."),
+  "updatedAt": ISODate("2024-11-06T...")
+}
+
+Related Collections:
+├─ Relationships (links seniors to family)
+│  {
+│    "seniorId": "550e8400-e29b-41d4-a716-446655440000",
+│    "linkAccId": "550e8400-e29b-41d4-a716-446655440001",
+│    "relation": "Daughter" | "Son" | etc.
+│    "createdAt": ISODate("...")
+│  }
+│
+├─ Engagement (tracks daily check-ins & activities)
+│  {
+│    "userId": "550e8400-e29b-41d4-a716-446655440000",
+│    "date": "2024-11-06",
+│    "checkIn": true,
+│    "tasksCompleted": [
+│      { "type": "game", "points": 10 },
+│      { "type": "exercise", "points": 15 }
+│    ],
+│    "totalScore": 25,
+│    "lastActiveAt": ISODate("...")
+│  }
+│
+└─ ... (Games Service has separate MongoDB)
+
+
+================================================================================
+END OF ARCHITECTURE DIAGRAMS
+================================================================================

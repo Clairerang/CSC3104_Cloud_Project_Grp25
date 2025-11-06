@@ -3,14 +3,20 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { initializeMQTT, disconnect } = require('./mqtt/client');
+const { router: gamesRouter, setAuthMiddleware } = require('./routes/games');
 
 const app = express();
 const port = 8080;
 
 app.use(express.json());
-const JWT_SECRET = 'secret1234@';
+const JWT_SECRET = process.env.JWT_SECRET || 'secret1234@';
 
-mongoose.connect('mongodb://localhost:27017/cloud', {
+// Initialize MQTT client
+initializeMQTT();
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cloud';
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
@@ -310,13 +316,31 @@ app.post('/login', async (req, res) => {
   }
 });
 
-app.use((req, res) => {
+// Set up games routes with authentication middleware
+setAuthMiddleware(authenticateToken);
+app.use('/api/games', gamesRouter);
+
+app.use((_req, res) => {
   res.status(404).send('404 - Page not found');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server and MQTT client');
+  disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server and MQTT client');
+  disconnect();
+  process.exit(0);
 });
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
 module.exports = {
   User,
   Relationship,
