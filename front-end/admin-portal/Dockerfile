@@ -4,6 +4,14 @@ FROM node:18-alpine AS build
 # Set working directory
 WORKDIR /app
 
+# Build arguments for environment variables
+ARG REACT_APP_USE_MOCK_DATA=false
+ARG REACT_APP_API_GATEWAY=http://localhost:8080
+
+# Set environment variables from build args
+ENV REACT_APP_USE_MOCK_DATA=$REACT_APP_USE_MOCK_DATA
+ENV REACT_APP_API_GATEWAY=$REACT_APP_API_GATEWAY
+
 # Copy package files
 COPY package*.json ./
 

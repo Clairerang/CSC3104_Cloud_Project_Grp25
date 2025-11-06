@@ -12,8 +12,10 @@ import {
   InputAdornment,
   IconButton,
 } from '@mui/material';
-import { Visibility, VisibilityOff, AdminPanelSettings } from '@mui/icons-material';
-import { api } from '../services/api';
+import { Visibility, VisibilityOff, FamilyRestroom } from '@mui/icons-material';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:8080';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -27,68 +29,44 @@ const Login: React.FC = () => {
     setError('');
     setLoading(true);
 
-    // Check if using mock data for development
-    const useMockData = process.env.REACT_APP_USE_MOCK_DATA === 'true';
+    try {
+      const response = await axios.post(`${API_BASE_URL}/login`, {
+        username: credentials.email,
+        password: credentials.password,
+      });
 
-    if (useMockData) {
-      // MOCK AUTHENTICATION (for development without backend)
-      setTimeout(() => {
-        const mockUser = {
-          id: 'admin-1',
-          name: 'Admin User',
-          email: credentials.email,
-          role: 'admin',
-        };
-        const mockToken = 'mock-jwt-token-' + Date.now();
+      const { token, user } = response.data;
 
-        localStorage.setItem('adminToken', mockToken);
-        localStorage.setItem('adminUser', JSON.stringify(mockUser));
+      // Store auth data
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('user', JSON.stringify(user));
 
-        navigate('/dashboard');
-        setLoading(false);
-      }, 1000); // Simulate network delay
-    } else {
-      // REAL API AUTHENTICATION - Unified for all user types
-      try {
-        const response = await api.auth.login(credentials);
-        const { token, user } = response.data;
-
-        // Store auth data (generic storage for all user types)
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('user', JSON.stringify(user));
-
-        // Also store with legacy keys for compatibility
-        localStorage.setItem('adminToken', token);
-        localStorage.setItem('adminUser', JSON.stringify(user));
-
-        // Redirect based on user role
-        switch (user.role) {
-          case 'admin':
-            // Stay on admin portal
-            navigate('/dashboard');
-            break;
-          case 'senior':
-            // Redirect to senior app
-            window.location.href = 'http://localhost:3000/dashboard';
-            break;
-          case 'family':
-            // Redirect to caregiver dashboard
-            window.location.href = 'http://localhost:3002/dashboard';
-            break;
-          default:
-            setError('Unknown user role. Please contact support.');
-            setLoading(false);
-            return;
-        }
-      } catch (err: any) {
-        setError(
-          err.response?.data?.error ||
-          err.response?.data?.message ||
-          'Login failed. Please check your credentials.'
-        );
-      } finally {
-        setLoading(false);
+      // Redirect based on user role
+      switch (user.role) {
+        case 'family':
+          // Stay on caregiver dashboard
+          navigate('/dashboard');
+          break;
+        case 'admin':
+          // Redirect to admin portal
+          window.location.href = 'http://localhost:3001/dashboard';
+          break;
+        case 'senior':
+          // Redirect to senior app
+          window.location.href = 'http://localhost:3000/dashboard';
+          break;
+        default:
+          setError('Unknown user role. Please contact support.');
+          setLoading(false);
+          return;
       }
+    } catch (err: any) {
+      setError(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Login failed. Please check your credentials.'
+      );
+      setLoading(false);
     }
   };
 
@@ -97,7 +75,7 @@ const Login: React.FC = () => {
       ...credentials,
       [e.target.name]: e.target.value,
     });
-    setError(''); // Clear error on input change
+    setError('');
   };
 
   return (
@@ -138,7 +116,7 @@ const Login: React.FC = () => {
                 mb: 2,
               }}
             >
-              <AdminPanelSettings sx={{ fontSize: 48, color: 'white' }} />
+              <FamilyRestroom sx={{ fontSize: 48, color: 'white' }} />
             </Box>
             <Typography component="h1" variant="h4" fontWeight="bold">
               Senior Connect

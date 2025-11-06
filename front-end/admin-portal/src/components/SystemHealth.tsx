@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import { CheckCircle, Error, Warning } from '@mui/icons-material';
 import {
-  Paper,
-  Typography,
   Box,
   Chip,
+  CircularProgress,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  CircularProgress,
+  Typography,
 } from '@mui/material';
-import { CheckCircle, Error, Warning } from '@mui/icons-material';
+import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { ServiceHealth } from '../types';
 

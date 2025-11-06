@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
@@ -8,6 +9,13 @@ const { router: gamesRouter, setAuthMiddleware } = require('./routes/games');
 
 const app = express();
 const port = 8080;
+
+// Enable CORS for all origins (adjust in production)
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use(express.json());
 const JWT_SECRET = process.env.JWT_SECRET || 'secret1234@';

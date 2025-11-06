@@ -14,10 +14,18 @@ function setAuthMiddleware(middleware) {
   authenticateToken = middleware;
 }
 
+// Wrapper middleware that calls authenticateToken at runtime
+const authMiddleware = (req, res, next) => {
+  if (authenticateToken) {
+    return authenticateToken(req, res, next);
+  }
+  return res.status(401).json({ error: 'Authentication not configured' });
+};
+
 /**
  * GET /api/games - Get list of all available games
  */
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
 
@@ -39,7 +47,7 @@ router.get('/', authenticateToken, async (req, res) => {
 /**
  * GET /api/games/trivia - Get trivia questions
  */
-router.get('/trivia', authenticateToken, async (req, res) => {
+router.get('/trivia', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
     const count = parseInt(req.query.count) || 3;
@@ -63,7 +71,7 @@ router.get('/trivia', authenticateToken, async (req, res) => {
 /**
  * GET /api/games/memory - Get memory card set
  */
-router.get('/memory', authenticateToken, async (req, res) => {
+router.get('/memory', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
     const difficulty = req.query.difficulty || 'easy';
@@ -87,7 +95,7 @@ router.get('/memory', authenticateToken, async (req, res) => {
 /**
  * GET /api/games/stretch - Get stretch exercises
  */
-router.get('/stretch', authenticateToken, async (req, res) => {
+router.get('/stretch', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
 
@@ -110,7 +118,7 @@ router.get('/stretch', authenticateToken, async (req, res) => {
  * POST /api/games/session/start - Start a new game session
  * Body: { gameId, gameType }
  */
-router.post('/session/start', authenticateToken, async (req, res) => {
+router.post('/session/start', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
     const { gameId, gameType } = req.body;
@@ -143,7 +151,7 @@ router.post('/session/start', authenticateToken, async (req, res) => {
  * POST /api/games/session/complete - Complete a game session
  * Body: { sessionId, score, moves, correctAnswers, totalQuestions, metadata }
  */
-router.post('/session/complete', authenticateToken, async (req, res) => {
+router.post('/session/complete', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
     const {
@@ -185,7 +193,7 @@ router.post('/session/complete', authenticateToken, async (req, res) => {
 /**
  * GET /api/games/history - Get user's game history
  */
-router.get('/history', authenticateToken, async (req, res) => {
+router.get('/history', authMiddleware, async (req, res) => {
   try {
     const correlationId = uuidv4();
     const limit = parseInt(req.query.limit) || 10;

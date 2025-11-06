@@ -11,6 +11,10 @@ import {
 const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:4000';
 const USE_MOCK_DATA = process.env.REACT_APP_USE_MOCK_DATA === 'true';
 
+// Use mock data for features not yet implemented in backend
+// But keep authentication real
+const USE_MOCK_FOR_DASHBOARD = true;
+
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -70,7 +74,24 @@ export const api = {
           },
         };
       }
-      return apiClient.post('/api/v1/auth/login', credentials);
+      // Backend uses 'username' field, so we map email to username
+      const response = await apiClient.post('/login', {
+        username: credentials.email,
+        password: credentials.password,
+      });
+
+      // Transform backend response to match frontend expectations
+      return {
+        data: {
+          token: response.data.token,
+          user: {
+            id: response.data.user.userId,
+            name: response.data.user.profile?.name || response.data.user.username,
+            email: response.data.user.profile?.email || credentials.email,
+            role: response.data.user.role,
+          },
+        },
+      };
     },
     logout: () => apiClient.post('/api/v1/auth/logout'),
     verifyToken: () => apiClient.get('/api/v1/auth/verify'),
@@ -79,13 +100,13 @@ export const api = {
   // ==================== USERS ====================
   users: {
     getAll: async (params?: any) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockUsers);
       }
       return apiClient.get('/api/v1/users', { params });
     },
     getById: async (id: string) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         const user = mockUsers.find((u) => u.id === id) || mockUsers[0];
         return mockApiCall(user);
       }
@@ -93,7 +114,7 @@ export const api = {
     },
     create: (data: any) => apiClient.post('/api/v1/users', data),
     update: async (id: string, data: any) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall({ success: true, message: 'User updated' });
       }
       return apiClient.put(`/api/v1/users/${id}`, data);
@@ -108,13 +129,13 @@ export const api = {
   // ==================== ENGAGEMENT ====================
   engagement: {
     getStats: async () => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockDashboardStats.engagement);
       }
       return apiClient.get('/api/v1/engagement/stats');
     },
     getByUser: async (userId: string, params?: any) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockUserEngagement);
       }
       return apiClient.get(`/api/v1/engagement/user/${userId}`, { params });
@@ -122,7 +143,7 @@ export const api = {
     getCheckIns: (params?: any) =>
       apiClient.get('/api/v1/engagement/checkins', { params }),
     getRecentActivity: async (limit: number = 10) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockActivityLog.slice(0, limit));
       }
       return apiClient.get('/api/v1/engagement/recent', { params: { limit } });
@@ -138,7 +159,7 @@ export const api = {
     getUserBadges: (userId: string) =>
       apiClient.get(`/api/v1/gamification/users/${userId}/badges`),
     getStats: async () => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockDashboardStats.gamification);
       }
       return apiClient.get('/api/v1/gamification/stats');
@@ -163,7 +184,7 @@ export const api = {
     getHealth: () => apiClient.get('/health'),
     getServiceHealth: (service: string) => apiClient.get(`/health/${service}`),
     getAllServices: async () => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockServiceHealth);
       }
       return apiClient.get('/health/services');
@@ -171,7 +192,7 @@ export const api = {
     getLogs: (params?: any) =>
       apiClient.get('/api/v1/system/logs', { params }),
     getMetrics: async () => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall({
           cpu: 35 + Math.random() * 10,
           memory: 60 + Math.random() * 10,
@@ -189,7 +210,7 @@ export const api = {
   // ==================== ANALYTICS ====================
   analytics: {
     getDashboard: async () => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall(mockDashboardStats);
       }
       return apiClient.get('/api/v1/analytics/dashboard');
@@ -208,14 +229,14 @@ export const api = {
   settings: {
     getAll: () => apiClient.get('/api/v1/settings'),
     update: async (data: any) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall({ success: true, message: 'Settings updated' });
       }
       return apiClient.put('/api/v1/settings', data);
     },
     getEmailConfig: () => apiClient.get('/api/v1/settings/email'),
     updateEmailConfig: async (data: any) => {
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_FOR_DASHBOARD) {
         return mockApiCall({ success: true, message: 'Email config updated' });
       }
       return apiClient.put('/api/v1/settings/email', data);
