@@ -1,0 +1,36 @@
+{
+  "name": "dialogflow-companion-service",
+  "version": "2.0.0",
+  "description": "AI Companion chatbot using Google Dialogflow (100% FREE) for senior care engagement",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "google-cloud",
+    "dialogflow",
+    "chatbot",
+    "senior-care",
+    "ai-companion",
+    "gcp"
+  ],
+  "author": "CSC3104 Group 25",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "@google-cloud/dialogflow": "^6.0.0",
+    "sentiment": "^5.0.2",
+    "kafkajs": "^2.2.4",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.1",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "prom-client": "^15.0.0",
+    "mongoose": "^8.0.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

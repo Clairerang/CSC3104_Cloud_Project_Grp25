@@ -55,16 +55,20 @@ services:
       retries: 5
 
   # --------------------------------------
-  # GAMIFICATION SERVICE (Jerald)
+  # GAMIFICATION SERVICE
   # --------------------------------------
   gamification:
-    build: ./gamification-service
+    build:
+      context: ./services/gamification-service
+      dockerfile: Dockerfile
     container_name: gamification
     depends_on:
       kafka:
         condition: service_healthy
       mongo:
         condition: service_healthy
+    env_file:
+      - config/secrets/.env
     environment:
       - TZ=Asia/Singapore
       - MONGO_URL=mongodb://mongo:27017/gamification
@@ -79,22 +83,90 @@ services:
   notification:
     build:
       context: .
-      dockerfile: ./notification-service/Dockerfile
+      dockerfile: ./services/notification-service/Dockerfile
     container_name: notification
     depends_on:
       kafka:
         condition: service_healthy
       mongo:
         condition: service_healthy
+    env_file:
+      - config/secrets/.env
     environment:
       - TZ=Asia/Singapore
       - KAFKA_BROKER=kafka:9092
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
       - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
-      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-/run/secrets/firebase-sa.json}
+      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/config/secrets/firebase-sa.json}
+    volumes:
+      - ./config/secrets:/app/config/secrets:ro
+      - ./shared/testing-ui:/app/testing-notification:ro
     ports:
       - "4002:4002"
+    restart: unless-stopped
+
+  # --------------------------------------
+  # SMS SERVICE
+  # --------------------------------------
+  sms:
+    build:
+      context: .
+      dockerfile: ./services/sms-service/Dockerfile
+    container_name: sms
+    depends_on:
+      kafka:
+        condition: service_healthy
+    env_file:
+      - config/secrets/.env
+    environment:
+      - TZ=Asia/Singapore
+      - KAFKA_BROKER=kafka:9092
+    ports:
+      - "4004:4004"
+    restart: unless-stopped
+
+  # --------------------------------------
+  # EMAIL SERVICE
+  # --------------------------------------
+  email:
+    build:
+      context: .
+      dockerfile: ./services/email-service/Dockerfile
+    container_name: email
+    depends_on:
+      kafka:
+        condition: service_healthy
+    env_file:
+      - config/secrets/.env
+    environment:
+      - TZ=Asia/Singapore
+      - KAFKA_BROKER=kafka:9092
+    ports:
+      - "4003:4003"
+    restart: unless-stopped
+
+  # --------------------------------------
+  # AI COMPANION SERVICE (Google Dialogflow - 100% FREE)
+  # --------------------------------------
+  ai-companion:
+    build:
+      context: .
+      dockerfile: ./services/ai-companion-service/Dockerfile
+    container_name: ai-companion
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    env_file:
+      - config/secrets/.env
+    environment:
+      - TZ=Asia/Singapore
+      - KAFKA_BROKER=kafka:9092
+      - MONGO_URI=mongodb://mongo:27017/ai-companion
+    ports:
+      - "4015:4015"
     restart: unless-stopped
 
   # --------------------------------------

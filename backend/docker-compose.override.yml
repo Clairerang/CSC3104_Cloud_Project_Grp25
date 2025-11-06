@@ -2,29 +2,23 @@ services:
   notification:
     # Use an env file for sensitive client config (do NOT commit .env)
     env_file:
-      - .env
+      - config/secrets/.env
     volumes:
       # Mount local Firebase service account JSON into the container if present
-      - ./firebase-sa.json:/run/secrets/firebase-sa.json:ro
+      - ./config/secrets/firebase-sa.json:/app/config/secrets/firebase-sa.json:ro
+      - ./shared/testing-ui:/app/testing-notification:ro
     environment:
       # Path the app expects for the service account JSON inside the container
-      FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/firebase-sa.json
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/config/secrets/firebase-sa.json
       # Keep the fallback toggle in the override to ease local debugging
       FCM_FALLBACK_V1: 'true'
-      # Optional overrides (these are read from .env by default but included
-      # here for clarity). They will be overwritten by the .env file if present.
-      FIREBASE_API_KEY: "${FIREBASE_API_KEY}"
-      FIREBASE_AUTH_DOMAIN: "${FIREBASE_AUTH_DOMAIN}"
-      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID}"
-      FIREBASE_MESSAGING_SENDER_ID: "${FIREBASE_MESSAGING_SENDER_ID}"
-      FIREBASE_APP_ID: "${FIREBASE_APP_ID}"
     ports:
       - "50051:50051"
 
   email:
     build:
-      context: ./email-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/email-service/Dockerfile
     container_name: email
     depends_on:
       kafka:
@@ -32,32 +26,22 @@ services:
       mongo:
         condition: service_healthy
     env_file:
-      - .env
+      - config/secrets/.env
     environment:
       - KAFKA_BROKER=kafka:9092
-      - EMAIL_USER=${EMAIL_USER}
-      - EMAIL_PASS=${EMAIL_PASS}
-      - EMAIL_FROM=${EMAIL_FROM:-}
-      - EMAIL_TOPIC=${EMAIL_TOPIC:-notification.events}
     restart: unless-stopped
     ports:
       - "4003:4003" # metrics endpoint for email-service
 
   sms:
     build:
-      context: ./sms-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/sms-service/Dockerfile
     container_name: sms
     env_file:
-      - .env
+      - config/secrets/.env
     environment:
       - KAFKA_BROKER=kafka:9092
-      - SMS_PROVIDER=${SMS_PROVIDER:-mock}
-      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
-      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
-      - TWILIO_FROM=${TWILIO_FROM:-}
-      - SMS_SENDER_ID=${SMS_SENDER_ID:-}
-      - SMS_TYPE=${SMS_TYPE:-Transactional}
       - METRICS_PORT=4004
     depends_on:
       kafka:
@@ -70,7 +54,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
     restart: unless-stopped
@@ -82,8 +66,8 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
     restart: unless-stopped
 
 volumes:
