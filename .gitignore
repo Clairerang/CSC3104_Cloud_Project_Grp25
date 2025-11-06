@@ -49,8 +49,11 @@ Thumbs.db
 **/mongo-data/
 
 # Backend-specific secrets and service account
-backend/.env
-backend/firebase-sa.json
-backend/*.p12
-backend/*.pem
-backend/*.key
+backend/config/secrets/.env
+backend/config/secrets/firebase-sa.json
+backend/config/secrets/*.p12
+backend/config/secrets/*.pem
+backend/config/secrets/*.key
+
+# Keep example file
+!backend/config/secrets/.env.example

@@ -1,0 +1,7 @@
+# Ignore local firebase service account files
+firebase-sa.json
+
+# Node
+node_modules/
+npm-debug.log
+.env
