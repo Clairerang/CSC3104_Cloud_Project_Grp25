@@ -54,7 +54,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
       <Box
         sx={{
           minHeight: '100vh',
-          background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
+          background: 'linear-gradient(to bottom, #fcf5bcff, #ffffff)',
           p: 3,
           display: 'flex',
           alignItems: 'center',
@@ -62,17 +62,17 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
         }}
       >
         <Box sx={{ maxWidth: 600, width: '100%', textAlign: 'center' }}>
-          <CheckCircleIcon sx={{ fontSize: 120, color: '#ff9800', mb: 3 }} />
-          <Typography variant="h3" gutterBottom sx={{ color: '#e65100' }}>
+          <CheckCircleIcon sx={{ fontSize: 120, color: '#ffe100ff', mb: 3 }} />
+          <Typography variant="h3" gutterBottom sx={{ color: '#dcc300ff' }}>
             Recipe Shared!
           </Typography>
           <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
             Thank you for sharing "{recipeName}" with the community!
           </Typography>
 
-          <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
+          <Card sx={{ mb: 3, bgcolor: '#fffcdeff' }}>
             <CardContent>
-              <Typography variant="h3" sx={{ color: '#ff9800', mb: 1 }}>
+              <Typography variant="h3" sx={{ color: '#dcc300ff', mb: 1 }}>
                 +20 Points Earned!
               </Typography>
               <Typography variant="h5" color="text.secondary">
@@ -86,7 +86,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
               variant="contained"
               size="large"
               onClick={onComplete}
-              sx={{ minHeight: 40, bgcolor: '#ff9800', fontSize: 20, '&:hover': { bgcolor: '#f57c00' } }}
+              sx={{ minHeight: 40, bgcolor: '#e6cf00ff', fontSize: 20, '&:hover': { bgcolor: '#dac400ff' } }}
             >
               Done
             </Button>
@@ -115,7 +115,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
     <Box
       sx={{
         minHeight: '190vh',
-        background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
+        background: 'linear-gradient(to bottom, #fcf5bcff, #ffffff)',
         p: 3,
       }}
     >
@@ -129,10 +129,10 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
           Back to Activities
         </Button>
 
-        <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
+        <Card sx={{ mb: 3, bgcolor: '#fffcdeff' }}>
           <CardContent>
             <Box sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h3" gutterBottom sx={{ color: '#e65100' }}>
+              <Typography variant="h3" gutterBottom sx={{ color: '#ccb400ff' }}>
                 Share a Recipe
               </Typography>
               <Typography variant="h5" color="text.secondary">
@@ -278,7 +278,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
         </Card>
 
         {!isValid && (
-          <Card sx={{ mb: 3, bgcolor: '#fff3e0', border: 2, borderColor: '#ffb74d' }}>
+          <Card sx={{ mb: 3, bgcolor: '#fffcdeff', border: 2, borderColor: '#e9d822ff' }}>
             <CardContent>
               <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center' }}>
                 ℹ️ Please fill in all required fields (*) to share your recipe
@@ -296,8 +296,8 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
             disabled={!isValid}
             sx={{
               minHeight: 50,
-              bgcolor: '#ff9800',
-              '&:hover': { bgcolor: '#f57c00' },
+              bgcolor: '#e6cf00ff',
+              '&:hover': { bgcolor: '#dac400ff' },
               '&:disabled': {
                 bgcolor: '#e0e0e0',
               },

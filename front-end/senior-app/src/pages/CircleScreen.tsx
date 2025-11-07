@@ -5,14 +5,21 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import StarIcon from "@mui/icons-material/Star";
 import type { Contact } from "../types";
 import ContactDetailModal from "../components/ContactDetailModal";
+import CreateNewContactModal from "./CreateNewContactModal";
+import EditContactModal from "./EditContactModal";
 
 interface Props {
   contacts: Contact[];
+  onAddContact: (contact: Omit<Contact, "id">) => void;
+  onEditContact: (contact: Contact) => void;
+  onDeleteContact: (contact: Contact) => void;
 }
 
-const CircleScreen: React.FC<Props> = ({ contacts }) => {
+const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, onDeleteContact }) => {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   const handleContactClick = (contact: Contact) => {
     setSelectedContact(contact);
@@ -39,6 +46,32 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
 
   const handleCloseModal = () => {
     setModalOpen(false);
+    setSelectedContact(null);
+  };
+
+  const handleCreateContact = () => {
+    setCreateModalOpen(true);
+  };
+
+  const handleSaveNewContact = (contact: Omit<Contact, "id">) => {
+    onAddContact(contact);
+    setCreateModalOpen(false);
+  };
+
+  const handleEditContact = (contact: Contact) => {
+    setModalOpen(false);
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEditedContact = (contact: Contact) => {
+    onEditContact(contact);
+    setEditModalOpen(false);
+    setSelectedContact(null);
+  };
+
+  const handleDeleteContact = (contact: Contact) => {
+    onDeleteContact(contact);
+    setEditModalOpen(false);
     setSelectedContact(null);
   };
 
@@ -151,9 +184,25 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
 
         {/* All Contacts Section */}
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
-            All Contacts
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              All Contacts
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={handleCreateContact}
+              sx={{
+                bgcolor: '#3b82f6',
+                '&:hover': { bgcolor: '#2563eb' },
+                textTransform: 'none',
+                px: 3,
+                py: 1,
+                fontSize: 16,
+              }}
+            >
+              Create New Contact
+            </Button>
+          </Box>
           <Stack spacing={3}>
             {contacts.filter(c => !c.isFavorite).map(contact => (
               <Card 
@@ -246,6 +295,24 @@ const CircleScreen: React.FC<Props> = ({ contacts }) => {
         onClose={handleCloseModal}
         onVoiceCall={handleVoiceCall}
         onVideoCall={handleVideoCall}
+        // onDelete={handleDeleteContact} 
+        onEdit={handleEditContact}
+      />
+
+      {/* Create New Contact Modal */}
+      <CreateNewContactModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSave={handleSaveNewContact}
+      />
+
+      {/* Edit Contact Modal */}
+      <EditContactModal
+        open={editModalOpen}
+        contact={selectedContact}
+        onClose={() => setEditModalOpen(false)}
+        onSave={handleSaveEditedContact}
+        onDelete={handleDeleteContact}
       />
     </Box>
   );

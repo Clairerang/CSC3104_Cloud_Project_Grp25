@@ -6,6 +6,7 @@ const Game = require('./models/Game');
 const TriviaQuestion = require('./models/TriviaQuestion');
 const Exercise = require('./models/Exercise');
 const MemorySet = require('./models/MemorySet');
+const StackTower = require('./models/StackTower');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/games';
 
@@ -165,6 +166,43 @@ const memorySets = [
   }
 ];
 
+// Stack Tower configurations (from StackTower.tsx)
+const stackTowers = [
+  {
+    towerId: uuidv4(),
+    name: 'Easy Tower',
+    targetBlocks: 5,
+    difficulty: 'easy',
+    settings: {
+      initialSpeed: 2,
+      speedIncrement: 0.2,
+      initialWidth: 100
+    }
+  },
+  {
+    towerId: uuidv4(),
+    name: 'Medium Tower',
+    targetBlocks: 8,
+    difficulty: 'medium',
+    settings: {
+      initialSpeed: 3,
+      speedIncrement: 0.3,
+      initialWidth: 80
+    }
+  },
+  {
+    towerId: uuidv4(),
+    name: 'Hard Tower',
+    targetBlocks: 12,
+    difficulty: 'hard',
+    settings: {
+      initialSpeed: 4,
+      speedIncrement: 0.4,
+      initialWidth: 60
+    }
+  }
+];
+
 async function seedDatabase() {
   try {
     console.log('Connecting to MongoDB...');
@@ -177,6 +215,7 @@ async function seedDatabase() {
     await TriviaQuestion.deleteMany({});
     await Exercise.deleteMany({});
     await MemorySet.deleteMany({});
+    await StackTower.deleteMany({});
     console.log('Existing data cleared');
 
     // Insert games
@@ -199,12 +238,18 @@ async function seedDatabase() {
     await MemorySet.insertMany(memorySets);
     console.log(`Inserted ${memorySets.length} memory sets`);
 
+    // Insert stack towers
+    console.log('Inserting stack tower configurations...');
+    await StackTower.insertMany(stackTowers);
+    console.log(`Inserted ${stackTowers.length} stack tower configurations`);
+
     console.log('\nDatabase seeding completed successfully!');
     console.log('\nSummary:');
     console.log(`- Games: ${games.length}`);
     console.log(`- Trivia Questions: ${triviaQuestions.length}`);
     console.log(`- Exercises: ${exercises.length}`);
     console.log(`- Memory Sets: ${memorySets.length}`);
+    console.log(`- Stack Towers: ${stackTowers.length}`);
 
     await mongoose.connection.close();
     console.log('\nDatabase connection closed');

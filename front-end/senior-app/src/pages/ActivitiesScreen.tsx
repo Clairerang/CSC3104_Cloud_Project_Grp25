@@ -5,7 +5,8 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import TriviaIcon from "@mui/icons-material/Quiz";
 import PeopleIcon from "@mui/icons-material/People";
-import type { Activity } from "../types";
+import TowerIcon from "@mui/icons-material/TableRows";  
+import type { Activity } from "../types";                 
 
 interface Props {
   activities: Activity[];
@@ -291,7 +292,8 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                 p: 4,
                 bgcolor: activity.category === 'Exercise' ? '#f0fdf4' :
                          activity.category === 'Mental' ? '#faf5ff' : 
-                         activity.category === 'Social' ? '#fef1e1ff' : '#fdfbeaff',
+                         activity.category === 'Learning' ? '#fef1e1ff' : 
+                         activity.category === 'Casual' ? '#deeeffff' : '#fdfbeaff',
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 4, mb: 4 }}>
@@ -308,10 +310,12 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                     <FitnessCenterIcon sx={{ width: 24, height: 24, color: '#16a34a' }} />
                   ) : activity.category === 'Mental' ? (
                     <PsychologyIcon sx={{ width: 24, height: 24, color: '#7c3aed' }} />
-                  ) : activity.category === 'Social' ? (
-                    <PeopleIcon sx={{ width: 24, height: 24, color: '#ea580c' }} />
+                  // ) : activity.category === 'Social' ? (
+                  //   <PeopleIcon sx={{ width: 24, height: 24, color: '#cab202ff' }} />
+                  ) : activity.category === 'Learning' ? (
+                    <TriviaIcon sx={{ width: 24, height: 24, color: '#ea580c' }} />
                   ) : (
-                    <TriviaIcon sx={{ width: 24, height: 24, color: '#e0d790ff' }} />
+                    <TowerIcon sx={{ width: 24, height: 24, color: '#3389ebff' }} />
                   )}
                 </Box>
                 <Box sx={{ flex: 1 }}>

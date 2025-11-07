@@ -5,6 +5,7 @@ export interface Contact {
   relationship: string;
   lastCall: string;
   isFavorite?: boolean;
+  phoneNumber: string;
 }
 
 export type Tab = "check-in" | "circle" | "activities";
@@ -28,6 +29,6 @@ export interface Activity {
   title: string;
   description: string;
   points: number;
-  category: "Exercise" | "Mental" | "Learning" | "Social";
+  category: "Exercise" | "Mental" | "Learning" | "Social" | "Casual";
   completed?: boolean;
 }

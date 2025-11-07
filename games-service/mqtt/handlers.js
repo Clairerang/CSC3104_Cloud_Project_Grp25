@@ -3,6 +3,7 @@ const Game = require('../models/Game');
 const TriviaQuestion = require('../models/TriviaQuestion');
 const Exercise = require('../models/Exercise');
 const MemorySet = require('../models/MemorySet');
+const StackTower = require('../models/StackTower');
 const GameSession = require('../models/GameSession');
 
 /**
@@ -43,6 +44,14 @@ async function handleMessage(topic, payload, mqttClient) {
         response = await handleStretchRequest(payload);
         mqttClient.publish(
           `games/response/stretch/${correlationId}`,
+          JSON.stringify(response)
+        );
+        break;
+      
+      case 'games/request/stacktower':
+        response = await handleStackTowerRequest(payload);
+        mqttClient.publish(
+          `games/response/stacktower/${correlationId}`,
           JSON.stringify(response)
         );
         break;
@@ -146,6 +155,26 @@ async function handleStretchRequest(payload) {
 }
 
 /**
+ * Get stack tower configuration
+ */
+async function handleStackTowerRequest(payload) {
+  const { difficulty = 'easy' } = payload;
+
+  const towers = await StackTower.find({
+    isActive: true,
+    difficulty
+  });
+
+  // Randomly select one tower configuration
+  const randomTower = towers[Math.floor(Math.random() * towers.length)];
+
+  return {
+    success: true,
+    tower: randomTower || null
+  };
+}
+
+/**
  * Start a new game session
  */
 async function handleSessionStart(payload) {
@@ -177,6 +206,8 @@ async function handleSessionComplete(payload) {
     moves,
     correctAnswers,
     totalQuestions,
+    blocksStacked,
+    highScore,
     metadata
   } = payload;
 
@@ -198,6 +229,8 @@ async function handleSessionComplete(payload) {
       pointsEarned += 5; // Perfect score bonus
     } else if (session.gameType === 'memory' && moves <= 15) {
       pointsEarned += 5; // Efficient completion bonus
+    } else if (session.gameType === 'stacktower' && blocksStacked >= 5) {
+      pointsEarned += 5; // Win bonus
     }
   }
 
@@ -209,6 +242,8 @@ async function handleSessionComplete(payload) {
   session.moves = moves;
   session.correctAnswers = correctAnswers;
   session.totalQuestions = totalQuestions;
+  session.blocksStacked = blocksStacked;
+  session.highScore = highScore;
   session.metadata = metadata || {};
 
   await session.save();
@@ -240,7 +275,8 @@ async function handleHistoryRequest(payload) {
     gamesbyType: {
       trivia: history.filter(s => s.gameType === 'trivia').length,
       memory: history.filter(s => s.gameType === 'memory').length,
-      stretch: history.filter(s => s.gameType === 'stretch').length
+      stretch: history.filter(s => s.gameType === 'stretch').length,
+      stacktower: history.filter(s => s.gameType === 'stacktower').length
     }
   };
 
@@ -257,6 +293,7 @@ module.exports = {
   handleTriviaRequest,
   handleMemoryRequest,
   handleStretchRequest,
+  handleStackTowerRequest,
   handleSessionStart,
   handleSessionComplete,
   handleHistoryRequest

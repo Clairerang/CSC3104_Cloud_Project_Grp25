@@ -14,26 +14,28 @@ import { MorningStretch } from "./pages/MorningStretch";
 import { MemoryQuiz } from "./pages/MemoryQuiz";
 import { CulturalTrivia } from "./pages/CulturalTrivia";
 import { ShareRecipe } from "./pages/ShareRecipe";
+import { StackTower } from "./pages/StackTower";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState<number>(850); // Initialize with starting points
 
-  const contacts: Contact[] = [
-    { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true },
-    { id: "2", name: "Michael", initials: "MJ", relationship: "Son", lastCall: "1 week ago", isFavorite: true },
-    { id: "3", name: "Emma", initials: "EJ", relationship: "Granddaughter", lastCall: "2 weeks ago", isFavorite: true },
-    { id: "4", name: "Robert", initials: "RM", relationship: "Friend", lastCall: "1 week ago" },
-    { id: "5", name: "Mary", initials: "MS", relationship: "Friend", lastCall: "1 week ago" },
-    { id: "6", name: "David", initials: "DJ", relationship: "Brother", lastCall: "3 days ago" },
-  ];
+  const [contacts, setContacts] = useState<Contact[]>([
+    { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true, phoneNumber: '+65 12345678' },
+    { id: "2", name: "Michael", initials: "MJ", relationship: "Son", lastCall: "1 week ago", isFavorite: true, phoneNumber: '+65 78945612' },
+    { id: "3", name: "Emma", initials: "EJ", relationship: "Granddaughter", lastCall: "2 weeks ago", isFavorite: true, phoneNumber: '+65 98765421' },
+    { id: "4", name: "Robert", initials: "RM", relationship: "Friend", lastCall: "1 week ago", phoneNumber: '+65 36925814' },
+    { id: "5", name: "Mary", initials: "MS", relationship: "Friend", lastCall: "1 week ago", phoneNumber: '+65 85274163' },
+    { id: "6", name: "David", initials: "DJ", relationship: "Brother", lastCall: "3 days ago", phoneNumber: '+65 65498721' },
+  ]);
 
   const activities: Activity[] = [
     { id: "1", title: "Morning Stretch", description: "5 gentle stretching exercises", points: 10, category: "Exercise" },
     { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
     { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning" },
-    { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
+    // { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
+    { id: "5", title: "Stack Tower", description: "Stack blocks perfectly to build a tall tower!", points: 20, category: "Casual"},
   ];
 
   const handleEmergencyCall = () => {
@@ -61,6 +63,24 @@ const App: React.FC = () => {
     setActiveTab("activities");
   };
 
+const handleAddContact = (newContact: Omit<Contact, "id">) => {
+  const contact: Contact = {
+    ...newContact,
+    id: Date.now().toString(), // Generate unique ID using timestamp
+  };
+  setContacts([...contacts, contact]);
+};
+
+const handleEditContact = (updatedContact: Contact) => {
+  setContacts(contacts.map(c => 
+    c.id === updatedContact.id ? updatedContact : c
+  ));
+};
+
+const handleDeleteContact = (contactToDelete: Contact) => {
+  setContacts(contacts.filter(c => c.id !== contactToDelete.id));
+};
+
   // If a game is active, show the game screen
   if (activeGame) {
     const getGameComponent = () => {
@@ -73,6 +93,8 @@ const App: React.FC = () => {
           return <CulturalTrivia onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         case "4":
           return <ShareRecipe onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+        case "5":
+          return <StackTower onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         default:
           return null;
       }
@@ -93,7 +115,7 @@ const App: React.FC = () => {
       <CssBaseline />
       <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
         {activeTab === "check-in" && <CheckInScreen onCheckIn={(m) => console.log("Checked in:", m)} />}
-        {activeTab === "circle" && <CircleScreen contacts={contacts} />}
+        {activeTab === "circle" && <CircleScreen contacts={contacts} onAddContact={handleAddContact} onEditContact={handleEditContact} onDeleteContact={handleDeleteContact} />}
         {activeTab === "activities" && (
           <ActivitiesScreen 
             activities={activities} 
