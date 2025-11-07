@@ -1,32 +1,31 @@
-// Play game intent handler
+// Games - Redirect to interactive game webpage
+// Addresses: Active participation, cognitive engagement, social interaction
 module.exports = {
-  async handle({ userId, message, producer, logger }) {
-    logger.info(`🎮 Game requested by user ${userId}`);
+  async handle({ userId, producer, logger }) {
+    logger.info(`🎮 Game requested by ${userId} - preparing game session`);
 
-    const gameType = message.toLowerCase().includes('trivia') ? 'trivia' : 'game';
-
-    // Publish engagement event
+    // Publish game session event with redirect URL
     try {
       await producer.send({
         topic: 'notification.events',
         messages: [{
           value: JSON.stringify({
-            type: 'game_started',
+            type: 'game_session_requested',
             userId,
-            gameType,
+            redirectUrl: '/games/interactive',
+            sessionId: `game_${userId}_${Date.now()}`,
             timestamp: new Date().toISOString(),
             source: 'ai-companion'
           })
         }]
       });
-      logger.info(`🎮 Game started event published for ${userId}`);
+      logger.info(`🎮 Game session event published for ${userId}`);
     } catch (error) {
-      logger.error('❌ Failed to publish game event:', error);
+      logger.error('❌ Failed to publish game session event:', error);
     }
 
-    return {
-      success: true,
-      response: `🎮 Let's play ${gameType}! Here's your first question: What year was the first computer invented? (Hint: 1940s)`
-    };
+    // Gemini will provide instructions about games
+    // Actual gameplay will be on separate webpage
+    return { success: true };
   }
 };

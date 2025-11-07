@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const winston = require('winston');
-const dialogflow = require('@google-cloud/dialogflow');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Sentiment = require('sentiment');
 const { v4: uuidv4 } = require('uuid');
 const { Kafka } = require('kafkajs');
@@ -33,14 +33,14 @@ const register = new promClient.Registry();
 promClient.collectDefaultMetrics({ register });
 
 const chatCounter = new promClient.Counter({
-  name: 'dialogflow_chat_messages_total',
+  name: 'ai_companion_chat_messages_total',
   help: 'Total number of chat messages processed',
   labelNames: ['intent', 'status'],
   registers: [register]
 });
 
 const sentimentGauge = new promClient.Gauge({
-  name: 'dialogflow_user_sentiment',
+  name: 'ai_companion_user_sentiment',
   help: 'User sentiment score (-5 to 5)',
   labelNames: ['userId'],
   registers: [register]
@@ -49,30 +49,30 @@ const sentimentGauge = new promClient.Gauge({
 // Sentiment analyzer (free npm package)
 const sentiment = new Sentiment();
 
-// Dialogflow Configuration (Google Cloud Platform)
-let sessionClient = null;
-let projectId = process.env.DIALOGFLOW_PROJECT_ID || null;
+// Google Gemini AI Configuration
+let genAI = null;
+let geminiModel = null;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
 
-// Initialize Dialogflow if credentials exist
-if (projectId) {
+// Initialize Google Gemini if API key exists
+if (GEMINI_API_KEY) {
   try {
-    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || '/app/config/dialogflow-key.json';
-    if (fs.existsSync(keyPath)) {
-      sessionClient = new dialogflow.SessionsClient({ keyFilename: keyPath });
-      logger.info('✅ Google Dialogflow initialized (GCP)');
-    } else {
-      logger.warn('⚠️ Dialogflow key not found, using fallback mode');
-      projectId = null;
-    }
+    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    // Use Gemini 2.0 Flash (experimental, FREE, latest model from Google AI Studio)
+    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    logger.info('✅ Google Gemini AI initialized (gemini-2.0-flash-exp)');
+    logger.info('💡 Mode: GEMINI (Powered by Google AI Studio)');
   } catch (error) {
-    logger.warn('⚠️ Dialogflow init failed, using fallback:', error.message);
-    projectId = null;
+    logger.warn('⚠️ Gemini init failed, using fallback:', error.message);
+    geminiModel = null;
   }
+} else {
+  logger.info('💡 Mode: FALLBACK (No API key - keyword-based detection)');
 }
 
 // Kafka setup
 const kafka = new Kafka({
-  clientId: 'dialogflow-companion-service',
+  clientId: 'ai-companion-service',
   brokers: [process.env.KAFKA_BROKER || 'kafka:9092']
 });
 
@@ -109,51 +109,63 @@ const ConversationSchema = new mongoose.Schema({
 
 const Conversation = mongoose.model('Conversation', ConversationSchema);
 
-// Intent handlers
+// Intent handlers - Simplified system for senior care
 const intentHandlers = {
-  'EmergencyHelp': require('./intents/emergency'),
-  'CallFamily': require('./intents/callFamily'),
+  // Core intents
+  'SocialIsolation': require('./intents/loneliness'),  // Loneliness detection with keywords
   'MedicationReminder': require('./intents/medication'),
-  'Loneliness': require('./intents/loneliness'),
   'WeatherInfo': require('./intents/weather'),
+  
+  // Communication & Social
+  'SMSFamily': require('./intents/smsFamily'),  // SMS to family members
+  'CommunityEvents': require('./intents/communityEvents'),  // Local activities
+  'VolunteerConnect': require('./intents/volunteerConnect'),
   'GameRequest': require('./intents/game')
 };
 
-// Fallback responses (when Dialogflow is not configured)
-const fallbackResponses = {
-  'help': "🚨 I'm sending an emergency alert to your family right now! Help is on the way.",
-  'lonely': "I'm here with you. You're not alone. Would you like me to call someone for you? 💜",
-  'call': "I'll help you connect with your family. Who would you like to talk to?",
-  'medication': "Let me check your medication schedule for you. One moment...",
-  'weather': "Let me get the weather information for you...",
-  'game': "How about a fun game? I can play trivia, tell jokes, or we can just chat!",
-  'default': "I'm here to help! You can ask me about medication, calling family, or just chat with me. 💜"
-};
-
-// Simple intent detection for fallback mode
+// Fallback intent detection (keyword-based when Gemini is not available)
+// Simplified system - 7 intents only
 function detectIntentFallback(message) {
   const lowerMsg = message.toLowerCase();
   
-  if (lowerMsg.includes('help') || lowerMsg.includes('emergency') || lowerMsg.includes('fell')) {
-    return { intent: 'EmergencyHelp', response: fallbackResponses.help };
-  }
-  if (lowerMsg.includes('lonely') || lowerMsg.includes('sad') || lowerMsg.includes('alone')) {
-    return { intent: 'Loneliness', response: fallbackResponses.lonely };
-  }
-  if (lowerMsg.includes('call') || lowerMsg.includes('family') || lowerMsg.includes('daughter') || lowerMsg.includes('son')) {
-    return { intent: 'CallFamily', response: fallbackResponses.call };
-  }
-  if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('pills')) {
-    return { intent: 'MedicationReminder', response: fallbackResponses.medication };
-  }
-  if (lowerMsg.includes('weather')) {
-    return { intent: 'WeatherInfo', response: fallbackResponses.weather };
-  }
-  if (lowerMsg.includes('game') || lowerMsg.includes('play') || lowerMsg.includes('trivia') || lowerMsg.includes('joke')) {
-    return { intent: 'GameRequest', response: fallbackResponses.game };
+  // 1. SMS Family (specific - message + family member)
+  if (lowerMsg.match(/\b(message|text|sms|tell|inform|let.*know|send)\b/) && 
+      lowerMsg.match(/\b(family|daughter|son|mom|dad|wife|husband|child|brother|sister|grandson|granddaughter)\b/)) {
+    return { intent: 'SMSFamily', response: "I'll send a message to your family right away." };
   }
   
-  return { intent: 'Default', response: fallbackResponses.default };
+  // 2. Community Events (check before loneliness - "miss an activity" != "miss someone")
+  if (lowerMsg.match(/\b(event|activit(y|ies)|community|group|club|class|workshop|exercise|tai chi)\b/)) {
+    return { intent: 'CommunityEvents', response: "Let me find community activities for you!" };
+  }
+  
+  // 3. Social Isolation & Loneliness (keyword-based alert)
+  if (lowerMsg.match(/\b(lonely|alone|sad|depressed|isolated|nobody|feel.*empty|hopeless)\b/) ||
+      (lowerMsg.includes('miss') && !lowerMsg.match(/\b(event|activit)/))) {
+    return { intent: 'SocialIsolation', response: "I'm here with you. You're not alone." };
+  }
+  
+  // 4. Volunteer Connection
+  if (lowerMsg.match(/\b(volunteer|visitor|companion|befriend|social.*worker)\b/)) {
+    return { intent: 'VolunteerConnect', response: "I can connect you with friendly volunteers!" };
+  }
+  
+  // 5. Medication
+  if (lowerMsg.match(/\b(medication|medicine|pills|tablet|doctor|prescription)\b/)) {
+    return { intent: 'MedicationReminder', response: "Let me check your medication schedule." };
+  }
+  
+  // 6. Weather (Singapore specific)
+  if (lowerMsg.match(/\b(weather|rain|sunny|temperature|forecast|hot|humid|go.*out)\b/)) {
+    return { intent: 'WeatherInfo', response: "Let me check the weather for you." };
+  }
+  
+  // 7. Games
+  if (lowerMsg.match(/\b(game|play|trivia|fun|entertainment|bored)\b/)) {
+    return { intent: 'GameRequest', response: "Let's have some fun! What game would you like?" };
+  }
+  
+  return { intent: 'Default', response: "I'm here to help! Ask me about activities, family, health, or just chat." };
 }
 
 // Main chat endpoint
@@ -176,38 +188,59 @@ app.post('/chat', async (req, res) => {
     let botResponse = '';
     let confidence = 0;
 
-    // Use Dialogflow if available, otherwise use fallback
-    if (projectId && sessionClient) {
+    // Use Google Gemini if available, otherwise use fallback
+    if (geminiModel) {
       try {
-        // Google Dialogflow API call
-        const sessionPath = sessionClient.projectAgentSessionPath(projectId, sessionId);
-        
-        const request = {
-          session: sessionPath,
-          queryInput: {
-            text: {
-              text: message,
-              languageCode: 'en-US',
-            },
-          },
-        };
+        // Create context-aware prompt for senior care companion (Singapore-focused)
+        const prompt = `You are a warm, caring AI companion for senior citizens in Singapore.
+Your mission is to reduce social isolation and improve wellbeing through:
 
-        const responses = await sessionClient.detectIntent(request);
-        const result = responses[0].queryResult;
+**Core Services (7 intents):**
+1. **Loneliness Support** - Detect keywords (lonely, alone, sad, depressed) and provide emotional support
+2. **SMS Family** - Help seniors send text messages to family members
+3. **Community Events** - Ask about their area/location to find nearby activities
+4. **Volunteer Connection** - Connect with friendly volunteer visitors
+5. **Medication Reminders** - Help track medication schedules
+6. **Weather Advice** - Singapore weather with safety advice for going outside
+7. **Fun Games** - Entertainment and cognitive engagement
 
-        intentName = result.intent ? result.intent.displayName : 'Default';
-        botResponse = result.fulfillmentText || 'I understand. Let me help you with that.';
-        confidence = result.intentDetectionConfidence || 0;
+**Communication Style:**
+- Warm, patient, and respectful
+- Use simple language (avoid jargon)
+- Show genuine care and empathy
+- For weather: specifically advise if elderly should go out based on Singapore weather
+- For community events: ask about their neighborhood/area first
+- For loneliness: be extra compassionate and supportive
+- Keep responses brief (2-4 sentences)
 
-        logger.info(`🤖 Dialogflow Intent: ${intentName} (${(confidence * 100).toFixed(1)}%)`);
+**User message:** "${message}"
+
+Respond warmly and helpfully. Always show you care about their wellbeing.`;
+
+        // Call Google Gemini AI
+        const result = await geminiModel.generateContent(prompt);
+        const response = await result.response;
+        botResponse = response.text();
+
+        // Detect intent from message for routing
+        const fallback = detectIntentFallback(message);
+        intentName = fallback.intent;
+        confidence = 0.85; // Gemini provides high-quality responses
+
+        logger.info(`🤖 Gemini AI Response Generated for Intent: ${intentName}`);
+        logger.info(`✨ Gemini Response: "${botResponse.substring(0, 100)}..."`);
       } catch (error) {
-        logger.warn('⚠️ Dialogflow error, using fallback:', error.message);
+        logger.error('❌ Gemini AI error:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
         const fallback = detectIntentFallback(message);
         intentName = fallback.intent;
         botResponse = fallback.response;
       }
     } else {
-      // Fallback mode (no Google Cloud credentials)
+      // Fallback mode (no Google Gemini API key)
       const fallback = detectIntentFallback(message);
       intentName = fallback.intent;
       botResponse = fallback.response;
@@ -225,7 +258,7 @@ app.post('/chat', async (req, res) => {
     // Update sentiment metric
     sentimentGauge.set({ userId }, sentimentScore);
 
-    // Handle specific intents
+    // Handle specific intents (for event publishing, not response generation)
     if (intentHandlers[intentName]) {
       try {
         const handlerResult = await intentHandlers[intentName].handle({
@@ -238,8 +271,12 @@ app.post('/chat', async (req, res) => {
           logger
         });
 
-        if (handlerResult && handlerResult.response) {
+        // Only use handler response if Gemini didn't generate one (fallback mode)
+        if (!geminiModel && handlerResult && handlerResult.response) {
+          logger.info(`🔄 Using intent handler response (fallback mode)`);
           botResponse = handlerResult.response;
+        } else if (geminiModel) {
+          logger.info(`✨ Keeping Gemini response (AI mode)`);
         }
 
         logger.info(`✅ Intent handler executed: ${intentName}`);
@@ -293,7 +330,8 @@ app.post('/chat', async (req, res) => {
       sentimentScore,
       confidence,
       sessionId,
-      mode: projectId ? 'dialogflow' : 'fallback'
+      mode: geminiModel ? 'gemini' : 'fallback',
+      aiProvider: geminiModel ? 'Google Gemini 2.0 Flash (Exp)' : 'Keyword-based'
     });
 
   } catch (error) {
@@ -378,10 +416,13 @@ app.get('/sentiment/:userId', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'dialogflow-companion',
-    mode: projectId ? 'dialogflow' : 'fallback',
-    cloud: projectId ? 'Google Cloud Platform (GCP)' : 'Local',
+    service: 'ai-companion',
+    mode: geminiModel ? 'gemini' : 'fallback',
+    aiProvider: geminiModel ? 'Google Gemini 2.0 Flash (Experimental)' : 'Keyword-based detection',
+    model: geminiModel ? 'gemini-2.0-flash-exp' : 'none',
+    cloud: geminiModel ? 'Google AI Studio' : 'Local',
     cost: '100% FREE',
+    rateLimit: geminiModel ? '60 requests/minute' : 'Unlimited',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -445,11 +486,15 @@ async function startServer() {
     logger.info('✅ Kafka producer connected');
 
     app.listen(PORT, () => {
-      logger.info(`🤖 Dialogflow Companion Service running on port ${PORT}`);
-      logger.info(`📊 Metrics available at http://localhost:${PORT}/metrics`);
-      logger.info(`🏥 Health check at http://localhost:${PORT}/health`);
-      logger.info(`🌐 Mode: ${projectId ? 'Google Dialogflow (GCP)' : 'Fallback (No credentials)'}`);
-      logger.info(`💰 Cost: 100% FREE${projectId ? ' with Google Cloud' : ' (local mode)'}`);
+      logger.info(`🤖 AI Companion Service running on port ${PORT}`);
+      logger.info(`🧠 AI Provider: ${geminiModel ? 'Google Gemini 2.0 Flash ✨' : 'Keyword-based fallback'}`);
+      logger.info(`📊 Metrics: http://localhost:${PORT}/metrics`);
+      logger.info(`🏥 Health: http://localhost:${PORT}/health`);
+      logger.info(`💰 Cost: 100% FREE forever`);
+      if (geminiModel) {
+        logger.info(`⚡ Rate Limit: 15 requests/minute (FREE tier)`);
+        logger.info(`🌐 Cloud: Google AI Studio`);
+      }
     });
   } catch (error) {
     logger.error('❌ Server startup error:', error);

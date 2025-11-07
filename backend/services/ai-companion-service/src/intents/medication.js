@@ -1,18 +1,30 @@
-// Medication reminder intent handler
+// Medication Management - Database-driven medication tracking
+// Addresses: Health management, independence, safety
 module.exports = {
-  async handle({ userId, message, producer, logger }) {
-    logger.info(`💊 Medication reminder requested by user ${userId}`);
+  async handle({ userId, producer, logger }) {
+    logger.info(`💊 Medication information requested by ${userId}`);
 
-    // This would fetch actual medication schedule from database
-    const mockMedications = [
-      { name: 'Blood pressure medication', time: '8:00 AM' },
-      { name: 'Vitamin D', time: '8:00 AM' },
-      { name: 'Evening medication', time: '6:00 PM' }
-    ];
+    // Publish request to fetch medication schedule from database
+    try {
+      await producer.send({
+        topic: 'notification.events',
+        messages: [{
+          value: JSON.stringify({
+            type: 'medication_schedule_request',
+            userId,
+            action: 'fetch_schedule',
+            timestamp: new Date().toISOString(),
+            source: 'ai-companion'
+          })
+        }]
+      });
+      logger.info(`💊 Medication schedule request published for ${userId}`);
+    } catch (error) {
+      logger.error('❌ Failed to publish medication request:', error);
+    }
 
-    return {
-      success: true,
-      response: `Here's your medication schedule:\n• ${mockMedications.map(m => `${m.name} at ${m.time}`).join('\n• ')}\n\nI'll remind you when it's time! 💊`
-    };
+    // Gemini will provide response about medication
+    // TODO: Integrate with medication database microservice
+    return { success: true };
   }
 };
