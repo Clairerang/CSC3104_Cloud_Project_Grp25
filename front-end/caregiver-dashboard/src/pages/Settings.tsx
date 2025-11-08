@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -22,36 +22,67 @@ import {
   Delete,
   Save,
 } from '@mui/icons-material';
-import { getSeniorsList } from '../api/mockData';
+import { mockApi, getSeniorsList, Profile, NotificationSettings } from '../api/mockData';
 
 const Settings: React.FC = () => {
-  const [profile, setProfile] = useState({
-    fullName: 'Sarah Johnson',
-    email: 'sarah.j@email.com',
-    phone: '+1 (555) 123-4567',
+  const [profile, setProfile] = useState<Profile>({
+    fullName: '',
+    email: '',
+    phone: '',
   });
 
-  const [notifications, setNotifications] = useState({
+  const [notifications, setNotifications] = useState<NotificationSettings>({
     email: true,
     push: true,
     missedCheckIn: true,
   });
 
   const [darkMode, setDarkMode] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const seniors = getSeniorsList();
+
+  // Load data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [profileData, notificationData] = await Promise.all([
+          mockApi.getProfile(),
+          mockApi.getNotificationSettings(),
+        ]);
+        setProfile(profileData);
+        setNotifications(notificationData);
+      } catch (error) {
+        console.error('Error loading settings data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleProfileChange = (field: string, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleNotificationChange = (field: string, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [field]: value }));
+  const handleNotificationChange = async (field: string, value: boolean) => {
+    const updated = { ...notifications, [field]: value };
+    setNotifications(updated);
+    try {
+      await mockApi.updateNotificationSettings(updated);
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+    }
   };
 
-  const handleSaveProfile = () => {
-    // Here you would typically save to API
-    console.log('Profile saved:', profile);
+  const handleSaveProfile = async () => {
+    try {
+      await mockApi.updateProfile(profile);
+      console.log('Profile saved:', profile);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    }
   };
 
   const handleRemoveSenior = (seniorName: string) => {

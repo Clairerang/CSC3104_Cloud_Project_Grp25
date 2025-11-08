@@ -16,14 +16,16 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Add,
   Delete,
-  Phone,
   CheckCircle,
-  Medication,
   Schedule,
   Notifications,
   AccessTime,
@@ -74,18 +76,6 @@ const Reminders: React.FC = () => {
 
   const seniors = getSeniorsList();
 
-  const reminderIcons = {
-    'call': Phone,
-    'task': CheckCircle,
-    'medication': Medication,
-  };
-
-  const reminderColors = {
-    'call': { bg: '#e3f2fd', border: '#bbdefb', text: '#1976d2', icon: '#1976d2' },
-    'task': { bg: '#e8f5e8', border: '#c8e6c9', text: '#4caf50', icon: '#4caf50' },
-    'medication': { bg: '#fff3e0', border: '#ffcc02', text: '#ff9800', icon: '#ff9800' },
-  };
-
   const frequencyLabels = {
     'once': 'Once',
     'daily': 'Daily',
@@ -113,7 +103,7 @@ const Reminders: React.FC = () => {
           description: '',
           frequency: 'once',
         });
-        setIsAddingReminder(false);
+        setIsAddingReminder(false); // Close dialog after adding
       } catch (error) {
         console.error('Error adding reminder:', error);
       }
@@ -197,24 +187,40 @@ const Reminders: React.FC = () => {
           </Typography>
         </Box>
 
-        {/* Add New Reminder Form */}
-        <Card sx={{ p: 4, mb: 6 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Schedule New Reminder for Elderly
-            </Typography>
-            <Button
-              variant={isAddingReminder ? "outlined" : "contained"}
-              startIcon={<Add />}
-              onClick={() => setIsAddingReminder(!isAddingReminder)}
-              sx={{ borderRadius: 2 }}
-            >
-              {isAddingReminder ? 'Cancel' : 'Add Reminder'}
-            </Button>
-          </Box>
+        {/* Schedule New Reminder Button */}
+        <Box sx={{ mb: 6 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setIsAddingReminder(true)}
+            sx={{ borderRadius: 2, px: 3, py: 1.5 }}
+          >
+            Schedule New Reminder for Elderly
+          </Button>
+        </Box>
 
-          {isAddingReminder && (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 3 }}>
+        {/* Add New Reminder Dialog */}
+        <Dialog 
+          open={isAddingReminder} 
+          onClose={() => {
+            setNewReminder({
+              title: '',
+              senior: '',
+              time: '',
+              type: 'call',
+              description: '',
+              frequency: 'once',
+            });
+            setIsAddingReminder(false);
+          }}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 600, fontSize: 20 }}>
+            Schedule New Reminder for Elderly
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3, mt: 2 }}>
               <TextField
                 label="Reminder Message for Elderly"
                 placeholder="e.g., Take your morning medication"
@@ -263,24 +269,12 @@ const Reminders: React.FC = () => {
                 fullWidth
               />
               <FormControl fullWidth>
-                <InputLabel>Reminder Type</InputLabel>
-                  <Select
-                    value={newReminder.type}
-                    onChange={(e) => setNewReminder({ ...newReminder, type: e.target.value as ReminderItem['type'] })}
-                    label="Reminder Type"
-                  >
-                  <MenuItem value="call">📞 Family Call</MenuItem>
-                  <MenuItem value="task">✅ Daily Task</MenuItem>
-                  <MenuItem value="medication">💊 Medication</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
                 <InputLabel>Frequency</InputLabel>
-                  <Select
-                    value={newReminder.frequency}
-                    onChange={(e) => setNewReminder({ ...newReminder, frequency: e.target.value as ReminderItem['frequency'] })}
-                    label="Frequency"
-                  >
+                <Select
+                  value={newReminder.frequency}
+                  onChange={(e) => setNewReminder({ ...newReminder, frequency: e.target.value as ReminderItem['frequency'] })}
+                  label="Frequency"
+                >
                   <MenuItem value="once">Once</MenuItem>
                   <MenuItem value="daily">Daily</MenuItem>
                   <MenuItem value="weekly">Weekly</MenuItem>
@@ -293,39 +287,14 @@ const Reminders: React.FC = () => {
                 value={newReminder.description}
                 onChange={(e) => setNewReminder({ ...newReminder, description: e.target.value })}
                 fullWidth
-                sx={{ gridColumn: { xs: '1', md: '1 / -1', lg: '1 / -1' } }}
+                sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}
+                multiline
+                rows={3}
               />
-              <Box sx={{ display: 'flex', gap: 2, gridColumn: { xs: '1', md: '1 / -1', lg: '1 / -1' } }}>
-                <Button
-                  variant="contained"
-                  onClick={addReminder}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Add Reminder
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setNewReminder({
-                      title: '',
-                      senior: '',
-                      time: '',
-                      type: 'call',
-                      description: '',
-                      frequency: 'once',
-                    });
-                    setIsAddingReminder(false);
-                  }}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Cancel
-                </Button>
-              </Box>
             </Box>
-          )}
 
-          {/* Preview Section */}
-          {isAddingReminder && newReminder.title && newReminder.senior && newReminder.time && (
+            {/* Preview Section */}
+            {newReminder.title && newReminder.senior && newReminder.time && (
             <Box sx={{ mt: 4, p: 3, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
                 📱 Preview: How this reminder will appear on {newReminder.senior}'s phone
@@ -356,11 +325,6 @@ const Reminders: React.FC = () => {
 
                   {/* Reminder Content */}
                   <Box sx={{ textAlign: 'center', mt: 2 }}>
-                    <Box sx={{ mb: 2 }}>
-                      {newReminder.type === 'call' && <Phone sx={{ color: '#3b82f6', fontSize: 32 }} />}
-                      {newReminder.type === 'task' && <CheckCircle sx={{ color: '#10b981', fontSize: 32 }} />}
-                      {newReminder.type === 'medication' && <Medication sx={{ color: '#f59e0b', fontSize: 32 }} />}
-                    </Box>
                     <Typography sx={{ color: 'white', fontSize: 16, fontWeight: 600, mb: 1 }}>
                       {newReminder.title}
                     </Typography>
@@ -406,8 +370,35 @@ const Reminders: React.FC = () => {
                 </Box>
               </Box>
             </Box>
-          )}
-        </Card>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 3, pt: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setNewReminder({
+                  title: '',
+                  senior: '',
+                  time: '',
+                  type: 'call',
+                  description: '',
+                  frequency: 'once',
+                });
+                setIsAddingReminder(false);
+              }}
+              sx={{ borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={addReminder}
+              sx={{ borderRadius: 2 }}
+            >
+              Add Reminder
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Active Reminders */}
         <Card sx={{ p: 4, mb: 6 }}>
@@ -480,36 +471,19 @@ const Reminders: React.FC = () => {
               </Box>
             ) : (
               activeReminders.map((reminder) => {
-                const Icon = reminderIcons[reminder.type];
-                const colors = reminderColors[reminder.type];
-                
                 return (
                   <Paper
                     key={reminder.id}
                     sx={{
                       p: 3,
-                      bgcolor: colors.bg,
-                      border: `1px solid ${colors.border}`,
+                      bgcolor: '#ffffff',
+                      border: '1px solid #e5e7eb',
                       borderRadius: 2,
                       '&:hover': { boxShadow: 2 },
                       transition: 'all 0.2s',
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Box
-                        sx={{
-                          p: 2,
-                          bgcolor: 'white',
-                          border: `1px solid ${colors.border}`,
-                          borderRadius: 2,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Icon sx={{ color: colors.icon, fontSize: 24 }} />
-                      </Box>
-                      
                       <Box sx={{ flex: 1 }}>
                         {/* Elderly Name Header */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -551,23 +525,11 @@ const Reminders: React.FC = () => {
                         
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccessTime sx={{ color: colors.icon, fontSize: 16 }} />
-                            <Typography sx={{ color: colors.text, fontWeight: 500 }}>
+                            <AccessTime sx={{ color: '#6b7280', fontSize: 16 }} />
+                            <Typography sx={{ color: '#6b7280', fontWeight: 500 }}>
                               {formatTime(reminder.time)}
                             </Typography>
                           </Box>
-                        </Box>
-                        
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Chip
-                            label={getReminderTypeLabel(reminder.type)}
-                            size="small"
-                            sx={{
-                              bgcolor: colors.bg,
-                              color: colors.text,
-                              border: `1px solid ${colors.border}`,
-                            }}
-                          />
                           <Chip
                             label={frequencyLabels[reminder.frequency]}
                             size="small"
@@ -624,34 +586,18 @@ const Reminders: React.FC = () => {
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {inactiveReminders.map((reminder) => {
-                const Icon = reminderIcons[reminder.type];
-                
                 return (
                   <Paper
                     key={reminder.id}
                     sx={{
                       p: 3,
                       bgcolor: '#f5f5f5',
-                      border: '1px solid #673232ff',
+                      border: '1px solid #e5e7eb',
                       borderRadius: 2,
                       opacity: 0.7,
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Box
-                        sx={{
-                          p: 2,
-                          bgcolor: '#e0e0e0',
-                          border: '1px solid #bdbdbd',
-                          borderRadius: 2,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Icon sx={{ color: '#757575', fontSize: 24 }} />
-                      </Box>
-                      
                       <Box sx={{ flex: 1 }}>
                         {/* Elderly Name Header */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -691,9 +637,21 @@ const Reminders: React.FC = () => {
                           {reminder.title}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                          <Typography sx={{ color: '#757575' }}>
-                            {formatTime(reminder.time)} • {getReminderTypeLabel(reminder.type)}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AccessTime sx={{ color: '#757575', fontSize: 16 }} />
+                            <Typography sx={{ color: '#757575' }}>
+                              {formatTime(reminder.time)}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={frequencyLabels[reminder.frequency]}
+                            size="small"
+                            sx={{
+                              bgcolor: '#f3f4f6',
+                              color: '#6b7280',
+                              border: '1px solid #d1d5db',
+                            }}
+                          />
                         </Box>
                         {reminder.description && (
                           <Typography sx={{ color: '#757575', fontSize: 14 }}>

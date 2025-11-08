@@ -31,24 +31,27 @@ import {
   Favorite,
   Medication,
 } from '@mui/icons-material';
-import { mockApi, Senior, AnalyticsData } from '../api/mockData';
+import { mockApi, Senior, AnalyticsData, OverallAnalyticsStats } from '../api/mockData';
 
 const Analytics: React.FC = () => {
   const [timeframe, setTimeframe] = useState('weekly');
   const [selectedSenior, setSelectedSenior] = useState('all');
   const [seniors, setSeniors] = useState<Senior[]>([]);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [overallStats, setOverallStats] = useState<OverallAnalyticsStats | null>(null);
 
   // Load data from API
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [seniorsData, analyticsDataResponse] = await Promise.all([
+        const [seniorsData, analyticsDataResponse, overallStatsData] = await Promise.all([
           mockApi.getSeniors(),
           mockApi.getAnalyticsData(),
+          mockApi.getOverallAnalyticsStats(),
         ]);
         setSeniors(seniorsData);
         setAnalyticsData(analyticsDataResponse);
+        setOverallStats(overallStatsData);
       } catch (error) {
         console.error('Error loading analytics data:', error);
       }
@@ -98,10 +101,14 @@ const Analytics: React.FC = () => {
               label="Select Senior"
             >
               <MenuItem value="all">All Seniors</MenuItem>
-              <MenuItem value="grandma-rose">Grandma Rose</MenuItem>
-              <MenuItem value="grandpa-joe">Grandpa Joe</MenuItem>
-              <MenuItem value="aunt-margaret">Aunt Margaret</MenuItem>
-              <MenuItem value="uncle-frank">Uncle Frank</MenuItem>
+              {seniors.map((senior) => {
+                const key = senior.name.toLowerCase().replace(/\s+/g, '-');
+                return (
+                  <MenuItem key={senior.id} value={key}>
+                    {senior.name}
+                  </MenuItem>
+                );
+              })}
             </Select>
           </FormControl>
           <FormControl sx={{ minWidth: 150 }}>
@@ -315,10 +322,10 @@ const Analytics: React.FC = () => {
               </Typography>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: '#1976d2', mb: 1 }}>
-              {isAllSeniors ? '264' : seniorData?.stats.checkIns}
+              {isAllSeniors ? overallStats?.checkIns : seniorData?.stats.checkIns}
             </Typography>
             <Typography sx={{ fontSize: 14, color: '#1976d2' }}>
-              +12% from last month
+              {isAllSeniors ? overallStats?.checkInsChange : ''}
             </Typography>
           </Card>
 
@@ -332,10 +339,10 @@ const Analytics: React.FC = () => {
               </Typography>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: '#4caf50', mb: 1 }}>
-              {isAllSeniors ? '178' : seniorData?.stats.calls}
+              {isAllSeniors ? overallStats?.calls : seniorData?.stats.calls}
             </Typography>
             <Typography sx={{ fontSize: 14, color: '#4caf50' }}>
-              +8% from last month
+              {isAllSeniors ? overallStats?.callsChange : ''}
             </Typography>
           </Card>
 
@@ -349,10 +356,10 @@ const Analytics: React.FC = () => {
               </Typography>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: '#ff9800', mb: 1 }}>
-              {isAllSeniors ? '342' : seniorData?.stats.tasks}
+              {isAllSeniors ? overallStats?.tasks : seniorData?.stats.tasks}
             </Typography>
             <Typography sx={{ fontSize: 14, color: '#ff9800' }}>
-              +15% from last month
+              {isAllSeniors ? overallStats?.tasksChange : ''}
             </Typography>
           </Card>
         </Box>
@@ -395,10 +402,7 @@ const Analytics: React.FC = () => {
                     Communication Preference
                   </Typography>
                   <Typography sx={{ color: '#6b7280' }}>
-                    {seniorData.name === 'Grandma Rose' ? 'Video calls preferred' :
-                     seniorData.name === 'Grandpa Joe' ? 'Phone calls preferred' :
-                     seniorData.name === 'Aunt Margaret' ? 'Mixed communication' :
-                     'Limited communication'}
+                    {seniorData.communicationPreference || 'Not specified'}
                   </Typography>
                 </Box>
               </Box>
