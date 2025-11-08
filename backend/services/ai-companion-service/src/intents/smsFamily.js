@@ -1,7 +1,9 @@
 ﻿// SMS Family - Send text messages to family members
 // Addresses: Family connection, communication, reducing isolation
+const { publishEvent } = require('../index');
+
 module.exports = {
-  async handle({ userId, message, producer, logger }) {
+  async handle({ userId, message, logger }) {
     logger.info(` SMS family request from ${userId}`);
 
     // Extract family member mentioned
@@ -22,21 +24,16 @@ module.exports = {
     const contentMatch = message.match(/(?:tell|message|text|let.*know|send|say)\s+(?:them|her|him|that)?\s*(.+)/i);
     const messageContent = contentMatch ? contentMatch[1] : message;
 
-    // Publish SMS request to Kafka
+    // Publish SMS request to MQTT
     try {
-      await producer.send({
-        topic: 'notification.events',
-        messages: [{
-          value: JSON.stringify({
-            type: 'sms_family_request',
-            userId,
-            recipient: familyMember,
-            messageContent,
-            originalRequest: message,
-            timestamp: new Date().toISOString(),
-            source: 'ai-companion'
-          })
-        }]
+      await publishEvent('notification/events', {
+        type: 'sms_family_request',
+        userId,
+        recipient: familyMember,
+        messageContent,
+        originalRequest: message,
+        timestamp: new Date().toISOString(),
+        source: 'ai-companion'
       });
       logger.info(` SMS family request published to ${familyMember}`);
     } catch (error) {

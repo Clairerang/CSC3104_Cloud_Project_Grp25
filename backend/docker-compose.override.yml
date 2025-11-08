@@ -1,5 +1,5 @@
 services:
-  notification:
+  event-dispatcher:
     # Use an env file for sensitive client config (do NOT commit .env)
     env_file:
       - config/secrets/.env
@@ -10,65 +10,52 @@ services:
     environment:
       # Path the app expects for the service account JSON inside the container
       FIREBASE_SERVICE_ACCOUNT_PATH: /app/config/secrets/firebase-sa.json
-      # Keep the fallback toggle in the override to ease local debugging
-      FCM_FALLBACK_V1: 'true'
     ports:
       - "50051:50051"
 
-  email:
+  push-notification:
+    env_file:
+      - config/secrets/.env
+    volumes:
+      - ./config/secrets/firebase-sa.json:/app/config/secrets/firebase-sa.json:ro
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/config/secrets/firebase-sa.json
+      FCM_FALLBACK_V1: 'true'
+
+  email-dispatcher:
     build:
       context: .
       dockerfile: ./services/email-service/Dockerfile
-    container_name: email
+    container_name: email-dispatcher
     depends_on:
-      kafka:
+      hivemq:
         condition: service_healthy
       mongo:
         condition: service_healthy
     env_file:
       - config/secrets/.env
     environment:
-      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
     restart: unless-stopped
     ports:
       - "4003:4003" # metrics endpoint for email-service
 
-  sms:
+  sms-dispatcher:
     build:
       context: .
       dockerfile: ./services/sms-service/Dockerfile
-    container_name: sms
+    container_name: sms-dispatcher
     env_file:
       - config/secrets/.env
     environment:
-      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
       - METRICS_PORT=4004
     depends_on:
-      kafka:
+      hivemq:
         condition: service_healthy
     restart: unless-stopped
     ports:
       - "4004:4004"
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    restart: unless-stopped
-
-volumes:
-  grafana_data:

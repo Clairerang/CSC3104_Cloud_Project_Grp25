@@ -9,7 +9,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
-    "kafkajs": "^2.2.4",
+    "mqtt": "^5.3.5",
     "mongoose": "^8.19.2",
     "nodemailer": "^7.0.9",
     "redis": "^5.8.3",

@@ -5,7 +5,7 @@ const winston = require('winston');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Sentiment = require('sentiment');
 const { v4: uuidv4 } = require('uuid');
-const { Kafka } = require('kafkajs');
+const mqtt = require('mqtt');
 const promClient = require('prom-client');
 const mongoose = require('mongoose');
 const fs = require('fs');
@@ -70,13 +70,22 @@ if (GEMINI_API_KEY) {
   logger.info('💡 Mode: FALLBACK (No API key - keyword-based detection)');
 }
 
-// Kafka setup
-const kafka = new Kafka({
-  clientId: 'ai-companion-service',
-  brokers: [process.env.KAFKA_BROKER || 'kafka:9092']
+// MQTT setup
+const MQTT_BROKER = process.env.MQTT_BROKER || 'hivemq';
+const MQTT_PORT = process.env.MQTT_PORT || 1883;
+const mqttClient = mqtt.connect(`mqtt://${MQTT_BROKER}:${MQTT_PORT}`, {
+  clientId: `ai-companion-${uuidv4()}`,
+  clean: true,
+  reconnectPeriod: 1000
 });
 
-const producer = kafka.producer();
+mqttClient.on('connect', () => {
+  logger.info(`✅ MQTT connected to HiveMQ at ${MQTT_BROKER}:${MQTT_PORT}`);
+});
+
+mqttClient.on('error', (err) => {
+  logger.error('❌ MQTT connection error:', err);
+});
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://mongo:27017/ai-companion', {
@@ -168,6 +177,44 @@ function detectIntentFallback(message) {
   return { intent: 'Default', response: "I'm here to help! Ask me about activities, family, health, or just chat." };
 }
 
+// Root endpoint - API info
+app.get('/', (req, res) => {
+  res.json({
+    service: 'AI Companion Service',
+    status: 'Running',
+    aiProvider: 'Google Gemini 2.0 Flash Thinking Experimental',
+    messaging: 'HiveMQ MQTT',
+    version: '2.0.0',
+    features: [
+      'Elderly-friendly conversational AI',
+      'Sentiment analysis',
+      'Intent detection (8 intents)',
+      'MQTT event publishing',
+      'Chat history tracking'
+    ],
+    endpoints: {
+      chat: 'POST /chat - Send a chat message',
+      history: 'GET /history/:userId - Get chat history',
+      sentiment: 'GET /sentiment/:userId - Get sentiment analysis',
+      health: 'GET /health - Health check',
+      metrics: 'GET /metrics - Prometheus metrics'
+    },
+    intents: [
+      'Weather Info',
+      'Loneliness/Social Isolation',
+      'SMS Family',
+      'Call Family',
+      'Community Events',
+      'Medication Reminder',
+      'Volunteer Connect',
+      'Play Game'
+    ],
+    cost: '100% FREE (Google AI Studio)',
+    rateLimit: '15 requests/minute',
+    documentation: 'https://ai.google.dev/gemini-api/docs'
+  });
+});
+
 // Main chat endpoint
 app.post('/chat', async (req, res) => {
   const startTime = Date.now();
@@ -188,65 +235,6 @@ app.post('/chat', async (req, res) => {
     let botResponse = '';
     let confidence = 0;
 
-    // Use Google Gemini if available, otherwise use fallback
-    if (geminiModel) {
-      try {
-        // Create context-aware prompt for senior care companion (Singapore-focused)
-        const prompt = `You are a warm, caring AI companion for senior citizens in Singapore.
-Your mission is to reduce social isolation and improve wellbeing through:
-
-**Core Services (7 intents):**
-1. **Loneliness Support** - Detect keywords (lonely, alone, sad, depressed) and provide emotional support
-2. **SMS Family** - Help seniors send text messages to family members
-3. **Community Events** - Ask about their area/location to find nearby activities
-4. **Volunteer Connection** - Connect with friendly volunteer visitors
-5. **Medication Reminders** - Help track medication schedules
-6. **Weather Advice** - Singapore weather with safety advice for going outside
-7. **Fun Games** - Entertainment and cognitive engagement
-
-**Communication Style:**
-- Warm, patient, and respectful
-- Use simple language (avoid jargon)
-- Show genuine care and empathy
-- For weather: specifically advise if elderly should go out based on Singapore weather
-- For community events: ask about their neighborhood/area first
-- For loneliness: be extra compassionate and supportive
-- Keep responses brief (2-4 sentences)
-
-**User message:** "${message}"
-
-Respond warmly and helpfully. Always show you care about their wellbeing.`;
-
-        // Call Google Gemini AI
-        const result = await geminiModel.generateContent(prompt);
-        const response = await result.response;
-        botResponse = response.text();
-
-        // Detect intent from message for routing
-        const fallback = detectIntentFallback(message);
-        intentName = fallback.intent;
-        confidence = 0.85; // Gemini provides high-quality responses
-
-        logger.info(`🤖 Gemini AI Response Generated for Intent: ${intentName}`);
-        logger.info(`✨ Gemini Response: "${botResponse.substring(0, 100)}..."`);
-      } catch (error) {
-        logger.error('❌ Gemini AI error:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
-        const fallback = detectIntentFallback(message);
-        intentName = fallback.intent;
-        botResponse = fallback.response;
-      }
-    } else {
-      // Fallback mode (no Google Gemini API key)
-      const fallback = detectIntentFallback(message);
-      intentName = fallback.intent;
-      botResponse = fallback.response;
-      logger.info(`🔄 Fallback Intent: ${intentName}`);
-    }
-
     // Analyze sentiment (free npm package)
     const sentimentResult = sentiment.analyze(message);
     const sentimentScore = sentimentResult.score;
@@ -258,7 +246,13 @@ Respond warmly and helpfully. Always show you care about their wellbeing.`;
     // Update sentiment metric
     sentimentGauge.set({ userId }, sentimentScore);
 
-    // Handle specific intents (for event publishing, not response generation)
+    // STEP 1: Detect intent FIRST (before calling Gemini)
+    const fallback = detectIntentFallback(message);
+    intentName = fallback.intent;
+    logger.info(`🎯 Detected Intent: ${intentName}`);
+
+    // STEP 2: Run intent handler to fetch context data (events, weather, etc.)
+    let contextData = '';
     if (intentHandlers[intentName]) {
       try {
         const handlerResult = await intentHandlers[intentName].handle({
@@ -267,22 +261,72 @@ Respond warmly and helpfully. Always show you care about their wellbeing.`;
           sessionId,
           sentiment: sentimentLabel,
           sentimentScore,
-          producer,
           logger
         });
 
-        // Only use handler response if Gemini didn't generate one (fallback mode)
-        if (!geminiModel && handlerResult && handlerResult.response) {
-          logger.info(`🔄 Using intent handler response (fallback mode)`);
-          botResponse = handlerResult.response;
-        } else if (geminiModel) {
-          logger.info(`✨ Keeping Gemini response (AI mode)`);
+        // If handler provides response data (real events, weather), use it as context
+        if (handlerResult && handlerResult.response) {
+          contextData = handlerResult.response;
+          logger.info(`📦 Context data fetched from ${intentName} handler (${contextData.length} chars)`);
         }
 
         logger.info(`✅ Intent handler executed: ${intentName}`);
       } catch (handlerError) {
         logger.error(`❌ Intent handler error for ${intentName}:`, handlerError);
       }
+    }
+
+    // STEP 3: Use Google Gemini with enriched context
+    if (geminiModel) {
+      try {
+        // Build context-aware prompt with real data injected
+        let prompt = `You are a warm, caring AI companion for senior citizens in Singapore.
+Your mission is to reduce social isolation and improve wellbeing through:
+
+**Core Services (7 intents):**
+1. **Loneliness Support** - Detect keywords (lonely, alone, sad, depressed) and provide emotional support
+2. **SMS Family** - Help seniors send text messages to family members
+3. **Community Events** - Provide real Singapore community events for their area
+4. **Volunteer Connection** - Connect with friendly volunteer visitors
+5. **Medication Reminders** - Help track medication schedules
+6. **Weather Advice** - Real Singapore weather with safety advice for going outside
+7. **Fun Games** - Entertainment and cognitive engagement
+
+**Communication Style:**
+- Warm, patient, and respectful
+- Use simple language (avoid jargon)
+- Show genuine care and empathy
+- Keep responses brief (2-4 sentences max)
+- NEVER ask for information already provided`;
+
+        // Inject real data if available
+        if (contextData) {
+          prompt += `\n\n**REAL DATA TO USE IN YOUR RESPONSE:**\n${contextData}\n\nUse this real data in your response. Do not ask for information that's already provided above.`;
+        }
+
+        prompt += `\n\n**User message:** "${message}"\n\nRespond warmly using the real data provided above (if any). Show you care about their wellbeing.`;
+
+        // Call Google Gemini AI with enriched context
+        const result = await geminiModel.generateContent(prompt);
+        const response = await result.response;
+        botResponse = response.text();
+        confidence = 0.85; // Gemini provides high-quality responses
+
+        logger.info(`🤖 Gemini AI Response Generated for Intent: ${intentName}`);
+        logger.info(`✨ Gemini Response: "${botResponse.substring(0, 100)}..."`);
+      } catch (error) {
+        logger.error('❌ Gemini AI error:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        // Use fallback response or context data
+        botResponse = contextData || fallback.response;
+      }
+    } else {
+      // Fallback mode: Use handler response or default
+      botResponse = contextData || fallback.response;
+      logger.info(`🔄 Fallback Intent: ${intentName}`);
     }
 
     // Publish negative sentiment alert
@@ -305,7 +349,7 @@ Respond warmly and helpfully. Always show you care about their wellbeing.`;
       sentimentScore
     });
 
-    // Publish chat message to Kafka
+    // Publish chat message to MQTT
     await publishEvent('chat.message', {
       userId,
       sessionId,
@@ -463,16 +507,18 @@ async function saveConversation(userId, sessionId, messageData) {
   }
 }
 
-// Helper: Publish Kafka event
+// Helper: Publish MQTT event
 async function publishEvent(topic, data) {
   try {
-    await producer.send({
-      topic,
-      messages: [{ value: JSON.stringify(data) }]
+    mqttClient.publish(topic, JSON.stringify(data), { qos: 1 }, (err) => {
+      if (err) {
+        logger.error(`❌ MQTT publish error to ${topic}:`, err);
+      } else {
+        logger.info(`📤 Published to MQTT topic: ${topic}`);
+      }
     });
-    logger.info(`� Published to ${topic}`);
   } catch (error) {
-    logger.error(`❌ Kafka publish error:`, error);
+    logger.error(`❌ MQTT publish error:`, error);
   }
 }
 
@@ -481,13 +527,10 @@ const PORT = process.env.PORT || 4015;
 
 async function startServer() {
   try {
-    // Connect Kafka producer
-    await producer.connect();
-    logger.info('✅ Kafka producer connected');
-
     app.listen(PORT, () => {
       logger.info(`🤖 AI Companion Service running on port ${PORT}`);
       logger.info(`🧠 AI Provider: ${geminiModel ? 'Google Gemini 2.0 Flash ✨' : 'Keyword-based fallback'}`);
+      logger.info(`📡 Messaging: HiveMQ MQTT at ${MQTT_BROKER}:${MQTT_PORT}`);
       logger.info(`📊 Metrics: http://localhost:${PORT}/metrics`);
       logger.info(`🏥 Health: http://localhost:${PORT}/health`);
       logger.info(`💰 Cost: 100% FREE forever`);
@@ -505,9 +548,12 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('⚠️ SIGTERM received, shutting down gracefully...');
-  await producer.disconnect();
+  mqttClient.end();
   await mongoose.disconnect();
   process.exit(0);
 });
 
 startServer();
+
+// Export for use in intent files
+module.exports = { mqttClient, publishEvent };

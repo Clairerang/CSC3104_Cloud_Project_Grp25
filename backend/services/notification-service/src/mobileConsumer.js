@@ -1,4 +1,5 @@
-const { Kafka } = require('kafkajs');
+const mqtt = require('mqtt');
+const { v4: uuidv4 } = require('uuid');
 const { connectMongo, models } = require('./models');
 const admin = require('firebase-admin');
 
@@ -34,8 +35,22 @@ function initFirebase() {
   }
 }
 
-const kafka = new Kafka({ clientId: 'mobile-consumer', brokers: [process.env.KAFKA_BROKER || 'kafka:9092'] });
-const consumer = kafka.consumer({ groupId: 'mobile-delivery-group' });
+const MQTT_BROKER = process.env.MQTT_BROKER || 'hivemq';
+const MQTT_PORT = process.env.MQTT_PORT || 1883;
+
+const mqttClient = mqtt.connect(`mqtt://${MQTT_BROKER}:${MQTT_PORT}`, {
+  clientId: `mobile-consumer-${uuidv4()}`,
+  clean: true,
+  reconnectPeriod: 1000
+});
+
+mqttClient.on('connect', () => {
+  console.log(`✅ Mobile consumer MQTT connected to ${MQTT_BROKER}:${MQTT_PORT}`);
+});
+
+mqttClient.on('error', (err) => {
+  console.error('❌ Mobile consumer MQTT connection error:', err);
+});
 
 // Optional send delay to avoid race where a freshly-created token
 // may not have fully propagated to FCM. Configure with env
@@ -122,48 +137,55 @@ async function startMobileConsumer() {
     console.warn('connectMongo warning in mobileConsumer', e && e.message ? e.message : e);
   }
 
-  await consumer.connect();
-  await consumer.subscribe({ topic: 'notification.events', fromBeginning: false });
-  console.log('📲 Mobile consumer subscribed to notification.events');
+  // Subscribe to notification/events MQTT topic
+  mqttClient.subscribe('notification/events', { qos: 1 }, (err) => {
+    if (err) {
+      console.error('❌ Failed to subscribe to notification/events:', err);
+    } else {
+      console.log('📲 Mobile consumer subscribed to notification/events');
+    }
+  });
 
-  await consumer.run({
-    eachMessage: async ({ message }) => {
-      let event = null;
-      try { event = JSON.parse(message.value.toString()); } catch (e) { console.warn('mobileConsumer: invalid JSON'); return; }
+  // Handle incoming MQTT messages
+  mqttClient.on('message', async (topic, mqttMessage) => {
+    if (topic !== 'notification/events') return;
+    
+    let event = null;
+    try { event = JSON.parse(mqttMessage.toString()); } catch (e) { console.warn('mobileConsumer: invalid JSON'); return; }
 
-      // only deliver to mobile targets
-      const targets = event.target || event.targets || [];
-      if (!targets.includes('mobile')) return;
+    // only deliver to mobile targets
+    const targets = event.target || event.targets || [];
+    if (!targets.includes('mobile')) return;
 
-      // find device tokens for user
-      try {
-        const tokens = await models.DeviceToken.find({ userId: event.userId, revoked: { $ne: true } }).lean().exec();
-        if (!tokens || tokens.length === 0) {
-          console.log('mobileConsumer: no device tokens for', event.userId);
-          return;
-        }
+    // find device tokens for user
+    try {
+      const tokens = await models.DeviceToken.find({ userId: event.userId, revoked: { $ne: true } }).lean().exec();
+      if (!tokens || tokens.length === 0) {
+        console.log('mobileConsumer: no device tokens for', event.userId);
+        return;
+      }
 
-        const message = {
-          notification: {
-            title: event.title || (event.type === 'checkin' ? 'Check-in received' : 'Notification'),
-            body: event.body || `Event: ${event.type}`
-          },
-          data: { payload: JSON.stringify(event) }
-        };
+      const message = {
+        notification: {
+          title: event.title || (event.type === 'checkin' ? 'Check-in received' : 'Notification'),
+          body: event.body || `Event: ${event.type}`
+        },
+        data: { payload: JSON.stringify(event) }
+      };
 
-        // send to each token
-        for (const t of tokens) {
-          try {
-            console.log('📣 Sending push to token (preview):', (t.token || '').slice(0,24) + '...');
-            if (FCM_SEND_DELAY_MS > 0) {
-              console.log(`⏳ Delaying send for ${FCM_SEND_DELAY_MS}ms to allow token propagation`);
-              await sleep(FCM_SEND_DELAY_MS);
-            }
-            const resp = await admin.messaging().sendToDevice(t.token, message);
-            console.log('📲 Sent push to', t.token, 'resp:', resp && resp.results ? resp.results.length : '(no results)');
-            // update lastSeenAt
-            await models.DeviceToken.updateOne({ _id: t._id }, { $set: { lastSeenAt: new Date() } });
-          } catch (err) {
+      // send to each token
+      for (const t of tokens) {
+        try {
+          console.log('📣 Sending push to token (preview):', (t.token || '').slice(0,24) + '...');
+          if (FCM_SEND_DELAY_MS > 0) {
+            console.log(`⏳ Delaying send for ${FCM_SEND_DELAY_MS}ms to allow token propagation`);
+            await sleep(FCM_SEND_DELAY_MS);
+          }
+          const resp = await admin.messaging().sendToDevice(t.token, message);
+          console.log('📲 Sent push to', t.token, 'resp:', resp && resp.results ? resp.results.length : '(no results)');
+          // update lastSeenAt
+          await models.DeviceToken.updateOne({ _id: t._id }, { $set: { lastSeenAt: new Date() } });
+        } catch (err) {
             // Log richer error info to help diagnose 4xx/5xx responses from FCM
             try {
               console.error('❌ sendToDevice error', {
@@ -201,9 +223,8 @@ async function startMobileConsumer() {
             }
           }
         }
-      } catch (e) {
-        console.error('mobileConsumer error', e && e.message ? e.message : e);
-      }
+    } catch (e) {
+      console.error('mobileConsumer error', e && e.message ? e.message : e);
     }
   });
 }

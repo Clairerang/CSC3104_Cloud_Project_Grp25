@@ -1,16 +1,16 @@
 {
   "name": "backend",
-  "version": "1.0.0",
-  "description": "npm init -y\r npm install express mongoose kafkajs redis dotenv\r npm install nodemailer\r npm install winston cors",
-  "main": "testProducer.js",
+  "version": "2.0.0",
+  "description": "CSC3104 Cloud Project - Backend microservices using HiveMQ MQTT, gRPC, and Firebase Cloud Messaging",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["mqtt", "hivemq", "grpc", "microservices", "firebase", "fcm"],
+  "author": "CSC3104 Group 25",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "kafkajs": "^2.2.4"
+    "mqtt": "^5.3.5"
   }
 }

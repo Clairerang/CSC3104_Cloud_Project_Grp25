@@ -38,21 +38,6 @@ const notificationEventSchema = new mongoose.Schema({
   receivedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-// Outbox table for reliable publish (Outbox pattern)
-const outboxSchema = new mongoose.Schema({
-  messageId: { type: String, default: () => new mongoose.Types.ObjectId().toString(), index: true },
-  eventType: String,
-  payload: { type: mongoose.Schema.Types.Mixed },
-  published: { type: Boolean, default: false },
-  attempts: { type: Number, default: 0 },
-  lastError: String,
-  createdAt: { type: Date, default: Date.now },
-  publishedAt: Date,
-  nextAttemptAt: Date
-});
-
-const Outbox = mongoose.models.Outbox || mongoose.model('Outbox', outboxSchema);
-
 // Existing models used by kafkaConsumer (idempotency + retry)
 const processedSchema = new mongoose.Schema({ messageId: { type: String, unique: true }, processedAt: Date }, { timestamps: true });
 const retryJobSchema = new mongoose.Schema({ event: { type: mongoose.Schema.Types.Mixed }, attempts: Number, nextAttemptAt: Date, createdAt: { type: Date, default: Date.now } });
@@ -128,7 +113,6 @@ module.exports = {
     RetryJob,
     NotificationEvent,
     DeviceToken,
-    Outbox,
     VerifiedPhone,
   }
 };

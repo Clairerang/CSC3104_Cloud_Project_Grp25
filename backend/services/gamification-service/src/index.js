@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const { startKafkaConsumer } = require("./kafkaConsumer");
+const { startMqttConsumer } = require("./mqttClient");
 const { publishEventViaGrpc } = require('./notificationGrpcClient');
 
 const app = express();
@@ -26,5 +26,5 @@ app.post('/rpc-publish', (req, res) => {
 const PORT = process.env.PORT || 4001;
 app.listen(PORT, () => {
   console.log(`🎮 Gamification Service listening on port ${PORT}`);
-  startKafkaConsumer();
+  startMqttConsumer();
 });

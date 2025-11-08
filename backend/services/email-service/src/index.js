@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { Kafka } = require('kafkajs');
+const mqtt = require('mqtt');
+const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const winston = require('winston');
 
@@ -8,8 +9,24 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console({ format: winston.format.simple() })]
 });
 
-const KAFKA_BROKER = process.env.KAFKA_BROKER || 'kafka:9092';
-const TOPIC = process.env.EMAIL_TOPIC || 'notification.events';
+const MQTT_BROKER = process.env.MQTT_BROKER || 'hivemq';
+const MQTT_PORT = process.env.MQTT_PORT || 1883;
+const TOPIC = 'notification/events';
+
+// MQTT setup
+const mqttClient = mqtt.connect(`mqtt://${MQTT_BROKER}:${MQTT_PORT}`, {
+  clientId: `email-service-${uuidv4()}`,
+  clean: true,
+  reconnectPeriod: 1000
+});
+
+mqttClient.on('connect', () => {
+  logger.info(`✅ MQTT connected to HiveMQ at ${MQTT_BROKER}:${MQTT_PORT}`);
+});
+
+mqttClient.on('error', (err) => {
+  logger.error('❌ MQTT connection error:', err);
+});
 
 // Setup Nodemailer transporter (Gmail SMTP for dev)
 const transporter = nodemailer.createTransport({
@@ -63,42 +80,41 @@ async function sendEmail({ to, subject, text, html }) {
 }
 
 async function start() {
-  const kafka = new Kafka({ brokers: [KAFKA_BROKER] });
-  const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP || 'email-service-group' });
+  // Subscribe to notification/events MQTT topic
+  mqttClient.subscribe(TOPIC, { qos: 1 }, (err) => {
+    if (err) {
+      logger.error('❌ Failed to subscribe to notification/events:', err);
+      return;
+    }
+    logger.info(`📧 Email service subscribed to ${TOPIC}`);
+  });
 
-  await consumer.connect();
-  logger.info(`Connected to Kafka broker ${KAFKA_BROKER}`);
-  // For dev: start from beginning so we consume previously-published test messages
-  await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
-  logger.info(`Subscribed to topic ${TOPIC}`);
+  // Handle incoming MQTT messages
+  mqttClient.on('message', async (topic, message) => {
+    try {
+      const raw = message.toString();
+      const evt = JSON.parse(raw);
+      logger.info(`Received event type='${evt.type}' userId='${evt.userId || ''}'`);
 
-  await consumer.run({
-    eachMessage: async ({ topic, partition, message }) => {
+      // Only handle daily_login events (adjust as needed)
+      if (evt.type !== 'daily_login' && evt.type !== 'email.send') return;
+
+      // Determine recipient(s)
+      const to = evt.familyEmail || (evt.to ? (Array.isArray(evt.to) ? evt.to.join(',') : evt.to) : process.env.EMAIL_USER);
+      const name = evt.userName || evt.userId || 'User';
+      const subject = evt.subject || `Daily login: ${name}`;
+      const text = evt.text || `${name} checked in today.`;
+      const html = evt.html || `<p>${name} checked in today.</p>`;
+
       try {
-        const raw = message.value.toString();
-        const evt = JSON.parse(raw);
-        logger.info(`Received event type='${evt.type}' userId='${evt.userId || ''}'`);
-
-        // Only handle daily_login events (adjust as needed)
-        if (evt.type !== 'daily_login' && evt.type !== 'email.send') return;
-
-        // Determine recipient(s)
-        const to = evt.familyEmail || (evt.to ? (Array.isArray(evt.to) ? evt.to.join(',') : evt.to) : process.env.EMAIL_USER);
-        const name = evt.userName || evt.userId || 'User';
-        const subject = evt.subject || `Daily login: ${name}`;
-        const text = evt.text || `${name} checked in today.`;
-        const html = evt.html || `<p>${name} checked in today.</p>`;
-
-        try {
-          const res = await sendEmail({ to, subject, text, html });
-          logger.info(`Email sent: ${res && res.messageId ? res.messageId : JSON.stringify(res)}`);
-        } catch (err) {
-          logger.error('Error sending email', err && err.message ? err.message : err);
-          // In a production system, push to DLQ or implement retry logic here
-        }
-      } catch (e) {
-        logger.error('Failed to process Kafka message', e && e.message ? e.message : e);
+        const res = await sendEmail({ to, subject, text, html });
+        logger.info(`Email sent: ${res && res.messageId ? res.messageId : JSON.stringify(res)}`);
+      } catch (err) {
+        logger.error('Error sending email', err && err.message ? err.message : err);
+        // In a production system, push to DLQ or implement retry logic here
       }
+    } catch (e) {
+      logger.error('Failed to process MQTT message', e && e.message ? e.message : e);
     }
   });
 }

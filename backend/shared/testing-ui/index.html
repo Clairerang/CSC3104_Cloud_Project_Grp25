@@ -147,6 +147,42 @@
       .ai-message.user .ai-message-avatar {
         background: #d1d5db;
       }
+      .ai-quick-actions {
+        padding: 16px 12px 8px 12px;
+        background: #f9fafb;
+        border-top: 1px solid #e5e7eb;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .ai-quick-btn {
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 14px 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+      }
+      .ai-quick-btn:hover {
+        border-color: #667eea;
+        background: #f0f4ff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.2);
+      }
+      .ai-quick-btn:active {
+        transform: translateY(0);
+      }
+      .ai-quick-btn .emoji {
+        font-size: 24px;
+        line-height: 1;
+      }
       .ai-chat-input-area {
         padding: 12px;
         background: white;
@@ -286,6 +322,24 @@
             Hello! I'm your AI companion. How can I help you today?
           </div>
         </div>
+      </div>
+      <div class="ai-quick-actions">
+        <button class="ai-quick-btn" data-action="sms">
+          <span class="emoji">📱</span>
+          <span>SMS Family</span>
+        </button>
+        <button class="ai-quick-btn" data-action="community">
+          <span class="emoji">🎉</span>
+          <span>Events</span>
+        </button>
+        <button class="ai-quick-btn" data-action="game">
+          <span class="emoji">🎮</span>
+          <span>Play Game</span>
+        </button>
+        <button class="ai-quick-btn" data-action="weather">
+          <span class="emoji">☀️</span>
+          <span>Weather</span>
+        </button>
       </div>
       <div class="ai-chat-input-area">
         <input 
@@ -789,6 +843,24 @@
           const message = aiChatInput.value;
           sendAIMessage(message);
         }
+      });
+
+      // Quick action buttons for elderly-friendly interface
+      const quickActionMessages = {
+        sms: "I want to send SMS to my family",
+        community: "What events are happening near me?",
+        game: "I want to play a game",
+        weather: "How is the weather today? Should I go out?"
+      };
+
+      document.querySelectorAll('.ai-quick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          const message = quickActionMessages[action];
+          if (message) {
+            sendAIMessage(message);
+          }
+        });
       });
 
       // Close chat on Escape key

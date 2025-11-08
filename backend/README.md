@@ -1,791 +1,530 @@
-# Senior Care Notification System - Backend
+# ElderCare Connect - Backend Services
 
-A microservices-based notification platform for senior care applications, featuring SMS verification (OTP), urgent messaging, gamification, and comprehensive monitoring.
+> **MQTT-based microservices platform** for elderly care notifications, AI companionship, and real-time communication.
 
-## 📁 Project Structure
+## 📁 Current Architecture
 
 ```
 backend/
-├── services/                      # All microservices
-│   ├── notification-service/      # Main API gateway & orchestrator
-│   ├── sms-service/              # SMS delivery & OTP verification
-│   ├── email-service/            # Email notifications
-│   └── gamification-service/     # Badges, points, streaks
+├── services/
+│   ├── event-dispatcher-service/     # API Gateway (Port 4002)
+│   ├── ai-companion-service/         # AI Chat with Gemini (Port 4015)
+│   ├── sms-dispatcher-service/       # SMS Notifications (Port 4004)
+│   ├── email-dispatcher-service/     # Email Notifications (Port 4003)
+│   └── push-notification-service/    # Firebase Push (Port 4020)
 │
-├── config/                        # Configuration files
-│   ├── secrets/                   # 🔒 GIT-IGNORED - Credentials
-│   │   ├── .env                   # Environment variables
-│   │   ├── .env.example           # Template (safe to commit)
-│   │   └── firebase-sa.json       # Firebase service account
-│   │
-│   ├── grafana/                   # Monitoring dashboards
-│   ├── prometheus/                # Metrics configuration
-│   └── protos/                    # gRPC definitions
+├── testing-notification/             # Browser testing UI
+│   ├── index.html                    # Main test interface
+│   └── dashboard.html                # Push notification dashboard
 │
-├── shared/                        # Shared utilities
-│   ├── testing-ui/                # Browser test interfaces
-│   │   ├── index.html             # Main testing page
-│   │   ├── complete-flow.html     # Phone verification flow
-│   │   └── verify-test.html       # OTP standalone test
-│   └── scripts/                   # Helper scripts
-│
-├── docker-compose.yml             # Main service definitions
-├── docker-compose.override.yml    # Local overrides
-└── README.md                      # This file
+├── docker-compose.yml                # Service orchestration
+└── README.md                         # This file
 ```
+
+## 🏗️ System Architecture
+
+### Message Flow (MQTT-based)
+
+```
+Client → Event Dispatcher → MQTT Broker (HiveMQ) → Dispatchers → External APIs
+                                  ↓
+                              MongoDB (Persistence)
+```
+
+### Active Services
+
+| Service | Port | Purpose | Technology |
+|---------|------|---------|------------|
+| **Event Dispatcher** | 4002 | API Gateway & Event Publisher | Node.js, Express, MQTT |
+| **AI Companion** | 4015 | Conversational AI | Node.js, Google Gemini 2.0 |
+| **SMS Dispatcher** | 4004 | SMS Delivery | Node.js, Twilio |
+| **Email Dispatcher** | 4003 | Email Delivery | Node.js, Nodemailer |
+| **Push Notification** | 4020 | Mobile Push | Node.js, Firebase FCM |
+| **HiveMQ** | 1883/8080 | MQTT Message Broker | MQTT 3.1.1, QoS 1 |
+| **MongoDB** | 27017 | Database | NoSQL Document Store |
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker Desktop (Windows/Mac) or Docker Engine (Linux)
-- Git
-- **Service Accounts (for production features)**:
-  - [Twilio Account](https://www.twilio.com/try-twilio) - For SMS & OTP verification
-  - [Gmail SMTP](https://support.google.com/mail/answer/185833) - For email notifications
-  - [Firebase Project](https://console.firebase.google.com/) - For push notifications
 
-### 1. Clone & Setup
+- **Docker Desktop** 24.0+ or Docker Engine
+- **Git** 2.30+
+- **External Accounts**:
+  - [Twilio](https://www.twilio.com/try-twilio) - SMS/OTP
+  - [Gmail SMTP](https://myaccount.google.com/apppasswords) - Email
+  - [Firebase](https://console.firebase.google.com/) - Push notifications
+  - [Google AI Studio](https://ai.google.dev/) - Gemini API
+
+### Setup & Start
 
 ```powershell
-# Clone repository
-git clone <repository-url>
-cd CSC3104_Cloud_Project_Grp25/backend
+# 1. Clone repository
+git clone <repo-url>
+cd backend
 
-# Create secrets from template
-Copy-Item config/secrets/.env.example config/secrets/.env
+# 2. Create environment file
+Copy-Item .env.example .env
+Need .env just message jerald
 
-# Edit config/secrets/.env with your credentials (see Step 2 below)
-notepad config/secrets/.env
+# 3. Edit .env with your credentials
+notepad .env
+
+# 4. Start all services
+docker compose up -d
+
+# 5. Check status
+docker compose ps
+
+# 6. View logs
+docker compose logs -f
 ```
 
-### 2. Configure Secrets (REQUIRED)
+### Access Points
 
-⚠️ **IMPORTANT**: The `config/secrets/` folder is **git-ignored** to protect your credentials. Never commit `.env` or `firebase-sa.json` files!
+- **Testing UI**: http://localhost:4002/testing-notification/
+- **Event Dispatcher API**: http://localhost:4002
+- **AI Companion API**: http://localhost:4015
+- **SMS Dispatcher**: http://localhost:4004
+- **Email Dispatcher**: http://localhost:4003
+- **Push Notification**: http://localhost:4020
+- **HiveMQ Dashboard**: http://localhost:8080
+- **MongoDB**: mongodb://localhost:27017
 
-#### 🔐 Setting Up Credentials
+## 🔐 Environment Configuration
 
-Edit `config/secrets/.env` with your actual service credentials:
+Create `.env` file in backend root:
 
 ```env
-# ===========================================
-# TWILIO SMS SERVICE (Required for SMS/OTP)
-# ===========================================
-# Get these from: https://console.twilio.com/
-SMS_PROVIDER=twilio
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # Your Account SID
-TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # Your Auth Token
-TWILIO_FROM=+1234567890  # Your Twilio phone number (E.164 format)
+# ============================================
+# TWILIO SMS SERVICE
+# ============================================
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_FROM=+1234567890
+TWILIO_VERIFY_SERVICE_SID=VAxxxxxxxxxxxxx
 
-# Twilio Verify Service (for OTP verification)
-# Create at: https://console.twilio.com/us1/develop/verify/services
-TWILIO_VERIFY_SERVICE_SID=VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# ⚠️ TRIAL ACCOUNT LIMITS:
-# - 50 messages/day limit
-# - Can only send to verified phone numbers
-# - Messages include "Sent from your Twilio trial account"
-# To remove limits: Upgrade account ($20 credit minimum)
-
-# ===========================================
-# EMAIL SERVICE (Gmail SMTP)
-# ===========================================
-# Use Gmail App Password: https://support.google.com/mail/answer/185833
+# ============================================
+# EMAIL SERVICE (Gmail)
+# ============================================
 EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=xxxx xxxx xxxx xxxx  # Gmail App Password (16 chars with spaces)
+EMAIL_PASS=xxxx xxxx xxxx xxxx    # App Password
 EMAIL_FROM=your-email@gmail.com
 
-# ===========================================
-# FIREBASE (Push Notifications)
-# ===========================================
-# 1. Create Firebase project: https://console.firebase.google.com/
-# 2. Enable Firebase Cloud Messaging (FCM)
-# 3. Add Web App to get these keys
-FIREBASE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# ============================================
+# FIREBASE PUSH NOTIFICATIONS
+# ============================================
+FIREBASE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXX
 FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
 FIREBASE_PROJECT_ID=your-project-id
 FIREBASE_STORAGE_BUCKET=your-project.appspot.com
 FIREBASE_MESSAGING_SENDER_ID=123456789012
-FIREBASE_APP_ID=1:123456789012:web:abcdef1234567890
-FIREBASE_VAPID_KEY=BXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+FIREBASE_APP_ID=1:123456:web:abc123
+FIREBASE_VAPID_KEY=BXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-# 4. Download Service Account JSON:
-#    Project Settings → Service Accounts → Generate New Private Key
-#    Save as: config/secrets/firebase-sa.json
-FCM_FALLBACK_V1=true
+# Also download firebase-sa.json and place in backend/
 
-# ===========================================
+# ============================================
+# GOOGLE AI STUDIO (Gemini)
+# ============================================
+GOOGLE_AI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXX
+
+# ============================================
 # DATABASE & MESSAGING (Auto-configured)
-# ===========================================
-MONGO_URI=mongodb://mongo:27017/notification-system
-KAFKA_BROKERS=kafka:9092
+# ============================================
+MONGO_URI=mongodb://mongo:27017/notification
+MQTT_BROKER_URL=mqtt://hivemq:1883
 ```
 
-#### 📱 Twilio Setup Guide
+### Quick Setup Links
 
-1. **Create Account**: Go to [twilio.com/try-twilio](https://www.twilio.com/try-twilio)
-2. **Get Phone Number**: 
-   - Navigate to **Phone Numbers** → Buy a number
-   - Trial accounts get 1 free number
-3. **Find Credentials**:
-   - **Account SID** & **Auth Token**: Dashboard home page
-   - Copy to `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
-4. **Create Verify Service**:
-   - Go to **Verify** → **Services** → Create new
-   - Copy Service SID to `TWILIO_VERIFY_SERVICE_SID`
-5. **Add Verified Numbers** (Trial only):
-   - **Phone Numbers** → **Verified Caller IDs** → Add number
-   - Trial accounts can only send to verified numbers
-
-⚠️ **Twilio Trial Limitations**:
-- **50 messages/day** - Resets at midnight UTC
-- **Verified numbers only** - Must verify recipients first
-- **"Trial account" prefix** in messages
-- **Solution**: Upgrade account or use mock adapter for development
-
-#### 📧 Gmail SMTP Setup
-
-1. **Enable 2FA**: Google Account → Security → 2-Step Verification
-2. **Create App Password**:
-   - Security → 2-Step Verification → App passwords
-   - Select **Mail** and **Other (Custom name)**
-   - Copy 16-character password to `EMAIL_PASS`
-3. **Use your Gmail address** for `EMAIL_USER` and `EMAIL_FROM`
-
-#### 🔥 Firebase Setup
-
-1. **Create Project**: [console.firebase.google.com](https://console.firebase.google.com/)
-2. **Add Web App**:
-   - Project Overview → Add app → Web (</>) icon
-   - Copy config values to `.env`
-3. **Enable Cloud Messaging**:
-   - Build → Cloud Messaging
-   - Generate VAPID key → Copy to `FIREBASE_VAPID_KEY`
-4. **Download Service Account**:
-   - Project Settings → Service Accounts
-   - Click **Generate New Private Key**
-   - Save as `config/secrets/firebase-sa.json`
-
-```powershell
-# Verify firebase-sa.json exists:
-Test-Path config/secrets/firebase-sa.json  # Should return: True
-```
-
-### 3. Start Services
-
-```powershell
-# Start all services
-docker compose up -d
-
-# Check status
-docker compose ps
-
-# View logs
-docker compose logs -f notification
-```
-
-### 4. Access Services
-
-- **Main Testing UI**: http://localhost:4002/testing-notification/
-- **Phone Verification Flow**: http://localhost:4002/testing-notification/complete-flow.html
-- **OTP Test**: http://localhost:4002/testing-notification/verify-test.html
-- **Notification Service**: http://localhost:4002
-- **SMS Service**: http://localhost:4004
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/admin)
-
-## 🏗️ Architecture
-
-### Event Flow
-
-```
-Mobile App / Admin Portal
-         ↓
-  Notification Service (4002)
-         ↓
-    Apache Kafka
-    ↙         ↘
-SMS Service  Email Service
-   (4004)       (4003)
-```
-
-### Key Features
-
-- **OTP Verification**: Twilio Verify API for phone number verification
-- **Urgent SMS**: Send to verified phones without OTP
-- **Event-Driven**: Apache Kafka (KRaft mode) for reliable messaging
-- **Outbox Pattern**: MongoDB persistence before Kafka publishing
-- **Monitoring**: Prometheus metrics + Grafana dashboards
-- **Pluggable Adapters**: Mock/Twilio SMS adapters
+1. **Twilio**: https://console.twilio.com/ → Get Account SID, Auth Token, Phone Number
+2. **Gmail App Password**: https://myaccount.google.com/apppasswords → Generate 16-char password
+3. **Firebase**: https://console.firebase.google.com/ → Create project, enable FCM, download service account
+4. **Google AI**: https://ai.google.dev/ → Get API key for Gemini
 
 ## 📡 API Reference
 
-### Notification Service (Port 4002)
+### Event Dispatcher (4002) - Main Gateway
 
-#### Phone Verification
+#### Send Notification Event
 
 ```bash
-# Save verified phone
-POST /verify-phone/save
+POST /events
 Content-Type: application/json
 
 {
+  "type": "sms",
   "userId": "user123",
-  "phoneNumber": "+6598765432",
-  "relationship": "self"  # self|family|caregiver|emergency
-}
-
-# List verified phones
-GET /verify-phone/list?userId=user123
-
-# Send urgent SMS (no OTP)
-POST /send-urgent-sms
-Content-Type: application/json
-
-{
-  "userId": "user123",
-  "message": "URGENT: Your elderly parent needs assistance!"
+  "message": "Your medication reminder",
+  "phoneNumber": "+6512345678"
 }
 ```
 
-### SMS Service (Port 4004)
+#### Health Check
+
+```bash
+GET /health
+# Returns: { status: "healthy", timestamp: "..." }
+```
+
+### AI Companion (4015) - Conversational AI
+
+#### Chat with AI
+
+```bash
+POST /chat
+Content-Type: application/json
+
+{
+  "userId": "user123",
+  "message": "What community events in Hougang?"
+}
+
+# Response includes:
+# - Real Singapore community events
+# - Weather forecasts with elderly safety advice
+# - Sentiment analysis
+# - Intent detection
+```
+
+**Features**:
+- ✅ **Real Data**: Singapore community events, weather
+- ✅ **Location-Aware**: Detects neighborhoods (Hougang, Tampines, etc.)
+- ✅ **Time-Aware**: Morning/afternoon/evening recommendations
+- ✅ **7 Intents**: Loneliness, SMS Family, Community Events, Weather, Medication, Volunteers, Games
+
+#### Get Chat History
+
+```bash
+GET /history/:userId
+# Returns conversation history with sentiment analysis
+```
+
+### SMS Dispatcher (4004)
+
+#### Send SMS
+
+```bash
+POST /send-sms
+{
+  "to": "+6512345678",
+  "message": "Test message"
+}
+```
 
 #### OTP Verification
 
 ```bash
-# Send OTP code
+# Send OTP
 POST /verify/send
-Content-Type: application/json
-
 {
-  "to": "+6598765432",
-  "channel": "sms"  # sms|call|whatsapp
+  "to": "+6512345678",
+  "channel": "sms"
 }
 
-# Verify OTP code
+# Verify OTP
 POST /verify/check
-Content-Type: application/json
-
 {
-  "to": "+6598765432",
+  "to": "+6512345678",
   "code": "123456"
 }
 ```
 
-#### Direct SMS
+### Email Dispatcher (4003)
 
 ```bash
-# Send SMS (bypasses Kafka)
-POST /send-sms
-Content-Type: application/json
-
+POST /send-email
 {
-  "to": "+6598765432",
-  "message": "Test message"
+  "to": "recipient@example.com",
+  "subject": "Test Subject",
+  "body": "Test message"
+}
+```
+
+### Push Notification (4020)
+
+```bash
+# Save device token
+POST /save-token
+{
+  "userId": "user123",
+  "token": "fcm_device_token_here"
+}
+
+# Send push notification
+POST /send-push
+{
+  "userId": "user123",
+  "title": "Notification Title",
+  "body": "Notification message"
 }
 ```
 
 ## 🧪 Testing
 
-### Browser Testing
+### Browser Testing UI
 
-1. **Complete Flow Test** (Recommended)
-   - Visit: http://localhost:4002/testing-notification/complete-flow.html
-   - Steps:
-     1. View verified phones for a user
-     2. Verify new phone with OTP
-     3. Send urgent SMS to all verified phones
+Visit: **http://localhost:4002/testing-notification/**
 
-2. **Standalone OTP Test**
-   - Visit: http://localhost:4002/testing-notification/verify-test.html
-   - Quick OTP send/verify testing
+Features:
+- ✅ **SMS Test**: Send test SMS to any number
+- ✅ **Email Test**: Send test emails
+- ✅ **Push Test**: Test Firebase notifications
+- ✅ **AI Chat**: Interactive AI companion testing
 
 ### PowerShell Testing
 
 ```powershell
-# Test OTP send
-Invoke-RestMethod -Uri "http://localhost:4004/verify/send" `
+# Test AI Companion
+$body = @{
+  userId = "test123"
+  message = "What's the weather in Singapore?"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:4015/chat" `
   -Method POST `
   -ContentType "application/json" `
-  -Body '{"to":"+6598765432","channel":"sms"}'
+  -Body $body
 
-# Test OTP verify
-Invoke-RestMethod -Uri "http://localhost:4004/verify/check" `
+# Test SMS
+$body = @{
+  to = "+6512345678"
+  message = "Test SMS from ElderCare"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:4004/send-sms" `
   -Method POST `
   -ContentType "application/json" `
-  -Body '{"to":"+6598765432","code":"123456"}'
+  -Body $body
 
-# Test urgent SMS
-Invoke-RestMethod -Uri "http://localhost:4002/send-urgent-sms" `
+# Test Event Dispatcher
+$body = @{
+  type = "sms"
+  userId = "user123"
+  message = "Medication reminder"
+  phoneNumber = "+6512345678"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:4002/events" `
   -Method POST `
   -ContentType "application/json" `
-  -Body '{"userId":"user123","message":"Test urgent message"}'
+  -Body $body
 ```
 
-## 🔒 Security & Secrets
-
-### What's Git-Ignored
-
-```gitignore
-config/secrets/.env
-config/secrets/firebase-sa.json
-config/secrets/*.key
-config/secrets/*.pem
-```
-
-### Secrets Best Practices
-
-✅ **DO:**
-- Keep all secrets in `config/secrets/`
-- Use `.env.example` as template
-- Rotate credentials every 90 days
-- Use Docker secrets in production
-
-❌ **DON'T:**
-- Commit `.env` files
-- Hardcode credentials
-- Share secrets via email/Slack
-- Use production secrets in development
-
-### If Secrets Were Committed
-
-```powershell
-# Remove from Git (file stays on disk)
-git rm --cached config/secrets/.env
-git commit -m "Remove secrets from tracking"
-
-# Rotate compromised credentials immediately
-# - Change Twilio credentials in console
-# - Regenerate Firebase keys
-# - Update SMTP passwords
-```
-
-## 🐛 Troubleshooting
-
-### Twilio Errors
-
-#### Error 30039 - Message Loops
-**Cause**: Too many messages sent to same number in short time
-**Solution**: Rate limiting implemented (10-minute window)
-
-#### Error 30454 - Geographic Permissions
-**Cause**: Destination country blocked (e.g., Singapore)
-**Solution**: Enable at https://console.twilio.com/us1/develop/sms/settings/geo-permissions
-
-#### Error 63038 - Daily Limit
-**Cause**: Trial account hit quota (50 messages/day)
-**Solutions**:
-- Wait for reset (8 AM SGT)
-- Upgrade to pay-as-you-go ($20 credit → ~2,667 messages)
-
-### Docker Issues
-
-```powershell
-# Service won't start
-docker compose logs <service-name> --tail=100
-
-# Port conflicts
-netstat -ano | findstr "4002"  # Find process using port
-Stop-Process -Id <PID>         # Kill conflicting process
-
-# Rebuild after code changes
-docker compose up -d --build <service-name>
-
-# Nuclear option (removes all data)
-docker compose down
-docker volume prune
-docker compose up -d
-```
-
-### Kafka Issues
-
-```powershell
-# Check Kafka is running
-docker compose ps kafka
-
-# View topics
-docker compose exec kafka kafka-topics.sh --list --bootstrap-server localhost:9092
-
-# View consumer groups
-docker compose exec kafka kafka-consumer-groups.sh --list --bootstrap-server localhost:9092
-```
-
-## 📊 Monitoring
-
-### Prometheus Metrics
-
-All services expose metrics at `/metrics`:
-- http://localhost:4002/metrics (notification)
-- http://localhost:4004/metrics (sms)
-
-### Grafana Dashboards
-
-1. Access: http://localhost:3000 (admin/admin)
-2. Pre-configured dashboards in `config/grafana/dashboards/`
-3. Key metrics:
-   - SMS delivery rate
-   - OTP verification success rate
-   - Kafka lag
-   - API response times
-
-### Service Health Checks
+### Health Checks
 
 ```powershell
 # Check all services
 docker compose ps
 
-# Notification service health
-Invoke-RestMethod http://localhost:4002/health
-
-# SMS service health
-Invoke-RestMethod http://localhost:4004/health
+# Individual health checks
+Invoke-RestMethod http://localhost:4002/health  # Event Dispatcher
+Invoke-RestMethod http://localhost:4015/health  # AI Companion
+Invoke-RestMethod http://localhost:4004/health  # SMS
+Invoke-RestMethod http://localhost:4003/health  # Email
+Invoke-RestMethod http://localhost:4020/health  # Push
 ```
 
 ## 🔧 Development
 
-### Adding a New Service
-
-1. Create service directory:
-```powershell
-mkdir services/new-service
-cd services/new-service
-npm init -y
-```
-
-2. Add to `docker-compose.yml`:
-```yaml
-new-service:
-  build:
-    context: .
-    dockerfile: services/new-service/Dockerfile
-  env_file:
-    - config/secrets/.env
-  ports:
-    - "4005:4005"
-  depends_on:
-    - kafka
-    - mongo
-```
-
-3. Implement Kafka consumer/producer
-4. Add Prometheus metrics
-5. Add health check endpoint
-
-### Code Changes
+### View Logs
 
 ```powershell
-# Rebuild specific service
-docker compose up -d --build notification
+# All services
+docker compose logs -f
 
-# View logs
-docker compose logs -f notification
+# Specific service
+docker compose logs -f ai-companion
+docker compose logs -f sms-dispatcher
 
-# Restart without rebuild
-docker compose restart notification
+# Last 50 lines
+docker logs ai-companion --tail 50
+```
+
+### Restart Services
+
+```powershell
+# Restart all
+docker compose restart
+
+# Restart specific service
+docker compose restart ai-companion
+
+# Rebuild after code changes
+docker compose up -d --build ai-companion
 ```
 
 ### Database Access
 
 ```powershell
 # MongoDB shell
-docker compose exec mongo mongosh notification-system
+docker exec -it mongo mongosh notification
 
 # View collections
 show collections
 
-# Query verified phones
-db.verifiedphones.find().pretty()
+# Query data
+db.conversations.find().limit(5).pretty()
+db.notifications.find().limit(5).pretty()
 ```
 
-## 🚀 Production Deployment
-
-### Pre-Deployment Checklist
-
-- [ ] All secrets in environment variables (not files)
-- [ ] Docker secrets configured
-- [ ] Kafka replication factor > 1
-- [ ] MongoDB replica set configured
-- [ ] Health checks enabled
-- [ ] Prometheus alerts configured
-- [ ] Log aggregation setup
-- [ ] Backup strategy implemented
-- [ ] Rate limiting tuned
-- [ ] SSL/TLS certificates valid
-
-### Docker Secrets (Production)
-
-```bash
-# Create secrets
-echo "ACxxx" | docker secret create twilio_account_sid -
-echo "xxx" | docker secret create twilio_auth_token -
-
-# Update docker-compose.yml
-services:
-  sms:
-    secrets:
-      - twilio_account_sid
-      - twilio_auth_token
-
-secrets:
-  twilio_account_sid:
-    external: true
-  twilio_auth_token:
-    external: true
-```
-
-### Environment-Specific Configs
+### MQTT Monitoring
 
 ```powershell
-# Development
-docker compose up -d
+# HiveMQ Dashboard
+# Visit: http://localhost:8080
 
-# Staging
-docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+# View MQTT logs
+docker logs hivemq --tail 100
 
-# Production
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Check MQTT connections
+docker exec hivemq cat /opt/hivemq/log/hivemq.log
 ```
 
 ## 🐛 Troubleshooting
 
-### SMS Service Issues
-
-#### ❌ "Account exceeded the 50 daily messages limit"
-
-**Problem**: Twilio trial accounts have a 50 message/day limit.
-
-**Solution**:
-```powershell
-# Option 1: Wait for daily reset (midnight UTC)
-# Check current time: https://www.timeanddate.com/worldclock/timezone/utc
-
-# Option 2: Use mock adapter for development
-# In config/secrets/.env, change:
-SMS_PROVIDER=mock  # Instead of 'twilio'
-
-# Restart SMS service
-docker compose restart sms
-
-# Test with mock adapter (no actual SMS sent, but logs show success)
-Invoke-RestMethod -Uri "http://localhost:4004/send-test" -Method POST -ContentType "application/json" -Body '{"to":"+6598765787","body":"Test"}'
-```
-
-**Option 3: Upgrade Twilio Account** (Removes limits)
-- Add $20 credit minimum
-- Removes "trial account" message prefix
-- No daily message limit
-- Can send to any number (not just verified)
-
-#### ❌ "TWILIO_FROM not set" or "Twilio credentials not configured"
-
-**Problem**: Missing environment variables in `.env` file.
-
-**Solution**:
-```powershell
-# 1. Verify .env file exists
-Test-Path config/secrets/.env  # Should return: True
-
-# 2. Check if variables are set
-Get-Content config/secrets/.env | Select-String "TWILIO"
-
-# 3. Ensure these variables exist:
-# SMS_PROVIDER=twilio
-# TWILIO_ACCOUNT_SID=ACxxxxx...
-# TWILIO_AUTH_TOKEN=xxxxx...
-# TWILIO_FROM=+1234567890
-# TWILIO_VERIFY_SERVICE_SID=VAxxxxx...
-
-# 4. Restart SMS service to reload environment
-docker compose restart sms
-
-# 5. Verify variables loaded in container
-docker exec sms env | Select-String "TWILIO"
-```
-
-#### ❌ "Cannot send to unverified numbers" (Trial accounts)
-
-**Problem**: Twilio trial can only send to verified phone numbers.
-
-**Solution**:
-1. Log into [Twilio Console](https://console.twilio.com/)
-2. Go to **Phone Numbers** → **Verified Caller IDs**
-3. Click **+** to add new number
-4. Enter phone number in E.164 format (e.g., +6598765787)
-5. Verify via SMS or call
-6. Now you can send to that number
-
-### OTP Verification Issues
-
-#### ❌ "Too many verification requests" (Error 30039)
-
-**Problem**: Twilio rate limiting - too many verification codes sent too quickly.
-
-**Solution**:
-```powershell
-# The service has built-in rate limiting (10 minutes between requests)
-# Wait 10 minutes before requesting a new code for the same phone number
-
-# Check logs for rate limit messages:
-docker logs sms | Select-String "Rate limit"
-```
-
-#### ❌ "Invalid verification code"
-
-**Causes**:
-1. Code expired (10 minutes validity)
-2. Wrong code entered
-3. Code already used
-
-**Solution**:
-```powershell
-# Request new code:
-Invoke-RestMethod -Uri "http://localhost:4004/verify/send" -Method POST -ContentType "application/json" -Body '{"to":"+6512345678"}'
-
-# Check new code in SMS and verify within 10 minutes
-```
-
-### Email Service Issues
-
-#### ❌ "Failed to send email" / "Invalid login"
-
-**Problem**: Gmail SMTP authentication failed.
-
-**Solution**:
-```powershell
-# 1. Enable 2-Factor Authentication on Gmail account
-# 2. Generate App Password (NOT your regular password):
-#    https://myaccount.google.com/apppasswords
-# 3. Update .env with 16-character app password:
-EMAIL_PASS=xxxx xxxx xxxx xxxx
-
-# 4. Restart email service
-docker compose restart email
-```
-
-### Firebase/Push Notification Issues
-
-#### ❌ "Firebase service account not found"
-
-**Problem**: `firebase-sa.json` file missing.
-
-**Solution**:
-```powershell
-# 1. Download from Firebase Console:
-#    Project Settings → Service Accounts → Generate New Private Key
-# 2. Save to: config/secrets/firebase-sa.json
-# 3. Verify file exists:
-Test-Path config/secrets/firebase-sa.json  # Should return: True
-
-# 4. Restart notification service
-docker compose restart notification
-```
-
-### Kafka Issues
-
-#### ❌ Services not receiving Kafka events
-
-**Problem**: Kafka consumer not connected or topic doesn't exist.
-
-**Solution**:
-```powershell
-# 1. Check Kafka is running
-docker compose ps kafka  # Should show "healthy"
-
-# 2. List topics
-docker exec kafka kafka-topics.sh --list --bootstrap-server localhost:9092
-
-# 3. Check consumer groups
-docker exec kafka kafka-consumer-groups.sh --list --bootstrap-server localhost:9092
-
-# 4. View consumer lag
-docker exec kafka kafka-consumer-groups.sh --describe --group sms-service-group --bootstrap-server localhost:9092
-
-# 5. Restart consumers
-docker compose restart sms email gamification
-```
-
-### General Issues
-
-#### ❌ "Port already in use"
-
-**Problem**: Another service using the same port.
-
-**Solution**:
-```powershell
-# Find process using port (example: 4004)
-Get-NetTCPConnection -LocalPort 4004 | Format-Table
-
-# Stop Docker services first
-docker compose down
-
-# Kill process if needed (use PID from above)
-Stop-Process -Id <PID> -Force
-
-# Restart services
-docker compose up -d
-```
-
-#### ❌ "Container keeps restarting"
-
-**Solution**:
-```powershell
-# Check logs for specific service
-docker logs <service-name> --tail 100
-
-# Common causes:
-# 1. Missing environment variables - check .env file
-# 2. Can't connect to dependencies - check Kafka/MongoDB health
-# 3. Port conflict - change port in docker-compose.yml
-
-# Rebuild service
-docker compose up -d --build <service-name>
-```
-
-## 🆘 Support
-
-### Common Commands
+### Services Not Starting
 
 ```powershell
-# View all logs
-docker compose logs -f
+# Check logs
+docker compose logs <service-name>
 
-# View specific service logs
-docker compose logs -f sms
+# Common issues:
+# 1. Port conflicts
+netstat -ano | findstr "4002"
+Stop-Process -Id <PID>
 
-# Restart all services
-docker compose restart
+# 2. Missing environment variables
+docker exec <service-name> env | Select-String "TWILIO"
 
-# Restart specific service
-docker compose restart sms
+# 3. MongoDB not ready
+docker logs mongo --tail 50
+docker restart mongo
 
-# Stop all services
-docker compose down
-
-# Clean rebuild
-docker compose down; docker compose up -d --build
-
-# Check resource usage
-docker stats
-
-# Check container health
-docker compose ps
+# 4. MQTT broker not ready
+docker logs hivemq --tail 50
+docker restart hivemq
 ```
 
-### Team Communication
+### AI Companion Issues
 
-- **Issues**: Create GitHub issue with logs
-- **Questions**: Check this README first
-- **Urgent**: Contact team lead
+```powershell
+# Check Gemini API key
+docker exec ai-companion env | Select-String "GOOGLE_AI"
 
-## 📚 Additional Resources
+# View AI logs
+docker logs ai-companion --tail 100
 
-- [Twilio Verify API](https://www.twilio.com/docs/verify/api)
+# Common errors:
+# - "API key not found" → Check GOOGLE_AI_API_KEY in .env
+# - "Rate limit exceeded" → Wait or upgrade API quota
+# - "publishEvent is not a function" → Fixed in latest version
+```
+
+### SMS/Email Not Sending
+
+```powershell
+# Check Twilio credentials
+docker exec sms-dispatcher env | Select-String "TWILIO"
+
+# Check Gmail credentials
+docker exec email-dispatcher env | Select-String "EMAIL"
+
+# Common errors:
+# - "Invalid credentials" → Verify API keys
+# - "Rate limit" → Wait or upgrade account
+# - "Unverified phone" (Twilio trial) → Verify phone in console
+```
+
+### MQTT Message Not Received
+
+```powershell
+# Check MQTT broker
+docker logs hivemq --tail 50
+
+# Check if dispatchers are subscribed
+docker logs sms-dispatcher | Select-String "MQTT"
+docker logs email-dispatcher | Select-String "MQTT"
+
+# Restart broker and dispatchers
+docker restart hivemq
+Start-Sleep 5
+docker restart sms-dispatcher email-dispatcher push-notification
+```
+
+## 📊 Architecture Decisions
+
+### Why MQTT instead of Kafka?
+
+✅ **Benefits**:
+- **Simpler**: No Zookeeper, easier to manage
+- **Lightweight**: Lower resource usage
+- **QoS 1**: Built-in at-least-once delivery
+- **Persistent sessions**: Messages retained for offline clients
+- **Pub/Sub**: Native topic-based routing
+
+### Why removed Outbox Pattern?
+
+✅ **Simplified**:
+- Direct MQTT publishing with QoS 1 guarantees delivery
+- MQTT broker handles persistence and retries
+- Reduced complexity (removed 90+ lines of code)
+- Fewer failure points
+
+### Why removed Gamification Service?
+
+✅ **Focus**:
+- Project focused on notifications and AI
+- Gamification can be added later if needed
+- Reduces deployment complexity
+
+## 🚀 Production Deployment
+
+### Docker Swarm
+
+```bash
+docker stack deploy -c docker-compose.yml eldercare
+```
+
+### Kubernetes
+
+```bash
+# Generate K8s manifests
+kompose convert -f docker-compose.yml
+
+# Deploy
+kubectl apply -f k8s/
+```
+
+### Environment Variables for Production
+
+```bash
+# Use Docker secrets
+echo "ACxxx" | docker secret create twilio_sid -
+echo "xxx" | docker secret create twilio_token -
+
+# Or use Kubernetes secrets
+kubectl create secret generic twilio-creds \
+  --from-literal=sid=ACxxx \
+  --from-literal=token=xxx
+```
+
+## 📚 Additional Documentation
+
+- [AI Companion Service](services/ai-companion-service/README.md)
+- [Event Dispatcher API](services/event-dispatcher-service/README.md)
+- [Testing Guide](testing-notification/README.md)
+
+## 🔗 External Resources
+
+- [MQTT Protocol](https://mqtt.org/)
+- [HiveMQ Documentation](https://www.hivemq.com/docs/)
+- [Google Gemini API](https://ai.google.dev/gemini-api/docs)
 - [Twilio SMS](https://www.twilio.com/docs/sms)
-- [Apache Kafka](https://kafka.apache.org/documentation/)
-- [MongoDB](https://docs.mongodb.com/)
-- [Prometheus](https://prometheus.io/docs/)
-- [Grafana](https://grafana.com/docs/)
+- [Firebase FCM](https://firebase.google.com/docs/cloud-messaging)
 
 ---
 
 **Last Updated**: November 2025  
-**Maintainer**: CSC3104 Group 25
+**Architecture**: MQTT-based Microservices  
+**Status**: Production Ready ✅

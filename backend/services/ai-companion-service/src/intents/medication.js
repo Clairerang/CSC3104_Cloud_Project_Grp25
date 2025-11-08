@@ -1,22 +1,19 @@
 // Medication Management - Database-driven medication tracking
 // Addresses: Health management, independence, safety
+const { publishEvent } = require('../index');
+
 module.exports = {
-  async handle({ userId, producer, logger }) {
+  async handle({ userId, logger }) {
     logger.info(`💊 Medication information requested by ${userId}`);
 
     // Publish request to fetch medication schedule from database
     try {
-      await producer.send({
-        topic: 'notification.events',
-        messages: [{
-          value: JSON.stringify({
-            type: 'medication_schedule_request',
-            userId,
-            action: 'fetch_schedule',
-            timestamp: new Date().toISOString(),
-            source: 'ai-companion'
-          })
-        }]
+      await publishEvent('notification/events', {
+        type: 'medication_schedule_request',
+        userId,
+        action: 'fetch_schedule',
+        timestamp: new Date().toISOString(),
+        source: 'ai-companion'
       });
       logger.info(`💊 Medication schedule request published for ${userId}`);
     } catch (error) {

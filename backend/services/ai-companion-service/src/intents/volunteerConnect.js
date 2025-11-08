@@ -1,7 +1,9 @@
 // Volunteer Visitor Connection - Match seniors with volunteers
 // Addresses: Social isolation, meaningful interaction, emotional support
+const { publishEvent } = require('../index');
+
 module.exports = {
-  async handle({ userId, message, producer, logger }) {
+  async handle({ userId, message, logger }) {
     logger.info(`🤝 Volunteer connection requested by ${userId}`);
 
     // Determine request type
@@ -11,20 +13,15 @@ module.exports = {
 
     // Publish volunteer connection request
     try {
-      await producer.send({
-        topic: 'notification.events',
-        messages: [{
-          value: JSON.stringify({
-            type: 'volunteer_connect_request',
-            userId,
-            requestType: needsHelp ? 'visitor_needed' : 'general_inquiry',
-            message: `Senior ${needsHelp ? 'requested volunteer visitor' : 'inquired about volunteer programs'}`,
-            originalMessage: message,
-            priority: needsHelp ? 'high' : 'normal',
-            timestamp: new Date().toISOString(),
-            source: 'ai-companion'
-          })
-        }]
+      await publishEvent('notification/events', {
+        type: 'volunteer_connect_request',
+        userId,
+        requestType: needsHelp ? 'visitor_needed' : 'general_inquiry',
+        message: `Senior ${needsHelp ? 'requested volunteer visitor' : 'inquired about volunteer programs'}`,
+        originalMessage: message,
+        priority: needsHelp ? 'high' : 'normal',
+        timestamp: new Date().toISOString(),
+        source: 'ai-companion'
       });
       logger.info(`🤝 Volunteer connection request published`);
     } catch (error) {

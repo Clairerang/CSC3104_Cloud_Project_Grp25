@@ -1,40 +1,29 @@
 # CSC3104 Cloud Project - Group 25
-# Backend Microservices Stack (KRaft mode - no ZooKeeper)
+# Backend Microservices Stack (HiveMQ MQTT + gRPC)
 # Run with: docker-compose up --build
 
 services:
   # --------------------------------------
-  # APACHE KAFKA BROKER (KRaft mode - no ZooKeeper)
+  # HIVEMQ MQTT BROKER
   # --------------------------------------
-  kafka:
-    image: confluentinc/cp-kafka:7.6.1
-    container_name: kafka
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: hivemq
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - "1883:1883"      # MQTT
+      - "8080:8080"      # HiveMQ Control Center Web UI
     environment:
       TZ: "Asia/Singapore"
-      # KRaft (ZooKeeper-less) configuration
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_NODE_ID: "1"
-      CLUSTER_ID: "OmZ3M1wlTKTiCRO5Xpo7QA"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
-      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
     volumes:
-      - kafka-data:/var/lib/kafka/data
+      - hivemq-data:/opt/hivemq/data
+      - hivemq-log:/opt/hivemq/log
     healthcheck:
-      test: ["CMD", "bash", "-c", "kafka-topics --bootstrap-server kafka:9092 --list || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/1883' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
 
   # --------------------------------------
   # MONGODB DATABASE
@@ -55,38 +44,16 @@ services:
       retries: 5
 
   # --------------------------------------
-  # GAMIFICATION SERVICE
+  # EVENT DISPATCHER SERVICE (formerly notification-service)
+  # Handles event routing, user management, check-ins, gRPC server
   # --------------------------------------
-  gamification:
-    build:
-      context: ./services/gamification-service
-      dockerfile: Dockerfile
-    container_name: gamification
-    depends_on:
-      kafka:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-    env_file:
-      - config/secrets/.env
-    environment:
-      - TZ=Asia/Singapore
-      - MONGO_URL=mongodb://mongo:27017/gamification
-      - KAFKA_BROKER=kafka:9092
-    ports:
-      - "4001:4001"
-    restart: unless-stopped
-
-  # --------------------------------------
-  # NOTIFICATION SERVICE
-  # --------------------------------------
-  notification:
+  event-dispatcher:
     build:
       context: .
       dockerfile: ./services/notification-service/Dockerfile
-    container_name: notification
+    container_name: event-dispatcher
     depends_on:
-      kafka:
+      hivemq:
         condition: service_healthy
       mongo:
         condition: service_healthy
@@ -94,60 +61,93 @@ services:
       - config/secrets/.env
     environment:
       - TZ=Asia/Singapore
-      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
-      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
-      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/config/secrets/firebase-sa.json}
     volumes:
       - ./config/secrets:/app/config/secrets:ro
       - ./shared/testing-ui:/app/testing-notification:ro
     ports:
       - "4002:4002"
+      - "50051:50051"
     restart: unless-stopped
 
   # --------------------------------------
-  # SMS SERVICE
+  # PUSH NOTIFICATION SERVICE
+  # Firebase Cloud Messaging push notifications for mobile devices
   # --------------------------------------
-  sms:
+  push-notification:
     build:
       context: .
-      dockerfile: ./services/sms-service/Dockerfile
-    container_name: sms
+      dockerfile: ./services/push-notification-service/Dockerfile
+    container_name: push-notification
     depends_on:
-      kafka:
+      hivemq:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
     env_file:
       - config/secrets/.env
     environment:
       - TZ=Asia/Singapore
-      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
+      - MONGO_URI=mongodb://mongo:27017/notification
+      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/config/secrets/firebase-sa.json}
+    volumes:
+      - ./config/secrets:/app/config/secrets:ro
+    ports:
+      - "4020:4020"
+    restart: unless-stopped
+
+  # --------------------------------------
+  # SMS DISPATCHER SERVICE
+  # Sends SMS messages via Twilio, subscribes to MQTT for event-driven messaging
+  # --------------------------------------
+  sms-dispatcher:
+    build:
+      context: .
+      dockerfile: ./services/sms-service/Dockerfile
+    container_name: sms-dispatcher
+    depends_on:
+      hivemq:
+        condition: service_healthy
+    env_file:
+      - config/secrets/.env
+    environment:
+      - TZ=Asia/Singapore
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
     ports:
       - "4004:4004"
     restart: unless-stopped
 
   # --------------------------------------
-  # EMAIL SERVICE
+  # EMAIL DISPATCHER SERVICE
+  # Sends emails via Gmail SMTP, subscribes to MQTT for event-driven messaging
   # --------------------------------------
-  email:
+  email-dispatcher:
     build:
       context: .
       dockerfile: ./services/email-service/Dockerfile
-    container_name: email
+    container_name: email-dispatcher
     depends_on:
-      kafka:
+      hivemq:
         condition: service_healthy
     env_file:
       - config/secrets/.env
     environment:
       - TZ=Asia/Singapore
-      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
     ports:
       - "4003:4003"
     restart: unless-stopped
 
   # --------------------------------------
-  # AI COMPANION SERVICE (Google Dialogflow - 100% FREE)
+  # AI COMPANION SERVICE (Google Gemini 2.0 Flash - 100% FREE)
   # --------------------------------------
   ai-companion:
     build:
@@ -155,7 +155,7 @@ services:
       dockerfile: ./services/ai-companion-service/Dockerfile
     container_name: ai-companion
     depends_on:
-      kafka:
+      hivemq:
         condition: service_healthy
       mongo:
         condition: service_healthy
@@ -163,32 +163,18 @@ services:
       - config/secrets/.env
     environment:
       - TZ=Asia/Singapore
-      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
       - MONGO_URI=mongodb://mongo:27017/ai-companion
     ports:
       - "4015:4015"
     restart: unless-stopped
 
-  # --------------------------------------
-  # Kafka UI Dashboard (Kafdrop)
-  # --------------------------------------
-  kafdrop:
-    image: obsidiandynamics/kafdrop
-    container_name: kafdrop
-    ports:
-      - "9100:9000"
-    environment:
-      - TZ=Asia/Singapore
-      - KAFKA_BROKERCONNECT=kafka:9092
-      - JVM_OPTS=-Xms32M -Xmx64M
-    depends_on:
-      kafka:
-        condition: service_healthy
-    restart: unless-stopped
 
 # --------------------------------------
 # DATA VOLUMES
 # --------------------------------------
 volumes:
   mongo-data:
-  kafka-data:
+  hivemq-data:
+  hivemq-log:

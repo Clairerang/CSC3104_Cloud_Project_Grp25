@@ -1,6 +1,5 @@
 require('dotenv').config();
-const mqtt = require('mqtt');
-const { v4: uuidv4 } = require('uuid');
+const { Kafka } = require('kafkajs');
 const express = require('express');
 const http = require('http');
 const client = require('prom-client');
@@ -36,22 +35,11 @@ try {
   logger.warn('Twilio Verify adapter not available', e && e.message ? e.message : e);
 }
 
-// MQTT setup
-const MQTT_BROKER = process.env.MQTT_BROKER || 'hivemq';
-const MQTT_PORT = process.env.MQTT_PORT || 1883;
-const mqttClient = mqtt.connect(`mqtt://${MQTT_BROKER}:${MQTT_PORT}`, {
-  clientId: `sms-service-${uuidv4()}`,
-  clean: true,
-  reconnectPeriod: 1000
-});
-
-mqttClient.on('connect', () => {
-  logger.info(`✅ MQTT connected to HiveMQ at ${MQTT_BROKER}:${MQTT_PORT}`);
-});
-
-mqttClient.on('error', (err) => {
-  logger.error('❌ MQTT connection error:', err);
-});
+// Kafka
+const KAFKA_BROKER = process.env.KAFKA_BROKER || 'kafka:9092';
+const kafka = new Kafka({ clientId: 'sms-service', brokers: [KAFKA_BROKER] });
+const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP || 'sms-service-group' });
+const producer = kafka.producer();
 
 // Simple HTTP app for metrics and test send
 const app = express();
@@ -247,17 +235,13 @@ app.post('/sms/status', async (req, res) => {
       receivedAt: new Date().toISOString()
     };
 
-    // publish delivery receipt to MQTT so other services can react
+    // publish delivery receipt to Kafka so other services can react
     try {
-      mqttClient.publish('notification/events', JSON.stringify(receipt), { qos: 1 }, (err) => {
-        if (err) {
-          logger.warn('Failed to publish SMS delivery receipt to MQTT', err);
-        } else {
-          logger.info('Published SMS delivery receipt to notification/events', messageId || '(no id)');
-        }
-      });
+      await producer.connect();
+      await producer.send({ topic: 'notification.events', messages: [{ value: JSON.stringify(receipt) }] });
+      logger.info('Published SMS delivery receipt to notification.events', messageId || '(no id)');
     } catch (px) {
-      logger.warn('Failed to publish SMS delivery receipt to MQTT', px && px.message ? px.message : px);
+      logger.warn('Failed to publish SMS delivery receipt to Kafka', px && px.message ? px.message : px);
     }
 
     // Respond quickly to the webhook sender
@@ -279,16 +263,13 @@ async function trySendSms({ to, body }) {
     // adapter success
     smsSent.inc(1);
     logger.info('SMS adapter result', result && result.messageId ? `id=${result.messageId}` : JSON.stringify(result));
-    // publish ack back to MQTT (notification/events) for visibility
+    // publish ack back to Kafka (notification.delivery) for visibility
     try {
+      await producer.connect();
       const ack = { type: 'sms.sent', userId: null, to, messageId: result && result.messageId ? result.messageId : null, timestamp: new Date().toISOString(), provider: SMS_PROVIDER };
-      mqttClient.publish('notification/events', JSON.stringify(ack), { qos: 1 }, (err) => {
-        if (err) {
-          logger.warn('Could not publish sms sent ack to MQTT', err);
-        }
-      });
+      await producer.send({ topic: 'notification.events', messages: [{ value: JSON.stringify(ack) }] });
     } catch (px) {
-      logger.warn('Could not publish sms sent ack to MQTT', px && px.message ? px.message : px);
+      logger.warn('Could not publish sms sent ack to kafka', px && px.message ? px.message : px);
     }
     return result;
   } catch (err) {
@@ -296,55 +277,55 @@ async function trySendSms({ to, body }) {
     logger.error('SMS send failed', err && err.message ? err.message : err);
     // publish to a DLQ topic
     try {
+      await producer.connect();
       const dlq = { type: 'sms.failed', error: err && err.message ? err.message : String(err), original: { to, body }, timestamp: new Date().toISOString(), provider: SMS_PROVIDER };
-      mqttClient.publish('notification/dlq', JSON.stringify(dlq), { qos: 1 }, (pubErr) => {
-        if (pubErr) {
-          logger.warn('Could not publish sms DLQ to MQTT', pubErr);
-        }
-      });
+      await producer.send({ topic: 'notification.dlq', messages: [{ value: JSON.stringify(dlq) }] });
     } catch (px) {
-      logger.warn('Could not publish sms DLQ to MQTT', px && px.message ? px.message : px);
+      logger.warn('Could not publish sms DLQ to kafka', px && px.message ? px.message : px);
     }
     throw err;
   }
 }
 
-// MQTT consumer: subscribe to sms/send and notification/events
-function startMqtt() {
-  mqttClient.subscribe(['sms/send', 'notification/events'], { qos: 1 }, (err) => {
-    if (err) {
-      logger.error('❌ Failed to subscribe to MQTT topics:', err);
-      return;
-    }
-    logger.info('📞 SMS service subscribed to sms/send, notification/events');
-  });
+// Kafka consumer: subscribe to sms.send and notification.events
+async function startKafka() {
+  try {
+    await consumer.connect();
+    await producer.connect();
+    await consumer.subscribe({ topic: process.env.SMS_TOPIC || 'sms.send', fromBeginning: false });
+    // Also subscribe to notification.events to pick up SMS-worthy events
+    await consumer.subscribe({ topic: 'notification.events', fromBeginning: false });
+    logger.info('Subscribed to sms.send and notification.events');
 
-  mqttClient.on('message', async (topic, message) => {
-    let evt = null;
-    try { evt = JSON.parse(message.toString()); } catch (e) { logger.warn('Invalid JSON in MQTT message'); return; }
-    try {
-      // IMPORTANT: Ignore acknowledgment/receipt events to prevent message loops!
-      if (evt.type === 'sms.sent' || evt.type === 'sms.failed' || evt.type === 'sms.delivery') {
-        logger.debug('Ignoring SMS acknowledgment event:', evt.type);
-        return;
-      }
-      
-      // Heuristics: message types that indicate SMS should be sent
-      if (evt.type === 'sms' || evt.type === 'sms.send' || evt.type === 'sms_family_request' || (evt.type === 'daily_login' && evt.familyPhone)) {
-        const to = evt.to || evt.familyPhone;
-        const body = evt.body || evt.message || (evt.userName ? `${evt.userName} checked in.` : `User ${evt.userId} checked in.`);
-        logger.info('Processing SMS send for', to);
-        try {
-          await trySendSms({ to, body });
-        } catch (err) {
-          logger.error('trySendSms failed for MQTT message', err && err.message ? err.message : err);
+    await consumer.run({ eachMessage: async ({ topic, message }) => {
+      let evt = null;
+      try { evt = JSON.parse(message.value.toString()); } catch (e) { logger.warn('Invalid JSON in kafka message'); return; }
+      try {
+        // IMPORTANT: Ignore acknowledgment/receipt events to prevent message loops!
+        if (evt.type === 'sms.sent' || evt.type === 'sms.failed' || evt.type === 'sms.delivery') {
+          logger.debug('Ignoring SMS acknowledgment event:', evt.type);
+          return;
         }
+        
+        // Heuristics: message types that indicate SMS should be sent
+        if (evt.type === 'sms' || evt.type === 'sms.send' || (evt.type === 'daily_login' && evt.familyPhone)) {
+          const to = evt.to || evt.familyPhone;
+          const body = evt.body || (evt.userName ? `${evt.userName} checked in.` : `User ${evt.userId} checked in.`);
+          logger.info('Processing SMS send for', to);
+          try {
+            await trySendSms({ to, body });
+          } catch (err) {
+            logger.error('trySendSms failed for kafka message', err && err.message ? err.message : err);
+          }
+        }
+      } catch (e) {
+        logger.error('Error handling kafka message', e && e.message ? e.message : e);
       }
-    } catch (e) {
-      logger.error('Error handling MQTT message', e && e.message ? e.message : e);
-    }
-  });
+    } });
+  } catch (e) {
+    logger.error('Failed to start kafka consumer', e && e.message ? e.message : e);
+    process.exit(1);
+  }
 }
 
-// Start MQTT consumer
-startMqtt();
+startKafka().catch(e => logger.error('startKafka error', e && e.message ? e.message : e));

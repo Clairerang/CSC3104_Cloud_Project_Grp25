@@ -1,9 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const path = require('path');
-const { startKafkaConsumer, publishEvent } = require("./kafkaConsumer");
+const { startMqttConsumer, publishEvent, mqttClient } = require("./mqttClient");
 const { startDashboardConsumer, emitter, getRecent } = require('./dashboardConsumer');
-const { startMobileConsumer } = require('./mobileConsumer');
 const { connectMongo, models } = require('./models');
 // Prometheus metrics
 const client = require('prom-client');
@@ -102,7 +101,7 @@ app.get('/debug/device-tokens', async (req, res) => {
   }
 });
 
-// HTTP route to publish an SMS send event (so UI can trigger SMS via Kafka)
+// HTTP route to publish an SMS send event (so UI can trigger SMS via MQTT)
 app.post('/send-sms', async (req, res) => {
   const { to, body, userId } = req.body || {};
   if (!to || !body) return res.status(400).json({ error: 'to and body are required' });
@@ -114,7 +113,7 @@ app.post('/send-sms', async (req, res) => {
       body,
       timestamp: new Date().toISOString()
     };
-    // publish to Kafka so sms-service will consume and send
+    // publish to MQTT so sms-service will consume and send
     await publishEvent(evt);
     res.json({ ok: true, publishedEvent: evt });
   } catch (e) {
@@ -206,7 +205,7 @@ app.post('/send-urgent-sms', async (req, res) => {
       return res.status(404).json({ error: 'No verified phone numbers found' });
     }
     
-    // Publish SMS events to Kafka for each phone number
+    // Publish SMS events to MQTT for each phone number
     const published = [];
     for (const phone of targetPhones) {
       const evt = {
@@ -402,14 +401,13 @@ async function start() {
     console.log(`📁 Serving testing frontend at http://localhost:${PORT}/testing-notification`);
   });
 
-  // Start Kafka consumer
-  startKafkaConsumer().catch(e => console.error('startKafkaConsumer error', e));
+  // Start MQTT consumer
+  startMqttConsumer().catch(e => console.error('startMqttConsumer error', e));
 
-  // Start dashboard consumer for notification.events -> SSE
+  // Start dashboard consumer for notification/events -> SSE
   startDashboardConsumer().catch(e => console.error('startDashboardConsumer error', e));
 
-  // Start mobile push consumer (FCM)
-  startMobileConsumer().catch(e => console.error('startMobileConsumer error', e));
+  // NOTE: Mobile push notifications moved to push-notification-service
 
   // Start gRPC server (PoC) to accept PublishEvent RPCs from other services
   try {

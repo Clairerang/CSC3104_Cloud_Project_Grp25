@@ -1,8 +1,10 @@
 ﻿// Loneliness and Social Isolation Detection - Core Problem Statement Intent
 // Addresses: Mental health, emotional support, social connection needs
 // KEYWORD-BASED ALERT: Detects specific loneliness keywords
+const { publishEvent } = require('../index');
+
 module.exports = {
-  async handle({ userId, message, sentimentScore, producer, logger }) {
+  async handle({ userId, message, sentimentScore, logger }) {
     logger.info(` Social isolation detected for user ${userId} (sentiment: ${sentimentScore})`);
 
     // Check for specific loneliness keywords
@@ -42,43 +44,38 @@ module.exports = {
 
     // Publish loneliness alert with severity level
     try {
-      await producer.send({
-        topic: 'notification.events',
-        messages: [{
-          value: JSON.stringify({
-            type: 'social_isolation_alert',
-            userId,
-            message: `Senior expressed loneliness: "${message}"`,
-            severity: finalSeverity,
-            sentimentScore,
-            detectedKeywords,
-            keywordSeverity,
-            recommendations: finalSeverity === 'critical' 
-              ? [
-                  ' URGENT: Immediate caregiver notification',
-                  'Emergency contact notification',
-                  'Mental health professional referral',
-                  'Schedule immediate check-in call'
-                ]
-              : finalSeverity === 'high'
-              ? [
-                  'Schedule video call with family within 24 hours',
-                  'Connect with volunteer visitor ASAP',
-                  'Arrange community activity participation',
-                  'Daily check-in for next week'
-                ]
-              : [
-                  'Schedule video call with family',
-                  'Suggest joining interest-based senior groups',
-                  'Arrange community activity participation',
-                  'Connect with volunteer visitor program'
-                ],
-            timestamp: new Date().toISOString(),
-            source: 'ai-companion',
-            requiresFollowUp: finalSeverity !== 'moderate',
-            urgentAction: finalSeverity === 'critical'
-          })
-        }]
+      await publishEvent('notification/events', {
+        type: 'social_isolation_alert',
+        userId,
+        message: `Senior expressed loneliness: "${message}"`,
+        severity: finalSeverity,
+        sentimentScore,
+        detectedKeywords,
+        keywordSeverity,
+        recommendations: finalSeverity === 'critical' 
+          ? [
+              ' URGENT: Immediate caregiver notification',
+              'Emergency contact notification',
+              'Mental health professional referral',
+              'Schedule immediate check-in call'
+            ]
+          : finalSeverity === 'high'
+          ? [
+              'Schedule video call with family within 24 hours',
+              'Connect with volunteer visitor ASAP',
+              'Arrange community activity participation',
+              'Daily check-in for next week'
+            ]
+          : [
+              'Schedule video call with family',
+              'Suggest joining interest-based senior groups',
+              'Arrange community activity participation',
+              'Connect with volunteer visitor program'
+            ],
+        timestamp: new Date().toISOString(),
+        source: 'ai-companion',
+        requiresFollowUp: finalSeverity !== 'moderate',
+        urgentAction: finalSeverity === 'critical'
       });
       logger.warn(` LONELINESS ALERT published (severity: ${finalSeverity}, keywords: ${detectedKeywords.join(', ')})`);
     } catch (error) {
