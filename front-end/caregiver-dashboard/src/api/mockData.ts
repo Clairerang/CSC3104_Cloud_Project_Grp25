@@ -604,9 +604,11 @@ export const mockApi = {
   },
 
   addReminderItem: (reminder: Omit<ReminderItem, 'id'>): Promise<ReminderItem> => {
+    // Generate a unique ID using timestamp + random number to avoid duplicates
+    const newId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
     const newReminder: ReminderItem = {
       ...reminder,
-      id: Date.now(),
+      id: newId,
     };
     mockReminderItems.push(newReminder);
     return Promise.resolve(newReminder);
