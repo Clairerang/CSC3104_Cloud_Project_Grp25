@@ -54,7 +54,7 @@ services:
     networks:
       - seniorcare-network
     healthcheck:
-      test: ["CMD-SHELL", "timeout", "5", "bash", "-c", "</dev/tcp/localhost/1883 || exit 1"]
+      test: ["CMD-SHELL", "pgrep java >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -69,7 +69,7 @@ services:
     container_name: api-gateway
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8083:8080"
     environment:
       - NODE_ENV=production
       - PORT=8080

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, Card, Typography, Stack } from "@mui/material";
+import { Box, Button, Card, Typography, Stack, Alert } from "@mui/material";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import CoffeeIcon from "@mui/icons-material/Coffee";
 import NightlightIcon from "@mui/icons-material/Nightlight";
 import MicIcon from "@mui/icons-material/Mic";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import type { Mood, CheckIn, DailyProgress } from "../types";
+import axios from "axios";
+
+const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:8080';
 
 interface Props {
   onCheckIn: (mood: Mood) => void;
@@ -82,8 +85,23 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
   );
 
   // Handle check-in
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
     if (!selectedMood) return;
+
+    // Save to backend
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        await axios.post(
+          `${API_BASE_URL}/checkin`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+    } catch (err: any) {
+      console.error('Error saving check-in to backend:', err);
+      // Continue anyway - save locally
+    }
 
     const newCheckIn: CheckIn = {
       id: Date.now().toString(),

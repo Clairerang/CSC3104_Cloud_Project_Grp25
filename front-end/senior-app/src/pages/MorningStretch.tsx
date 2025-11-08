@@ -13,13 +13,26 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
+import axios from 'axios';
 
 interface MorningStretchProps {
   onComplete: () => void;
   onBack: () => void;
 }
 
-const stretches = [
+interface Stretch {
+  id: number;
+  name: string;
+  description: string;
+  duration: number;
+  image: string;
+  videoUrl: string;
+}
+
+const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:8080';
+
+// Fallback stretches
+const defaultStretches: Stretch[] = [
   {
     id: 1,
     name: 'Neck Rolls',
@@ -63,12 +76,40 @@ const stretches = [
 ];
 
 export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
+  const [stretches, setStretches] = useState<Stretch[]>(defaultStretches);
   const [started, setStarted] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(stretches[0].duration);
+  const [timeLeft, setTimeLeft] = useState(defaultStretches[0].duration);
   const [isPaused, setIsPaused] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Fetch exercises from API
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await axios.get(`${API_BASE_URL}/api/games/stretch`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.data.success && response.data.exercises) {
+          // Map exerciseId to id for frontend
+          const mappedExercises = response.data.exercises.map((ex: any) => ({
+            ...ex,
+            id: ex.exerciseId || ex.id
+          }));
+          setStretches(mappedExercises);
+          setTimeLeft(mappedExercises[0]?.duration || 30);
+        }
+      } catch (err) {
+        console.error('Error fetching exercises:', err);
+      }
+    };
+
+    fetchExercises();
+  }, []);
 
 useEffect(() => {
   if (!started || isPaused || completed) return;
@@ -106,7 +147,22 @@ useEffect(() => {
     }
   }, [currentStep, isPaused, started, completed]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/api/games/session/start`,
+        { gameId: '1', gameType: 'stretch' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success && response.data.session) {
+        setSessionId(response.data.session.sessionId);
+      }
+    } catch (err) {
+      console.error('Error starting session:', err);
+    }
+
     setStarted(true);
   };
 
@@ -114,7 +170,26 @@ useEffect(() => {
     setIsPaused(!isPaused);
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    // Track session completion
+    if (sessionId) {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          await axios.post(
+            `${API_BASE_URL}/api/games/session/complete`,
+            {
+              sessionId,
+              score: stretches.length,
+              metadata: { gameType: 'stretch', exercisesCompleted: stretches.length }
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } catch (err) {
+        console.error('Error completing session:', err);
+      }
+    }
     onComplete();
   };
 

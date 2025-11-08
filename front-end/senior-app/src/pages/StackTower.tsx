@@ -11,6 +11,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import axios from 'axios';
 
 interface StackTowerProps {
   onComplete: () => void;
@@ -23,6 +24,8 @@ interface Block {
   color: string;
 }
 
+const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:8080';
+
 export function StackTower({ onComplete, onBack }: StackTowerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'completed' | 'failed'>('menu');
@@ -32,6 +35,7 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
   const [movingBlock, setMovingBlock] = useState<Block | null>(null);
   const [direction, setDirection] = useState(1);
   const [speed, setSpeed] = useState(2);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
   const CANVAS_WIDTH = 400;
@@ -57,7 +61,25 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
     '#e91e63',
   ];
 
-  const startGame = () => {
+  const startGame = async () => {
+    // Start game session
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const response = await axios.post(
+          `${API_BASE_URL}/api/games/session/start`,
+          { gameId: '5', gameType: 'stacktower' },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (response.data.success && response.data.session) {
+          setSessionId(response.data.session.sessionId);
+        }
+      }
+    } catch (err) {
+      console.error('Error starting session:', err);
+    }
+
     const initialBlock: Block = {
       x: CANVAS_WIDTH / 2 - INITIAL_WIDTH / 2,
       width: INITIAL_WIDTH,
@@ -83,10 +105,7 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
 
     if (overlap <= 0) {
       // Game over - no overlap
-      setGameState('failed');
-      if (score > highScore) {
-        setHighScore(score);
-      }
+      handleGameEnd(score, false);
       return;
     }
 
@@ -104,12 +123,9 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
     setBlocks(newBlocks);
     setScore(newBlocks.length - 1);
 
-    // Check if player reached 5 blocks (win condition)
+    // Check if player reached 16 blocks (win condition)
     if (newBlocks.length >= 16) {
-      setGameState('completed');
-      if (score > highScore) {
-        setHighScore(score + 1);
-      }
+      handleGameEnd(newBlocks.length - 1, true);
       return;
     }
 
@@ -128,6 +144,42 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
     const left = Math.max(block1.x, block2.x);
     const right = Math.min(block1.x + block1.width, block2.x + block2.width);
     return Math.max(0, right - left);
+  };
+
+  const handleGameEnd = async (finalScore: number, won: boolean) => {
+    if (won) {
+      setGameState('completed');
+      if (finalScore > highScore) {
+        setHighScore(finalScore);
+      }
+    } else {
+      setGameState('failed');
+      if (finalScore > highScore) {
+        setHighScore(finalScore);
+      }
+    }
+
+    // Track session completion
+    if (sessionId) {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          await axios.post(
+            `${API_BASE_URL}/api/games/session/complete`,
+            {
+              sessionId,
+              score: finalScore,
+              blocksStacked: finalScore,
+              highScore: highScore > finalScore ? highScore : finalScore,
+              metadata: { gameType: 'stacktower', won }
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } catch (err) {
+        console.error('Error completing session:', err);
+      }
+    }
   };
 
   useEffect(() => {

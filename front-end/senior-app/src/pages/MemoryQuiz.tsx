@@ -10,13 +10,14 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import axios from 'axios';
 
 interface MemoryQuizProps {
   onComplete: () => void;
   onBack: () => void;
 }
 
-const cards = ['🍎', '🍌', '🍇', '🍓', '🍊', '🍋', '🥝', '🍒'];
+const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:8080';
 
 export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
   const [gameCards, setGameCards] = useState<string[]>([]);
@@ -26,15 +27,31 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [showingPreview, setShowingPreview] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
+  // Fetch memory cards from API
   useEffect(() => {
-    initializeGame();
+    const fetchMemoryCards = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await axios.get(`${API_BASE_URL}/api/games/memory?difficulty=easy`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.data.success && response.data.memorySet?.cards) {
+          setGameCards([...response.data.memorySet.cards, ...response.data.memorySet.cards]);
+        }
+      } catch (err) {
+        console.error('Error fetching memory game:', err);
+      }
+    };
+
+    fetchMemoryCards();
   }, []);
 
   const initializeGame = () => {
-    const shuffled = [...cards, ...cards]
-      .sort(() => Math.random() - 0.5)
-      .map((card) => card);
+    const shuffled = [...gameCards]
+      .sort(() => Math.random() - 0.5);
     setGameCards(shuffled);
     setFlipped([]);
     setMatched([]);
@@ -43,10 +60,24 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
     setShowingPreview(false);
   };
 
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/api/games/session/start`,
+        { gameId: '2', gameType: 'memory' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success && response.data.session) {
+        setSessionId(response.data.session.sessionId);
+      }
+    } catch (err) {
+      console.error('Error starting session:', err);
+    }
+
     setStarted(true);
     setShowingPreview(true);
-    // Show all cards for 3 seconds, then flip them face down
     setTimeout(() => {
       setShowingPreview(false);
     }, 3000);
@@ -63,13 +94,38 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
       }
       setMoves(moves + 1);
     }
-  }, [flipped]);
+  }, [flipped, gameCards, matched, moves]);
 
   useEffect(() => {
     if (matched.length === gameCards.length && gameCards.length > 0) {
-      setCompleted(true);
+      handleComplete();
     }
   }, [matched, gameCards]);
+
+  const handleComplete = async () => {
+    setCompleted(true);
+    
+    // Track session completion
+    if (sessionId) {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          await axios.post(
+            `${API_BASE_URL}/api/games/session/complete`,
+            {
+              sessionId,
+              score: matched.length / 2,
+              moves,
+              metadata: { gameType: 'memory' }
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } catch (err) {
+        console.error('Error completing session:', err);
+      }
+    }
+  };
 
   const handleCardClick = (index: number) => {
     if (!started || showingPreview || flipped.length === 2 || flipped.includes(index) || matched.includes(index)) {
@@ -125,6 +181,7 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
               onClick={() => {
                 initializeGame();
                 setStarted(false);
+                setSessionId(null);
               }}
               sx={{ minHeight: 60 }}
             >
@@ -137,6 +194,7 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
   }
 
   if (!started) {
+    const cardCount = gameCards.length / 2;
     return (
       <Box
         sx={{
@@ -184,7 +242,7 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Typography sx={{ fontSize: '2rem' }}>3️⃣</Typography>
-                  <Typography variant="h5">Match all pairs to win!</Typography>
+                  <Typography variant="h5">Match all {cardCount} pairs to win!</Typography>
                 </Box>
               </Stack>
             </CardContent>
@@ -236,7 +294,7 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
                   Matched
                 </Typography>
                 <Typography variant="h3">
-                  {matched.length / 2} / {cards.length}
+                  {matched.length / 2} / {gameCards.length / 2}
                 </Typography>
               </Box>
             </Box>

@@ -5,8 +5,8 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import StarIcon from "@mui/icons-material/Star";
 import type { Contact } from "../types";
 import ContactDetailModal from "../components/ContactDetailModal";
-import CreateNewContactModal from "./CreateNewContactModal";
-import EditContactModal from "./EditContactModal";
+import CreateNewContactModal from "../components/circle/CreateNewContactModal";
+import EditContactModal from "../components/circle/EditContactModal";
 
 interface Props {
   contacts: Contact[];

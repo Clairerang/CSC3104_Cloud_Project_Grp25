@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -13,49 +13,76 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import axios from 'axios';
 
 interface CulturalTriviaProps {
   onComplete: () => void;
   onBack: () => void;
 }
 
-const questions = [
-  {
-    id: 1,
-    question: 'What year did the first person land on the moon?',
-    options: ['1965', '1969', '1972', '1975'],
-    correctAnswer: 1,
-    fact: 'Neil Armstrong and Buzz Aldrin landed on the moon on July 20, 1969!',
-  },
-  {
-    id: 2,
-    question: 'Which famous ship sank in 1912?',
-    options: ['Lusitania', 'Titanic', 'Britannic', 'Olympic'],
-    correctAnswer: 1,
-    fact: 'The RMS Titanic sank on its maiden voyage after hitting an iceberg.',
-  },
-  {
-    id: 3,
-    question: 'Who was the first president of the United States?',
-    options: ['Thomas Jefferson', 'John Adams', 'George Washington', 'Benjamin Franklin'],
-    correctAnswer: 2,
-    fact: 'George Washington served as the first U.S. President from 1789 to 1797.',
-  },
-];
+interface Question {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  fact: string;
+}
+
+const API_BASE_URL = process.env.REACT_APP_API_GATEWAY || 'http://localhost:8080';
 
 export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Fetch questions from API
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await axios.get(`${API_BASE_URL}/api/games/trivia?count=3`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.data.success && response.data.questions) {
+          setQuestions(response.data.questions);
+        }
+      } catch (err) {
+        console.error('Error fetching trivia:', err);
+      }
+    };
+
+    fetchQuestions();
+  }, []);
+
+  // Start game session
+  const handleStartGame = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/api/games/session/start`,
+        { gameId: '3', gameType: 'trivia' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success && response.data.session) {
+        setSessionId(response.data.session.sessionId);
+      }
+    } catch (err) {
+      console.error('Error starting session:', err);
+    }
+    setStarted(true);
+  };
 
   const question = questions[currentQuestion];
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
 
   const handleAnswerSelect = (index: number) => {
-    if (showResult) return;
+    if (showResult || !question) return;
     setSelectedAnswer(index);
     setShowResult(true);
     if (index === question.correctAnswer) {
@@ -69,12 +96,41 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
       setSelectedAnswer(null);
       setShowResult(false);
     } else {
-      setCompleted(true);
+      handleComplete();
     }
   };
 
+  // Complete game session
+  const handleComplete = async () => {
+    setCompleted(true);
+    
+    // Track session completion
+    if (sessionId) {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          await axios.post(
+            `${API_BASE_URL}/api/games/session/complete`,
+            {
+              sessionId,
+              score,
+              correctAnswers: score,
+              totalQuestions: questions.length,
+              metadata: { gameType: 'trivia' }
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } catch (err) {
+        console.error('Error completing session:', err);
+        // Continue anyway
+      }
+    }
+  };
+
+
   if (completed) {
-    const percentage = Math.round((score / questions.length) * 100);
+    const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
     return (
       <Box
         sx={{
@@ -127,6 +183,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
                 setShowResult(false);
                 setScore(0);
                 setCompleted(false);
+                setSessionId(null);
               }}
               sx={{ minHeight: 60 }}
             >
@@ -178,7 +235,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               <Stack spacing={2}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Typography sx={{ fontSize: '2rem' }}>❓</Typography>
-                  <Typography variant="h5">{questions.length} Questions</Typography>
+                  <Typography variant="h5">{questions.length || 3} Questions</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Typography sx={{ fontSize: '2rem' }}>🎯</Typography>
@@ -196,7 +253,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
             variant="contained"
             fullWidth
             size="large"
-            onClick={() => setStarted(true)}
+            onClick={handleStartGame}
             startIcon={<PlayArrowIcon sx={{ fontSize: '40px !important' }} />}
             sx={{
               minHeight: 40,
@@ -209,6 +266,14 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
             </Typography>
           </Button>
         </Box>
+      </Box>
+    );
+  }
+
+  if (!question || questions.length === 0) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography>Loading questions...</Typography>
       </Box>
     );
   }
@@ -236,7 +301,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               value={progress}
               sx={{ height: 12, borderRadius: 6, bgcolor: '#ffdab6ff',
                 '& .MuiLinearProgress-bar': {
-                  backgroundColor: '#f57c00', // progress color
+                  backgroundColor: '#f57c00',
                 },
               }}
             />

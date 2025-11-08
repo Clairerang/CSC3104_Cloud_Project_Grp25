@@ -115,6 +115,30 @@ router.get('/stretch', authMiddleware, async (req, res) => {
 });
 
 /**
+ * GET /api/games/stacktower - Get stack tower configuration
+ */
+router.get('/stacktower', authMiddleware, async (req, res) => {
+  try {
+    const correlationId = uuidv4();
+    const difficulty = req.query.difficulty || 'easy';
+
+    const response = await sendRequest('games/request/stacktower', {
+      correlationId,
+      userId: req.user.userId,
+      difficulty
+    });
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error fetching stack tower:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch stack tower configuration'
+    });
+  }
+});
+
+/**
  * POST /api/games/session/start - Start a new game session
  * Body: { gameId, gameType }
  */
