@@ -13,7 +13,7 @@ import {
   Timeline,
 } from '@mui/icons-material';
 import { mockApi, Senior, Alert } from '../api/mockData';
-import SeniorDetailsDialog from '../components/senior/SeniorDetailsDialog';
+import SeniorDetailsDialog from '../components/dashboard/SeniorDetailsDialog';
 
 const Dashboard: React.FC = () => {
   const [seniors, setSeniors] = useState<Senior[]>([]);

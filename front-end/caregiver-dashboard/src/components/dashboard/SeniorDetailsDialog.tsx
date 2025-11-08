@@ -59,17 +59,17 @@ const SeniorDetailsDialog: React.FC<SeniorDetailsDialogProps> = ({ senior, open,
       <DialogActions sx={{ p: 3 }}>
         <Button
           variant="contained"
+          startIcon={<VideoCall />}
+          sx={{ flex: 1 }}
+        >
+          Video Call
+        </Button>
+        <Button
+          variant="contained"
           startIcon={<Phone />}
           sx={{ flex: 1 }}
         >
           Call Now
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<VideoCall />}
-          sx={{ flex: 1 }}
-        >
-          Send Message
         </Button>
       </DialogActions>
     </Dialog>
