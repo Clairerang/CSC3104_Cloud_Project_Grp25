@@ -4,34 +4,46 @@ Cloud-based Senior Care Management System with Microservices Architecture
 
 ## Architecture
 
-This system uses a microservices architecture with MQTT for inter-service communication:
+**Updated Consolidated Architecture** with API Gateway Proxy pattern:
 
 ```
 ┌──────────────────┐
-│   Senior App     │ (React - Port 3000)
-│   Frontend       │
+│   Frontend       │ (React - Port 3000)
+│   (Nginx)        │
 └────────┬─────────┘
-         │ HTTP/REST
-    ┌────▼─────────────────┐
-    │   API Gateway        │ (Express - Port 8080)
-    │   (HTTP → MQTT)      │
-    └────────┬─────────────┘
-             │ MQTT Pub/Sub
-    ┌────────▼──────────────────────┐
-    │   HiveMQ Community Broker     │ (Ports: 1883, 8000, 8080)
-    └────┬──────────────────┬───────┘
-         │                  │
-    ┌────▼────────┐    ┌───▼──────────────┐
-    │  Main API   │    │  Games Service   │
-    │  Service    │    │  Microservice    │
-    │  Port 8080  │    │  Port 8081       │
-    └────┬────────┘    └────┬─────────────┘
-         │                  │
-    ┌────▼────────┐    ┌───▼──────────────┐
-    │  MongoDB    │    │  MongoDB         │
-    │  (main DB)  │    │  (games DB)      │
-    │  Port 27017 │    │  Port 27018      │
-    └─────────────┘    └──────────────────┘
+         │ HTTP/REST (All requests via /api)
+    ┌────▼─────────────────────────────┐
+    │   API Gateway (Single Entry)     │ (Express - Port 8080)
+    │   ================                │
+    │   • /api/* → Direct handling      │
+    │   • /games/* → Proxy to games     │
+    └────┬─────────────────────┬────────┘
+         │                     │ (Proxy)
+         │ MQTT           ┌────▼──────────────┐
+         │                │  Games Service    │ (Internal)
+         │                │  Microservice     │
+         ▼                └────┬──────────────┘
+    ┌────────────┐            │
+    │  HiveMQ    │◄───────────┘ MQTT
+    │  Broker    │
+    │  Port 1883 │
+    │  Port 8000 │ WebSocket
+    └────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │      MongoDB (Consolidated)     │ (Port 27017)
+    │      Database: senior_care      │
+    │      =====================       │
+    │      • users                    │
+    │      • relationships            │
+    │      • engagements              │
+    │      • games                    │
+    │      • gamesessions             │
+    │      • exercises                │
+    │      • triviaquestions          │
+    │      • memorysets               │
+    └─────────────────────────────────┘
 ```
 
 ## Project Structure
@@ -89,11 +101,15 @@ docker-compose down
 ```
 
 ### Access Points
-- **API Gateway**: http://localhost:8080
-- **Games Service**: http://localhost:8081
-- **HiveMQ Control Center**: http://localhost:8080 (MQTT broker UI)
-- **MongoDB Main**: mongodb://localhost:27017
-- **MongoDB Games**: mongodb://localhost:27018
+- **Frontend**: http://localhost:3000
+- **API Gateway**: http://localhost:8080 (Single entry point for all backend requests)
+- **MongoDB**: mongodb://localhost:27017 (Database: senior_care)
+- **MQTT Broker**: mqtt://localhost:1883 (For MQTT client connections)
+- **MQTT WebSocket**: ws://localhost:8000 (For WebSocket connections)
+
+**Note:** Games Service runs internally and is not directly accessible from the host. Access it via API Gateway proxy at `http://localhost:8080/games/*`
+
+**Note:** HiveMQ Community Edition does not include a Control Center web UI. To monitor MQTT messages, use a third-party MQTT client tool (see Monitoring section below).
 
 ### Seed Games Database
 
@@ -244,18 +260,38 @@ Games functionality accessed via MQTT topics:
 # API Gateway
 curl http://localhost:8080/
 
-# Games Service
-curl http://localhost:8081/health
+# Games Service (via API Gateway proxy)
+curl http://localhost:8080/games/health
 
-# HiveMQ
-curl http://localhost:8080  # Control Center
+# Check all Docker services status
+docker compose ps
+
+# Check HiveMQ logs
+docker compose logs hivemq
 ```
 
 ### View MQTT Messages
-Access HiveMQ Control Center at http://localhost:8080 to:
-- Monitor active topics
-- View message flow
-- Debug service communication
+
+**Important:** HiveMQ Community Edition does not include a web-based Control Center. To monitor MQTT messages, use one of these methods:
+
+**Option 1: Using mosquitto_sub (Command line)**
+```bash
+# Subscribe to all game-related topics
+docker run --rm --network csc3104_cloud-_project_grp25_default eclipse-mosquitto mosquitto_sub -h hivemq -t 'games/#' -v
+
+# Subscribe to specific topic
+docker run --rm --network csc3104_cloud-_project_grp25_default eclipse-mosquitto mosquitto_sub -h hivemq -t 'games/request/list' -v
+```
+
+**Option 2: Using MQTT Explorer (GUI Tool)**
+1. Download MQTT Explorer: http://mqtt-explorer.com/
+2. Connect to `mqtt://localhost:1883`
+3. Subscribe to topic pattern: `games/#`
+
+**Option 3: Using HiveMQ WebSocket Client**
+1. Download HiveMQ WebSocket Client: https://www.hivemq.com/demos/websocket-client/
+2. Connect to `ws://localhost:8000/mqtt`
+3. Subscribe to topics to monitor message flow
 
 ## Troubleshooting
 
