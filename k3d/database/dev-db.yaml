@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      # Disable authentication for dev
+      MONGO_INITDB_ROOT_USERNAME: ""
+      MONGO_INITDB_ROOT_PASSWORD: ""
+    command: ["mongod", "--bind_ip_all", "--noauth"]
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
