@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const port = 8080;
@@ -10,7 +11,25 @@ const port = 8080;
 app.use(express.json());
 const JWT_SECRET = 'secret1234@';
 
-mongoose.connect('mongodb://localhost:27017/cloud', {
+// Proxy /games requests to games-service
+const GAMES_SERVICE_URL = process.env.GAMES_SERVICE_URL || 'http://games-service:8081';
+app.use('/games', createProxyMiddleware({
+  target: GAMES_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/games': '', // Remove /games prefix when forwarding
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Proxy] ${req.method} ${req.path} -> ${GAMES_SERVICE_URL}${req.path}`);
+  },
+  onError: (err, req, res) => {
+    console.error('[Proxy Error]', err);
+    res.status(500).json({ error: 'Games service unavailable' });
+  }
+}));
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/senior_care';
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })

@@ -16,7 +16,7 @@ const mqttHandlers = require('./mqtt/handlers');
 
 const app = express();
 const PORT = process.env.PORT || 8081;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/games';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/senior_care';
 const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
 
 // Middleware

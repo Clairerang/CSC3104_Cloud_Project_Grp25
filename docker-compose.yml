@@ -13,7 +13,6 @@ services:
       - REACT_APP_API_URL=/api
     depends_on:
       - api-gateway
-      - games-service
     networks:
       - senior-care-network
     restart: unless-stopped
@@ -43,16 +42,16 @@ services:
       retries: 3
       start_period: 10s
 
-  # MongoDB for Main API
-  mongodb-main:
+  # MongoDB Database (Single Instance for All Services)
+  mongodb:
     image: mongo:7.0
-    container_name: mongodb-main
+    container_name: mongodb
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: cloud
+      MONGO_INITDB_DATABASE: senior_care
     volumes:
-      - mongodb-main-data:/data/db
+      - mongodb-data:/data/db
     networks:
       - senior-care-network
     healthcheck:
@@ -62,26 +61,7 @@ services:
       retries: 5
       start_period: 30s
 
-  # MongoDB for Games Service
-  mongodb-games:
-    image: mongo:7.0
-    container_name: mongodb-games
-    ports:
-      - "27018:27017"
-    environment:
-      MONGO_INITDB_DATABASE: games
-    volumes:
-      - mongodb-games-data:/data/db
-    networks:
-      - senior-care-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # API Gateway (Main API with MQTT)
+  # API Gateway (Main API with MQTT & Proxy)
   api-gateway:
     build:
       context: ./api
@@ -92,15 +72,18 @@ services:
       - "8080:8080"
     environment:
       PORT: 8080
-      MONGODB_URI: mongodb://mongodb-main:27017/cloud
+      MONGODB_URI: mongodb://mongodb:27017/senior_care
       MQTT_BROKER_URL: mqtt://hivemq:1883
+      GAMES_SERVICE_URL: http://games-service:8081
       JWT_SECRET: secret1234@
       SERVICE_NAME: api-gateway
       NODE_ENV: production
     depends_on:
-      mongodb-main:
+      mongodb:
         condition: service_healthy
       hivemq:
+        condition: service_healthy
+      games-service:
         condition: service_healthy
     networks:
       - senior-care-network
@@ -112,24 +95,24 @@ services:
       retries: 3
       start_period: 40s
 
-  # Games Microservice
+  # Games Microservice (Internal - not exposed to frontend directly)
   games-service:
     build:
       context: ./games-service
       dockerfile: Dockerfile
     image: senior-care-games-service:latest
     container_name: games-service
-    ports:
-      - "8081:8081"
+    expose:
+      - "8081"
     environment:
       PORT: 8081
-      MONGODB_URI: mongodb://mongodb-games:27017/games
+      MONGODB_URI: mongodb://mongodb:27017/senior_care
       MQTT_BROKER_URL: mqtt://hivemq:1883
       JWT_SECRET: secret1234@
       SERVICE_NAME: games-service
       NODE_ENV: production
     depends_on:
-      mongodb-games:
+      mongodb:
         condition: service_healthy
       hivemq:
         condition: service_healthy
@@ -152,7 +135,5 @@ volumes:
     driver: local
   hivemq-log:
     driver: local
-  mongodb-main-data:
-    driver: local
-  mongodb-games-data:
+  mongodb-data:
     driver: local
