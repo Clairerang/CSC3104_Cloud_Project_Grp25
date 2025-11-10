@@ -2,18 +2,13 @@
 
 ## Quick Collection Overview
 
-### Database: `cloud` (Port 27017)
+### Database: `senior_care` (Port 27017)
 
 | Collection | Purpose | Key Fields | Primary Key |
 |------------|---------|------------|-------------|
 | **users** | User accounts | userId, username, role, profile | userId (unique) |
 | **relationships** | Senior-family links | seniorId, linkAccId, relation | seniorId+linkAccId |
 | **engagements** | Daily activity tracking | userId, date, checkIn, totalScore | userId+date |
-
-### Database: `games` (Port 27018)
-
-| Collection | Purpose | Key Fields | Primary Key |
-|------------|---------|------------|-------------|
 | **games** | Game catalog | gameId, type, difficulty | gameId (unique) |
 | **gamesessions** | Play sessions | sessionId, userId, gameId | sessionId (unique) |
 | **exercises** | Exercise library | exerciseId, duration, videoUrl | exerciseId (unique) |
@@ -148,31 +143,31 @@ const newId = uuidv4(); // e.g., "550e8400-e29b-41d4-a716-446655440000"
 
 ## Required Indexes (Already Implemented)
 
-### cloud.users
+### users
 - `userId`: unique
 - `username`: unique (implicit)
 
-### cloud.relationships
+### relationships
 - `{ seniorId: 1, linkAccId: 1 }`: unique compound
 
-### cloud.engagements
+### engagements
 - `{ userId: 1, date: 1 }`: unique compound
 
-### games.games
+### games
 - `gameId`: unique
 
-### games.gamesessions
+### gamesessions
 - `sessionId`: unique
 - `userId`: indexed
 - `{ userId: 1, completedAt: -1 }`: compound
 
-### games.exercises
+### exercises
 - `exerciseId`: unique
 
-### games.triviaquestions
+### triviaquestions
 - `questionId`: unique
 
-### games.memorysets
+### memorysets
 - `setId`: unique
 
 ---
@@ -181,14 +176,12 @@ const newId = uuidv4(); // e.g., "550e8400-e29b-41d4-a716-446655440000"
 
 ### Local Development
 ```
-Main API:   mongodb://localhost:27017/cloud
-Games API:  mongodb://localhost:27018/games
+mongodb://localhost:27017/senior_care
 ```
 
 ### Docker Containers
 ```
-Main API:   mongodb://mongodb-main:27017/cloud
-Games API:  mongodb://mongodb-games:27017/games
+mongodb://mongodb:27017/senior_care
 ```
 
 ---
