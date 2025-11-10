@@ -47,11 +47,11 @@ services:
   # EVENT DISPATCHER SERVICE (formerly notification-service)
   # Handles event routing, user management, check-ins, gRPC server
   # --------------------------------------
-  event-dispatcher:
+  notification:
     build:
       context: .
       dockerfile: ./services/notification-service/Dockerfile
-    container_name: event-dispatcher
+    container_name: notification
     depends_on:
       hivemq:
         condition: service_healthy
@@ -103,14 +103,14 @@ services:
     restart: unless-stopped
 
   # --------------------------------------
-  # SMS DISPATCHER SERVICE
+  # SMS SERVICE
   # Sends SMS messages via Twilio, subscribes to MQTT for event-driven messaging
   # --------------------------------------
-  sms-dispatcher:
+  sms:
     build:
       context: .
       dockerfile: ./services/sms-service/Dockerfile
-    container_name: sms-dispatcher
+    container_name: sms
     depends_on:
       hivemq:
         condition: service_healthy
@@ -125,14 +125,14 @@ services:
     restart: unless-stopped
 
   # --------------------------------------
-  # EMAIL DISPATCHER SERVICE
+  # EMAIL SERVICE
   # Sends emails via Gmail SMTP, subscribes to MQTT for event-driven messaging
   # --------------------------------------
-  email-dispatcher:
+  email:
     build:
       context: .
       dockerfile: ./services/email-service/Dockerfile
-    container_name: email-dispatcher
+    container_name: email
     depends_on:
       hivemq:
         condition: service_healthy
