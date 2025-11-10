@@ -55,6 +55,8 @@ CSC3104_Cloud_Project_Grp25/
 │   ├── caregiver-dashboard/      # Dashboard for caregivers and staff
 │   └── senior-app/               # Application for senior citizens
 ├── api/                          # API Gateway (Main backend service)
+├── database/                     # MongoDB Database Storage
+│   ├── mongo-init/               # Initialisation script for automated seeding
 ├── games-service/                # Games microservice
 ├── docker-compose.yml            # Docker orchestration
 └── k3d/                          # Kubernetes deployment configuration (legacy)
@@ -111,17 +113,26 @@ docker-compose down
 
 **Note:** HiveMQ Community Edition does not include a Control Center web UI. To monitor MQTT messages, use a third-party MQTT client tool (see Monitoring section below).
 
-### Seed Games Database
+### Verify Seeded Database
 
 ```bash
-# Enter games-service container
-docker-compose exec games-service sh
+# Enter mongodb container
+docker-compose exec -it mongodb mongosh
 
-# Run seed script
-npm run seed
+# View dbs
+test>show dbs
+
+# Switch database to senior_care
+test>use senior_care
+
+# Show all collections
+senior_care>show collections
+
+# Verify each collections have data
+senior_care>db.<collection_name>.find().pretty()
 
 # Exit container
-exit
+senior_care>exit
 ```
 
 ## Local Development (Without Docker)
@@ -309,11 +320,10 @@ docker-compose up -d
 ### MongoDB connection issues
 ```bash
 # Check MongoDB status
-docker-compose logs mongodb-main
-docker-compose logs mongodb-games
+docker-compose logs mongodb
 
 # Restart MongoDB
-docker-compose restart mongodb-main mongodb-games
+docker-compose restart mongodb
 ```
 
 ### MQTT connection issues
