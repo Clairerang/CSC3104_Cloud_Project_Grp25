@@ -7,15 +7,18 @@
 ```
 backend/
 ├── services/
-│   ├── event-dispatcher-service/     # API Gateway (Port 4002)
+│   ├── notification-service/         # API Gateway & Event Hub (Port 4002)
 │   ├── ai-companion-service/         # AI Chat with Gemini (Port 4015)
-│   ├── sms-dispatcher-service/       # SMS Notifications (Port 4004)
-│   ├── email-dispatcher-service/     # Email Notifications (Port 4003)
+│   ├── sms-service/                  # SMS & OTP Verification (Port 4004)
+│   ├── email-service/                # Email Notifications (Port 4003)
 │   └── push-notification-service/    # Firebase Push (Port 4020)
 │
-├── testing-notification/             # Browser testing UI
-│   ├── index.html                    # Main test interface
-│   └── dashboard.html                # Push notification dashboard
+├── shared/
+│   └── testing-ui/                   # Browser testing UI
+│       ├── index.html                # Main test interface with AI chat
+│       ├── ai-companion-chat.html    # Standalone AI chat UI
+│       ├── dashboard.html            # Push notification dashboard
+│       └── complete-flow.html        # Full workflow testing
 │
 ├── docker-compose.yml                # Service orchestration
 └── README.md                         # This file
@@ -26,20 +29,20 @@ backend/
 ### Message Flow (MQTT-based)
 
 ```
-Client → Event Dispatcher → MQTT Broker (HiveMQ) → Dispatchers → External APIs
-                                  ↓
-                              MongoDB (Persistence)
+Client → Notification Service → MQTT Broker (HiveMQ) → Service Subscribers → External APIs
+                                       ↓
+                                   MongoDB (Persistence)
 ```
 
 ### Active Services
 
 | Service | Port | Purpose | Technology |
 |---------|------|---------|------------|
-| **Event Dispatcher** | 4002 | API Gateway & Event Publisher | Node.js, Express, MQTT |
-| **AI Companion** | 4015 | Conversational AI | Node.js, Google Gemini 2.0 |
-| **SMS Dispatcher** | 4004 | SMS Delivery | Node.js, Twilio |
-| **Email Dispatcher** | 4003 | Email Delivery | Node.js, Nodemailer |
-| **Push Notification** | 4020 | Mobile Push | Node.js, Firebase FCM |
+| **Notification Service** | 4002 | API Gateway & Event Publisher | Node.js, Express, MQTT, gRPC |
+| **AI Companion** | 4015 | Conversational AI (6 Intents) | Node.js, Google Gemini 2.0 Flash |
+| **SMS Service** | 4004 | SMS Delivery & OTP Verification | Node.js, Twilio, Twilio Verify |
+| **Email Service** | 4003 | Email Delivery | Node.js, Nodemailer |
+| **Push Notification** | 4020 | Mobile Push Notifications | Node.js, Firebase FCM v1 |
 | **HiveMQ** | 1883/8080 | MQTT Message Broker | MQTT 3.1.1, QoS 1 |
 | **MongoDB** | 27017 | Database | NoSQL Document Store |
 
@@ -82,10 +85,10 @@ docker compose logs -f
 ### Access Points
 
 - **Testing UI**: http://localhost:4002/testing-notification/
-- **Event Dispatcher API**: http://localhost:4002
+- **Notification Service API**: http://localhost:4002
 - **AI Companion API**: http://localhost:4015
-- **SMS Dispatcher**: http://localhost:4004
-- **Email Dispatcher**: http://localhost:4003
+- **SMS Service**: http://localhost:4004
+- **Email Service**: http://localhost:4003
 - **Push Notification**: http://localhost:4020
 - **HiveMQ Dashboard**: http://localhost:8080
 - **MongoDB**: mongodb://localhost:27017
@@ -124,9 +127,11 @@ FIREBASE_VAPID_KEY=BXXXXXXXXXXXXXXXXXXXXXXXXXX
 # Also download firebase-sa.json and place in backend/
 
 # ============================================
-# GOOGLE AI STUDIO (Gemini)
+# GOOGLE GEMINI AI (AI Companion Service)
 # ============================================
-GOOGLE_AI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXX
+GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXX
+# Get your free API key: https://ai.google.dev/
+# Model: gemini-2.0-flash-exp (FREE tier, 15 req/min)
 
 # ============================================
 # DATABASE & MESSAGING (Auto-configured)
@@ -137,14 +142,14 @@ MQTT_BROKER_URL=mqtt://hivemq:1883
 
 ### Quick Setup Links
 
-1. **Twilio**: https://console.twilio.com/ → Get Account SID, Auth Token, Phone Number
+1. **Twilio**: https://console.twilio.com/ → Get Account SID, Auth Token, Phone Number, Verify Service SID
 2. **Gmail App Password**: https://myaccount.google.com/apppasswords → Generate 16-char password
-3. **Firebase**: https://console.firebase.google.com/ → Create project, enable FCM, download service account
-4. **Google AI**: https://ai.google.dev/ → Get API key for Gemini
+3. **Firebase**: https://console.firebase.google.com/ → Create project, enable FCM, download service account JSON
+4. **Google Gemini AI**: https://ai.google.dev/ → Get free API key (15 requests/min, unlimited for personal use)
 
 ## 📡 API Reference
 
-### Event Dispatcher (4002) - Main Gateway
+### Notification Service (4002) - Main Gateway
 
 #### Send Notification Event
 
@@ -177,30 +182,39 @@ Content-Type: application/json
 
 {
   "userId": "user123",
-  "message": "What community events in Hougang?"
+  "message": "What community events are happening today?"
 }
 
 # Response includes:
-# - Real Singapore community events
-# - Weather forecasts with elderly safety advice
-# - Sentiment analysis
-# - Intent detection
+# - AI-powered natural language responses
+# - Intent detection (6 intents)
+# - Context-aware suggestions
+# - Real-time information
 ```
 
+**Supported Intents**:
+1. 🏠 **Call Family** - Request to SMS family members
+2. 💊 **Medication Reminder** - Check today's medications
+3. 🎉 **Community Events** - Browse local activities and events
+4. 🤝 **Volunteer Connect** - Connect with Lions Befrienders volunteers
+5. 🌤️ **Weather Info** - Get weather updates and safety advice
+6. 🎮 **Play Game** - Interactive games and activities
+
 **Features**:
-- ✅ **Real Data**: Singapore community events, weather
-- ✅ **Location-Aware**: Detects neighborhoods (Hougang, Tampines, etc.)
-- ✅ **Time-Aware**: Morning/afternoon/evening recommendations
-- ✅ **7 Intents**: Loneliness, SMS Family, Community Events, Weather, Medication, Volunteers, Games
+- ✅ **Google Gemini 2.0 Flash** - Latest AI model (FREE tier)
+- ✅ **Natural Conversations** - Context-aware responses
+- ✅ **No Sentiment Analysis** - Simplified, focused on actionable help
+- ✅ **MongoDB Integration** - Conversation history storage
+- ✅ **MQTT Publishing** - Triggers real notifications
 
 #### Get Chat History
 
 ```bash
 GET /history/:userId
-# Returns conversation history with sentiment analysis
+# Returns conversation history with timestamps and intents
 ```
 
-### SMS Dispatcher (4004)
+### SMS Service (4004)
 
 #### Send SMS
 
@@ -230,7 +244,7 @@ POST /verify/check
 }
 ```
 
-### Email Dispatcher (4003)
+### Email Service (4003)
 
 ```bash
 POST /send-email
@@ -240,6 +254,12 @@ POST /send-email
   "body": "Test message"
 }
 ```
+
+**Features**:
+- ✅ Gmail SMTP integration
+- ✅ Daily check-in email notifications
+- ✅ HTML email templates
+- ✅ MQTT consumer for `daily_login` events
 
 ### Push Notification (4020)
 
@@ -267,10 +287,24 @@ POST /send-push
 Visit: **http://localhost:4002/testing-notification/**
 
 Features:
-- ✅ **SMS Test**: Send test SMS to any number
-- ✅ **Email Test**: Send test emails
-- ✅ **Push Test**: Test Firebase notifications
-- ✅ **AI Chat**: Interactive AI companion testing
+- ✅ **Daily Check-In Interface** - Test senior daily login flow
+- ✅ **Phone Verification** - Test Twilio OTP verification
+- ✅ **AI Chat Widget** - Floating chat button with 6 quick actions
+  - Call Family
+  - Medication for the day
+  - Community Events
+  - Volunteer Connect (Lions Befrienders)
+  - Weather
+  - Play Game
+- ✅ **Push Notifications** - Test Firebase FCM
+- ✅ **SMS & Email** - Send test messages
+- ✅ **Real-time Logs** - View service responses
+
+**New Features**:
+- 🎨 Beautifully formatted Lions Befrienders volunteer info with gradient styling
+- 📏 Taller chat window (650px) for better conversation view
+- 🤖 AI responses render as HTML for rich formatting
+- 🔔 Floating purple AI chat button (bottom-right)
 
 ### PowerShell Testing
 
@@ -297,7 +331,7 @@ Invoke-RestMethod -Uri "http://localhost:4004/send-sms" `
   -ContentType "application/json" `
   -Body $body
 
-# Test Event Dispatcher
+# Test Notification Service
 $body = @{
   type = "sms"
   userId = "user123"
@@ -318,11 +352,11 @@ Invoke-RestMethod -Uri "http://localhost:4002/events" `
 docker compose ps
 
 # Individual health checks
-Invoke-RestMethod http://localhost:4002/health  # Event Dispatcher
+Invoke-RestMethod http://localhost:4002/health  # Notification Service
 Invoke-RestMethod http://localhost:4015/health  # AI Companion
-Invoke-RestMethod http://localhost:4004/health  # SMS
-Invoke-RestMethod http://localhost:4003/health  # Email
-Invoke-RestMethod http://localhost:4020/health  # Push
+Invoke-RestMethod http://localhost:4004/health  # SMS Service
+Invoke-RestMethod http://localhost:4003/health  # Email Service
+Invoke-RestMethod http://localhost:4020/health  # Push Notification
 ```
 
 ## 🔧 Development
@@ -335,7 +369,7 @@ docker compose logs -f
 
 # Specific service
 docker compose logs -f ai-companion
-docker compose logs -f sms-dispatcher
+docker compose logs -f sms-service
 
 # Last 50 lines
 docker logs ai-companion --tail 50
@@ -350,7 +384,7 @@ docker compose restart
 # Restart specific service
 docker compose restart ai-companion
 
-# Rebuild after code changes
+# Rebuild after code changes (important for dependency updates)
 docker compose up -d --build ai-companion
 ```
 
@@ -410,25 +444,39 @@ docker restart hivemq
 
 ```powershell
 # Check Gemini API key
-docker exec ai-companion env | Select-String "GOOGLE_AI"
+docker exec ai-companion env | Select-String "GEMINI"
 
 # View AI logs
 docker logs ai-companion --tail 100
 
+# Verify Gemini is initialized (look for this in logs)
+# ✅ Google Gemini AI initialized (gemini-2.0-flash-exp)
+# 💡 Mode: GEMINI (Powered by Google AI Studio)
+
 # Common errors:
-# - "API key not found" → Check GOOGLE_AI_API_KEY in .env
-# - "Rate limit exceeded" → Wait or upgrade API quota
-# - "publishEvent is not a function" → Fixed in latest version
+# - "API key not found" → Check GEMINI_API_KEY in .env file
+# - "Fallback mode" → API key not loaded, rebuild container: docker compose up -d --build ai-companion
+# - "Rate limit exceeded" → Free tier: 15 req/min, wait 1 minute
+# - Missing dependencies → Ensure package.json is correct, rebuild container
+```
+
+**Important**: After updating .env file, you must **rebuild** the container, not just restart:
+```powershell
+# Wrong (won't pick up new env vars if dependencies changed)
+docker compose restart ai-companion
+
+# Correct (rebuilds with new env vars and dependencies)
+docker compose up -d --build ai-companion
 ```
 
 ### SMS/Email Not Sending
 
 ```powershell
 # Check Twilio credentials
-docker exec sms-dispatcher env | Select-String "TWILIO"
+docker exec sms-service env | Select-String "TWILIO"
 
 # Check Gmail credentials
-docker exec email-dispatcher env | Select-String "EMAIL"
+docker exec email-service env | Select-String "EMAIL"
 
 # Common errors:
 # - "Invalid credentials" → Verify API keys
@@ -442,17 +490,42 @@ docker exec email-dispatcher env | Select-String "EMAIL"
 # Check MQTT broker
 docker logs hivemq --tail 50
 
-# Check if dispatchers are subscribed
-docker logs sms-dispatcher | Select-String "MQTT"
-docker logs email-dispatcher | Select-String "MQTT"
+# Check if services are subscribed to topics
+docker logs sms-service | Select-String "MQTT"
+docker logs email-service | Select-String "MQTT"
+docker logs ai-companion | Select-String "MQTT"
 
-# Restart broker and dispatchers
+# Restart broker and services
 docker restart hivemq
 Start-Sleep 5
-docker restart sms-dispatcher email-dispatcher push-notification
+docker restart sms-service email-service push-notification ai-companion
 ```
 
 ## 📊 Architecture Decisions
+
+### Recent Changes (November 2025)
+
+✅ **Removed Sentiment Analysis**:
+- Simplified AI companion to focus on actionable help
+- Removed `sentiment` npm package dependency
+- Removed sentiment tracking from conversations
+- Reduced complexity and improved response times
+
+✅ **Removed Loneliness Intent**:
+- Merged into general conversation flow
+- Volunteer Connect button provides direct help
+- Streamlined from 7 to 6 core intents
+
+✅ **Enhanced UI**:
+- Taller chat window (650px) for better UX
+- Rich HTML formatting for Lions Befrienders info
+- Floating AI chat button with modern gradient design
+- Quick action buttons for common tasks
+
+✅ **Improved File Structure**:
+- Moved testing UI to `shared/testing-ui/`
+- Single source of truth for HTML files
+- Docker volume mounts for instant updates (no rebuild needed)
 
 ### Why MQTT instead of Kafka?
 
@@ -470,13 +543,26 @@ docker restart sms-dispatcher email-dispatcher push-notification
 - MQTT broker handles persistence and retries
 - Reduced complexity (removed 90+ lines of code)
 - Fewer failure points
+- Better for real-time communication
 
-### Why removed Gamification Service?
+### MongoDB Collections
 
-✅ **Focus**:
-- Project focused on notifications and AI
-- Gamification can be added later if needed
-- Reduces deployment complexity
+The system uses 4 main collections:
+
+1. **users** - Senior user profiles
+2. **checkins** - Daily check-in records
+3. **devicetokens** - FCM tokens for push notifications
+4. **conversations** - AI chat history (removed sentiment fields)
+5. **medications** - Medication tracking (new schema)
+
+## 🔒 Security Considerations
+
+- ✅ **Environment Variables**: All secrets in `.env` file (never commit!)
+- ✅ **Firebase Service Account**: JSON file excluded from git
+- ✅ **MQTT QoS 1**: At-least-once delivery guarantee
+- ✅ **MongoDB**: No authentication in dev (add for production)
+- ✅ **API Keys**: Validated on container startup
+- ⚠️ **CORS**: Currently open for testing (restrict in production)
 
 ## 🚀 Production Deployment
 
@@ -511,20 +597,52 @@ kubectl create secret generic twilio-creds \
 
 ## 📚 Additional Documentation
 
-- [AI Companion Service](services/ai-companion-service/README.md)
-- [Event Dispatcher API](services/event-dispatcher-service/README.md)
-- [Testing Guide](testing-notification/README.md)
+- [AI Companion Service](services/ai-companion-service/README.md) - Gemini AI integration
+- [Notification Service API](services/notification-service/README.md) - Core event hub
+- [SMS Service](services/sms-service/README.md) - Twilio integration
+- [Testing Guide](shared/testing-ui/README.md) - UI testing documentation
 
 ## 🔗 External Resources
 
 - [MQTT Protocol](https://mqtt.org/)
 - [HiveMQ Documentation](https://www.hivemq.com/docs/)
-- [Google Gemini API](https://ai.google.dev/gemini-api/docs)
+- [Google Gemini API](https://ai.google.dev/gemini-api/docs) - Get free API key
 - [Twilio SMS](https://www.twilio.com/docs/sms)
+- [Twilio Verify](https://www.twilio.com/docs/verify/api) - OTP verification
 - [Firebase FCM](https://firebase.google.com/docs/cloud-messaging)
+- [Lions Befrienders](https://www.lionsbefrienders.org.sg/) - Senior volunteer services
+
+## 🎯 Key Features Summary
+
+### AI Companion
+- ✅ Google Gemini 2.0 Flash (FREE tier)
+- ✅ 6 intent detection system
+- ✅ Natural language conversations
+- ✅ Context-aware responses
+- ✅ MongoDB conversation history
+- ✅ MQTT event publishing
+
+### Notification System
+- ✅ MQTT-based event distribution
+- ✅ Multi-channel delivery (SMS, Email, Push)
+- ✅ OTP verification via Twilio Verify
+- ✅ Firebase FCM v1 API
+- ✅ Real-time dashboard updates
+- ✅ Persistent message queuing
+
+### Testing Interface
+- ✅ Floating AI chat widget
+- ✅ Daily check-in workflow
+- ✅ Phone verification UI
+- ✅ Quick action buttons
+- ✅ Rich HTML formatting
+- ✅ Real-time service logs
 
 ---
 
-**Last Updated**: November 2025  
+**Last Updated**: November 11, 2025  
 **Architecture**: MQTT-based Microservices  
-**Status**: Production Ready ✅
+**AI Model**: Google Gemini 2.0 Flash (FREE)  
+**Status**: Production Ready ✅  
+**Team**: CSC3104 Cloud Project Group 25
+

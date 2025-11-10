@@ -3,7 +3,6 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const winston = require('winston');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const Sentiment = require('sentiment');
 const { v4: uuidv4 } = require('uuid');
 const mqtt = require('mqtt');
 const promClient = require('prom-client');
@@ -38,16 +37,6 @@ const chatCounter = new promClient.Counter({
   labelNames: ['intent', 'status'],
   registers: [register]
 });
-
-const sentimentGauge = new promClient.Gauge({
-  name: 'ai_companion_user_sentiment',
-  help: 'User sentiment score (-5 to 5)',
-  labelNames: ['userId'],
-  registers: [register]
-});
-
-// Sentiment analyzer (free npm package)
-const sentiment = new Sentiment();
 
 // Google Gemini AI Configuration
 let genAI = null;
@@ -105,9 +94,7 @@ const ConversationSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
     userMessage: String,
     botResponse: String,
-    intent: String,
-    sentiment: String,
-    sentimentScore: Number
+    intent: String
   }],
   metadata: {
     startTime: { type: Date, default: Date.now },
@@ -121,7 +108,6 @@ const Conversation = mongoose.model('Conversation', ConversationSchema);
 // Intent handlers - Simplified system for senior care
 const intentHandlers = {
   // Core intents
-  'SocialIsolation': require('./intents/loneliness'),  // Loneliness detection with keywords
   'MedicationReminder': require('./intents/medication'),
   'WeatherInfo': require('./intents/weather'),
   
@@ -133,43 +119,37 @@ const intentHandlers = {
 };
 
 // Fallback intent detection (keyword-based when Gemini is not available)
-// Simplified system - 7 intents only
+// Simplified system - 6 intents only
 function detectIntentFallback(message) {
   const lowerMsg = message.toLowerCase();
   
   // 1. SMS Family (specific - message + family member)
-  if (lowerMsg.match(/\b(message|text|sms|tell|inform|let.*know|send)\b/) && 
+  if (lowerMsg.match(/\b(message|text|sms|tell|inform|let.*know|send|call)\b/) && 
       lowerMsg.match(/\b(family|daughter|son|mom|dad|wife|husband|child|brother|sister|grandson|granddaughter)\b/)) {
-    return { intent: 'SMSFamily', response: "I'll send a message to your family right away." };
+    return { intent: 'SMSFamily', response: "I'll help you contact your family right away." };
   }
   
-  // 2. Community Events (check before loneliness - "miss an activity" != "miss someone")
-  if (lowerMsg.match(/\b(event|activit(y|ies)|community|group|club|class|workshop|exercise|tai chi)\b/)) {
+  // 2. Community Events (activities, things to do, events nearby)
+  if (lowerMsg.match(/\b(event|activit(y|ies)|community|group|club|class|workshop|exercise|tai chi|what.*do|happening|near me)\b/)) {
     return { intent: 'CommunityEvents', response: "Let me find community activities for you!" };
   }
   
-  // 3. Social Isolation & Loneliness (keyword-based alert)
-  if (lowerMsg.match(/\b(lonely|alone|sad|depressed|isolated|nobody|feel.*empty|hopeless)\b/) ||
-      (lowerMsg.includes('miss') && !lowerMsg.match(/\b(event|activit)/))) {
-    return { intent: 'SocialIsolation', response: "I'm here with you. You're not alone." };
-  }
-  
-  // 4. Volunteer Connection
+  // 3. Volunteer Connection
   if (lowerMsg.match(/\b(volunteer|visitor|companion|befriend|social.*worker)\b/)) {
     return { intent: 'VolunteerConnect', response: "I can connect you with friendly volunteers!" };
   }
   
-  // 5. Medication
+  // 4. Medication
   if (lowerMsg.match(/\b(medication|medicine|pills|tablet|doctor|prescription)\b/)) {
     return { intent: 'MedicationReminder', response: "Let me check your medication schedule." };
   }
   
-  // 6. Weather (Singapore specific)
+  // 5. Weather (Singapore specific)
   if (lowerMsg.match(/\b(weather|rain|sunny|temperature|forecast|hot|humid|go.*out)\b/)) {
     return { intent: 'WeatherInfo', response: "Let me check the weather for you." };
   }
   
-  // 7. Games
+  // 6. Games
   if (lowerMsg.match(/\b(game|play|trivia|fun|entertainment|bored)\b/)) {
     return { intent: 'GameRequest', response: "Let's have some fun! What game would you like?" };
   }
@@ -187,26 +167,22 @@ app.get('/', (req, res) => {
     version: '2.0.0',
     features: [
       'Elderly-friendly conversational AI',
-      'Sentiment analysis',
-      'Intent detection (8 intents)',
+      'Intent detection (6 intents)',
       'MQTT event publishing',
       'Chat history tracking'
     ],
     endpoints: {
       chat: 'POST /chat - Send a chat message',
       history: 'GET /history/:userId - Get chat history',
-      sentiment: 'GET /sentiment/:userId - Get sentiment analysis',
       health: 'GET /health - Health check',
       metrics: 'GET /metrics - Prometheus metrics'
     },
     intents: [
-      'Weather Info',
-      'Loneliness/Social Isolation',
       'SMS Family',
-      'Call Family',
       'Community Events',
-      'Medication Reminder',
       'Volunteer Connect',
+      'Medication Reminder',
+      'Weather Info',
       'Play Game'
     ],
     cost: '100% FREE (Google AI Studio)',
@@ -235,17 +211,6 @@ app.post('/chat', async (req, res) => {
     let botResponse = '';
     let confidence = 0;
 
-    // Analyze sentiment (free npm package)
-    const sentimentResult = sentiment.analyze(message);
-    const sentimentScore = sentimentResult.score;
-    const sentimentLabel = sentimentScore > 2 ? 'POSITIVE' : 
-                          sentimentScore < -2 ? 'NEGATIVE' : 'NEUTRAL';
-
-    logger.info(`😊 Sentiment: ${sentimentLabel} (${sentimentScore})`);
-
-    // Update sentiment metric
-    sentimentGauge.set({ userId }, sentimentScore);
-
     // STEP 1: Detect intent FIRST (before calling Gemini)
     const fallback = detectIntentFallback(message);
     intentName = fallback.intent;
@@ -259,8 +224,6 @@ app.post('/chat', async (req, res) => {
           userId,
           message,
           sessionId,
-          sentiment: sentimentLabel,
-          sentimentScore,
           logger
         });
 
@@ -281,16 +244,15 @@ app.post('/chat', async (req, res) => {
       try {
         // Build context-aware prompt with real data injected
         let prompt = `You are a warm, caring AI companion for senior citizens in Singapore.
-Your mission is to reduce social isolation and improve wellbeing through:
+Your mission is to improve wellbeing and provide helpful assistance through:
 
-**Core Services (7 intents):**
-1. **Loneliness Support** - Detect keywords (lonely, alone, sad, depressed) and provide emotional support
-2. **SMS Family** - Help seniors send text messages to family members
-3. **Community Events** - Provide real Singapore community events for their area
-4. **Volunteer Connection** - Connect with friendly volunteer visitors
-5. **Medication Reminders** - Help track medication schedules
-6. **Weather Advice** - Real Singapore weather with safety advice for going outside
-7. **Fun Games** - Entertainment and cognitive engagement
+**Core Services (6 intents):**
+1. **SMS Family** - Help seniors contact their family members
+2. **Community Events** - Provide real Singapore community events for their area
+3. **Volunteer Connection** - Connect with friendly volunteer visitors
+4. **Medication Reminders** - Help track medication schedules
+5. **Weather Advice** - Real Singapore weather with safety advice for going outside
+6. **Fun Games** - Entertainment and cognitive engagement
 
 **Communication Style:**
 - Warm, patient, and respectful
@@ -329,24 +291,11 @@ Your mission is to reduce social isolation and improve wellbeing through:
       logger.info(`🔄 Fallback Intent: ${intentName}`);
     }
 
-    // Publish negative sentiment alert
-    if (sentimentScore < -3) {
-      await publishEvent('notification.events', {
-        type: 'negative_sentiment',
-        userId,
-        message: `User showing negative sentiment: "${message}"`,
-        sentimentScore,
-        timestamp: new Date().toISOString()
-      });
-    }
-
     // Save conversation to MongoDB
     await saveConversation(userId, sessionId, {
       userMessage: message,
       botResponse,
-      intent: intentName,
-      sentiment: sentimentLabel,
-      sentimentScore
+      intent: intentName
     });
 
     // Publish chat message to MQTT
@@ -356,7 +305,6 @@ Your mission is to reduce social isolation and improve wellbeing through:
       message,
       response: botResponse,
       intent: intentName,
-      sentiment: sentimentLabel,
       timestamp: new Date().toISOString()
     });
 
@@ -370,8 +318,6 @@ Your mission is to reduce social isolation and improve wellbeing through:
       success: true,
       response: botResponse,
       intent: intentName,
-      sentiment: sentimentLabel,
-      sentimentScore,
       confidence,
       sessionId,
       mode: geminiModel ? 'gemini' : 'fallback',
@@ -413,45 +359,6 @@ app.get('/history/:userId', async (req, res) => {
     });
   } catch (error) {
     logger.error('❌ History error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get sentiment trend
-app.get('/sentiment/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const days = parseInt(req.query.days) || 7;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const conversations = await Conversation.find({
-      userId,
-      'metadata.lastActivity': { $gte: startDate }
-    });
-
-    const sentimentData = conversations.flatMap(conv => 
-      conv.messages.map(msg => ({
-        timestamp: msg.timestamp,
-        score: msg.sentimentScore,
-        sentiment: msg.sentiment
-      }))
-    );
-
-    const avgSentiment = sentimentData.length > 0
-      ? sentimentData.reduce((sum, item) => sum + item.score, 0) / sentimentData.length
-      : 0;
-
-    res.json({
-      success: true,
-      userId,
-      period: `${days} days`,
-      averageSentiment: avgSentiment.toFixed(2),
-      dataPoints: sentimentData.length,
-      trend: sentimentData
-    });
-  } catch (error) {
-    logger.error('❌ Sentiment trend error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -100,11 +100,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        .sentiment-indicator {
-            font-size: 20px;
-            margin-left: 5px;
-        }
-
         .chat-input-area {
             padding: 20px;
             background: white;
@@ -356,11 +351,10 @@
 
                 if (data.success) {
                     lastBotMessage = data.response;
-                    const sentimentEmoji = getSentimentEmoji(data.sentiment);
                     const intentBadge = data.intent ? `<span class="intent-badge">${data.intent}</span>` : '';
                     
                     addMessage(
-                        `${data.response} ${sentimentEmoji}${intentBadge}`, 
+                        `${data.response} ${intentBadge}`, 
                         'bot'
                     );
                 } else {
@@ -371,16 +365,6 @@
                 addMessage('❌ Connection error. Is the service running?', 'bot');
                 console.error('Error:', error);
             }
-        }
-
-        function getSentimentEmoji(sentiment) {
-            const emojis = {
-                'POSITIVE': '😊',
-                'NEGATIVE': '😟',
-                'NEUTRAL': '😐',
-                'MIXED': '🤔'
-            };
-            return emojis[sentiment] || '';
         }
 
         function addMessage(text, type) {

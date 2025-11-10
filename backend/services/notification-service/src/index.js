@@ -306,8 +306,8 @@ async function checkForMissedCheckins() {
 async function start() {
   const PORT = process.env.PORT || 4002;
   await connectMongo();
-  // serve testing-notification static frontend if present
-  // index.js lives in /app/src inside the container, so testing-notification is one level up
+  // serve testing-ui static frontend from shared directory
+  // Docker mounts ./shared/testing-ui to /app/testing-notification
   const staticPath = path.join(__dirname, '..', 'testing-notification');
   app.use('/testing-notification', express.static(staticPath));
   app.get('/testing-notification', (req, res) => res.sendFile(path.join(staticPath, 'index.html')));

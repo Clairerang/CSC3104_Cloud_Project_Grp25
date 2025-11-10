@@ -38,7 +38,8 @@ const notificationEventSchema = new mongoose.Schema({
   receivedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-// Existing models used by kafkaConsumer (idempotency + retry)
+// MongoDB Models for Notification Service
+// Simple event-driven architecture using MQTT
 const processedSchema = new mongoose.Schema({ messageId: { type: String, unique: true }, processedAt: Date }, { timestamps: true });
 const retryJobSchema = new mongoose.Schema({ event: { type: mongoose.Schema.Types.Mixed }, attempts: Number, nextAttemptAt: Date, createdAt: { type: Date, default: Date.now } });
 
