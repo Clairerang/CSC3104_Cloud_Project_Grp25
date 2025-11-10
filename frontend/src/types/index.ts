@@ -7,6 +7,7 @@ export interface Contact {
   initials: string;
   relationship: string;
   lastCall: string;
+  phoneNumber: string;
   isFavorite?: boolean;
 }
 
@@ -31,7 +32,7 @@ export interface Activity {
   title: string;
   description: string;
   points: number;
-  category: "Exercise" | "Mental" | "Learning" | "Social";
+  category: "Exercise" | "Mental" | "Learning" | "Casual";
   completed?: boolean;
 }
 

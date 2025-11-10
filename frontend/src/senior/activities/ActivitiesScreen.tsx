@@ -5,6 +5,7 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import TriviaIcon from "@mui/icons-material/Quiz";
 import PeopleIcon from "@mui/icons-material/People";
+import TowerIcon from "@mui/icons-material/TableRows";
 import type { Activity } from "../../types";
 
 interface Props {
@@ -291,7 +292,8 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                 p: 4,
                 bgcolor: activity.category === 'Exercise' ? '#f0fdf4' :
                          activity.category === 'Mental' ? '#faf5ff' : 
-                         activity.category === 'Social' ? '#fef1e1ff' : '#fdfbeaff',
+                         activity.category === 'Learning' ? '#fef1e1ff' :
+                         activity.category === 'Casual' ? '#deeeffff' : '#fdfbeaff',     
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 4, mb: 4 }}>
@@ -305,14 +307,16 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                   justifyContent: 'center',
                 }}>
                   {activity.category === 'Exercise' ? (
-                    <FitnessCenterIcon sx={{ width: 24, height: 24, color: '#16a34a' }} />
-                  ) : activity.category === 'Mental' ? (
-                    <PsychologyIcon sx={{ width: 24, height: 24, color: '#7c3aed' }} />
-                  ) : activity.category === 'Social' ? (
-                    <PeopleIcon sx={{ width: 24, height: 24, color: '#ea580c' }} />
-                  ) : (
-                    <TriviaIcon sx={{ width: 24, height: 24, color: '#e0d790ff' }} />
-                  )}
+                  <FitnessCenterIcon sx={{ width: 24, height: 24, color: '#16a34a' }} />
+                ) : activity.category === 'Mental' ? (
+                  <PsychologyIcon sx={{ width: 24, height: 24, color: '#7c3aed' }} />
+                ) : activity.category === 'Learning' ? (
+                  <PeopleIcon sx={{ width: 24, height: 24, color: '#ea580c' }} />
+                ) : activity.category === 'Casual' ? (
+                  <TowerIcon sx={{ width: 24, height: 24, color: '#3389ebff' }} />
+                ) : (
+                  <TriviaIcon sx={{ width: 24, height: 24, color: '#e0d790ff' }} />
+                )}
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
