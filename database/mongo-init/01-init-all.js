@@ -30,7 +30,7 @@ var triviaQ3Id = UUID().toString();
 var memorySetId = UUID().toString();
 
 // Switch to / Create desired database
-db = db.getSiblingDB('seniorcare');
+db = db.getSiblingDB('senior_care');
 
 // Create Collections
 db.createCollection('users');

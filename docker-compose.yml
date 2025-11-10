@@ -52,8 +52,10 @@ services:
       MONGO_INITDB_DATABASE: senior_care
     volumes:
       - mongodb-data:/data/db
+      - ./database/mongo-init:/docker-entrypoint-initdb.d
     networks:
       - senior-care-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
