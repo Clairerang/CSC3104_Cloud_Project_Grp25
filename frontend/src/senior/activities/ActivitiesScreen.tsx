@@ -64,7 +64,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
           <Box sx={{
             width: 48,
             height: 48,
-            color: '#7c3aed',
+            color: '#eab308',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -181,7 +181,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: 1,
-                          '&:hover': { bgcolor: '#7c3aed' }
+                          '&:hover': { bgcolor: '#16a34a' }
                         }}
                       >
                         <Typography sx={{ fontSize: 20, color: 'white' }}>✓</Typography>

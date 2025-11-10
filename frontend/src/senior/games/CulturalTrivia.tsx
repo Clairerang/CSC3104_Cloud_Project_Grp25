@@ -79,7 +79,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
       <Box
         sx={{
           minHeight: '100vh',
-          background: 'linear-gradient(to bottom, #bbdefb, #ffffff)',
+          background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
           p: 3,
           display: 'flex',
           alignItems: 'center',
@@ -87,17 +87,17 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
         }}
       >
         <Box sx={{ maxWidth: 600, width: '100%', textAlign: 'center' }}>
-          <CheckCircleIcon sx={{ fontSize: 120, color: '#2196f3', mb: 3 }} />
-          <Typography variant="h3" gutterBottom sx={{ color: '#1976d2' }}>
+          <CheckCircleIcon sx={{ fontSize: 120, color: '#ff9800', mb: 3 }} />
+          <Typography variant="h3" gutterBottom sx={{ color: '#e65100' }}>
             Quiz Complete!
           </Typography>
           <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
             You got {score} out of {questions.length} correct!
           </Typography>
 
-          <Card sx={{ mb: 3, bgcolor: '#e3f2fd' }}>
+          <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
             <CardContent>
-              <Typography variant="h3" sx={{ color: '#2196f3', mb: 1 }}>
+              <Typography variant="h3" sx={{ color: '#ff9800', mb: 1 }}>
                 +15 Points Earned!
               </Typography>
               <Typography variant="h5" color="text.secondary">
@@ -113,7 +113,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               variant="contained"
               size="large"
               onClick={onComplete}
-              sx={{ minHeight: 50, bgcolor: '#2196f3', fontSize: 20, '&:hover': { bgcolor: '#1976d2' } }}
+              sx={{ minHeight: 50, bgcolor: '#ff9800', fontSize: 20, '&:hover': { bgcolor: '#f57c00' } }}
             >
               Done
             </Button>
@@ -143,7 +143,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
       <Box
         sx={{
           minHeight: '100vh',
-          background: 'linear-gradient(to bottom, #bbdefb, #ffffff)',
+          background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
           p: 3,
         }}
       >
@@ -157,10 +157,10 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
             Back to Activities
           </Button>
 
-          <Card sx={{ mb: 3, bgcolor: '#e3f2fd' }}>
+          <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
             <CardContent>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h3" gutterBottom sx={{ color: '#1976d2' }}>
+                <Typography variant="h3" gutterBottom sx={{ color: '#ff9800' }}>
                   Cultural Trivia
                 </Typography>
                 <Typography variant="h5" color="text.secondary">
@@ -200,8 +200,8 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
             startIcon={<PlayArrowIcon sx={{ fontSize: '40px !important' }} />}
             sx={{
               minHeight: 40,
-              bgcolor: '#2196f3',
-              '&:hover': { bgcolor: '#1976d2' },
+              bgcolor: '#ff9800',
+              '&:hover': { bgcolor: '#f57c00' },
             }}
           >
             <Typography variant="h5" sx={{ color: 'white' }}>
@@ -217,7 +217,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(to bottom, #bbdefb, #ffffff)',
+        background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
         p: 3,
       }}
     >
@@ -229,20 +229,24 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               <Typography variant="body1" color="text.secondary">
                 Question {currentQuestion + 1} of {questions.length}
               </Typography>
-              <Chip label={`Score: ${score}`} color="primary" size="medium" />
+              <Chip label={`Score: ${score}`} color="primary" size="medium" sx={{ bgcolor: '#f57c00' }}/>
             </Box>
             <LinearProgress
               variant="determinate"
               value={progress}
-              sx={{ height: 12, borderRadius: 6 }}
+              sx={{ height: 12, borderRadius: 6, bgcolor: '#ffdab6ff',
+                '& .MuiLinearProgress-bar': {
+                  backgroundColor: '#f57c00', // progress color
+                },
+              }}
             />
           </CardContent>
         </Card>
 
         {/* Question */}
-        <Card sx={{ mb: 3, bgcolor: '#e3f2fd', border: 2, borderColor: '#64b5f6' }}>
+        <Card sx={{ mb: 3, bgcolor: '#fdefdaff', border: 2, borderColor: '#ffc368ff' }}>
           <CardContent>
-            <Typography variant="body1" sx={{ color: '#1976d2', mb: 3, fontSize: 32 }}>
+            <Typography variant="body1" sx={{ color: '#ce861aff', mb: 3, fontSize: 32 }}>
               {question.question}
             </Typography>
 
@@ -269,7 +273,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
                         : showWrong
                         ? '#f44336'
                         : isSelected
-                        ? '#2196f3'
+                        ? '#fba21dff'
                         : 'white',
                       color: showResult && (showCorrect || showWrong) ? 'white' : 'inherit',
                       '&:hover': {
@@ -278,7 +282,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
                           : showWrong
                           ? '#f44336'
                           : isSelected
-                          ? '#2196f3'
+                          ? '#fba21dff'
                           : '#f5f5f5',
                       },
                     }}
@@ -324,7 +328,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               fullWidth
               size="large"
               onClick={handleNext}
-              sx={{ minHeight: 50, bgcolor: '#2196f3', '&:hover': { bgcolor: '#1976d2' } }}
+              sx={{ minHeight: 50, bgcolor: '#ff9800', '&:hover': { bgcolor: '#f57c00' } }}
             >
               <Typography variant="h5" sx={{ color: 'white' }}>
                 {currentQuestion < questions.length - 1 ? 'Next Question' : 'See Results'}
