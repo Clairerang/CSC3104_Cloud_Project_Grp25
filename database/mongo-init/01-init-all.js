@@ -26,8 +26,12 @@ var exerciseId5 = UUID().toString();
 var triviaQ1Id = UUID().toString();
 var triviaQ2Id = UUID().toString();
 var triviaQ3Id = UUID().toString();
+var triviaQ4Id = UUID().toString();
+var triviaQ5Id = UUID().toString();
 
-var memorySetId = UUID().toString();
+var memorySet1Id = UUID().toString();
+var memorySet2Id = UUID().toString();
+var memorySet3Id = UUID().toString();
 
 // Switch to / Create desired database
 db = db.getSiblingDB('senior_care');
@@ -325,7 +329,7 @@ db.triviaquestions.insertMany([
     options: ['1965', '1969', '1972', '1975'],
     correctAnswer: 1,
     fact: 'Neil Armstrong and Buzz Aldrin landed on the moon on July 20, 1969!',
-    category: "general",
+    category: "history",
     difficulty: "easy",
     isActive: true,
     createdAt: now
@@ -336,13 +340,24 @@ db.triviaquestions.insertMany([
     options: ['Lusitania', 'Titanic', 'Britannic', 'Olympic'],
     correctAnswer: 1,
     fact: 'The RMS Titanic sank on its maiden voyage after hitting an iceberg.',
-    category: "general",
-    difficulty: "medium",
+    category: "history",
+    difficulty: "easy",
     isActive: true,
     createdAt: now
   },
   {
     questionId: triviaQ3Id,
+    question: 'In which year did World War II end?',
+    options: ['1943', '1944', '1945', '1946'],
+    correctAnswer: 2,
+    fact: 'World War II ended in 1945 with the surrender of Germany in May and Japan in August.',
+    category: 'history',
+    difficulty: 'medium',
+    isActive: true,
+    createdAt: now
+  },
+  {
+    questionId: triviaQ4Id,
     question: "Which organ pumps blood around the body?",
     options: ["Lungs", "Brain", "Heart", "Stomach"],
     correctAnswer: 2,
@@ -351,17 +366,48 @@ db.triviaquestions.insertMany([
     difficulty: "easy",
     isActive: true,
     createdAt: now
+  },
+  {
+    questionId: triviaQ5Id,
+    question: 'What is the capital of France?',
+    options: ['London', 'Berlin', 'Paris', 'Rome'],
+    correctAnswer: 2,
+    fact: 'Paris, known as the City of Light, has been the capital of France since the 12th century.',
+    category: 'geography',
+    difficulty: 'easy',
+    isActive: true,
+    createdAt: now
   }
 ]);
 
 // Memory Set
-db.memorysets.insertOne({
-  setId: memorySetId,
-  name: "Fruit Pairs",
-  cards: ["🍎", "🍌", "🍇", "🍓", "🍊", "🍋", "🥝", "🍒"],
-  grid: { rows: 4, cols: 4 }, 
-  theme: "fruits",
-  difficulty: "easy",
-  isActive: true,
-  createdAt: now
-});
+db.memorysets.insertMany([
+  {
+    setId: memorySet1Id,
+    name: "Fruit Pairs",
+    cards: ["🍎", "🍌", "🍇", "🍓", "🍊", "🍋", "🥝", "🍒"],
+    grid: { rows: 4, cols: 4 }, 
+    theme: "fruits",
+    difficulty: "easy",
+    isActive: true,
+    createdAt: now
+  },
+  {
+    setId: memorySet2Id,
+    name: 'Animal Memory',
+    cards: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'],
+    theme: 'animals',
+    difficulty: 'easy',
+    isActive: true,
+    createdAt: now
+  },
+  {
+    setId: memorySet3Id,
+    name: 'Nature Memory',
+    cards: ['🌸', '🌺', '🌻', '🌷', '🌹', '🌼', '🌿', '🍀'],
+    theme: 'nature',
+    difficulty: 'medium',
+    isActive: true,
+    createdAt: now
+  }
+]);
