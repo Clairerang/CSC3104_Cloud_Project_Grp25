@@ -326,19 +326,27 @@
       <div class="ai-quick-actions">
         <button class="ai-quick-btn" data-action="sms">
           <span class="emoji">📱</span>
-          <span>SMS Family</span>
+          <span>Call Family</span>
+        </button>
+        <button class="ai-quick-btn" data-action="medication">
+          <span class="emoji">💊</span>
+          <span>Medication</span>
         </button>
         <button class="ai-quick-btn" data-action="community">
-          <span class="emoji">🎉</span>
+          <span class="emoji">�️</span>
           <span>Events</span>
+        </button>
+        <button class="ai-quick-btn" data-action="volunteer">
+          <span class="emoji">🤝</span>
+          <span>Volunteer</span>
+        </button>
+        <button class="ai-quick-btn" data-action="weather">
+          <span class="emoji">🌤️</span>
+          <span>Weather</span>
         </button>
         <button class="ai-quick-btn" data-action="game">
           <span class="emoji">🎮</span>
           <span>Play Game</span>
-        </button>
-        <button class="ai-quick-btn" data-action="weather">
-          <span class="emoji">☀️</span>
-          <span>Weather</span>
         </button>
       </div>
       <div class="ai-chat-input-area">
@@ -847,15 +855,40 @@
 
       // Quick action buttons for elderly-friendly interface
       const quickActionMessages = {
-        sms: "I want to send SMS to my family",
+        sms: "Call my daughter",
+        medication: "Medication for the day",
         community: "What events are happening near me?",
-        game: "I want to play a game",
-        weather: "How is the weather today? Should I go out?"
+        volunteer: "volunteer-connect",  // Special flag for volunteer connect
+        weather: "What's the weather?",
+        game: "Let's play trivia"
       };
 
       document.querySelectorAll('.ai-quick-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const action = btn.dataset.action;
+          
+          // Special handling for volunteer connect
+          if (action === 'volunteer') {
+            addChatMessage('I would like to connect with a volunteer companion', true);
+            
+            setTimeout(() => {
+              const volunteerInfo = `<strong>🤝 Lions Befrienders Senior Citizen Centre</strong><br><br>
+Lions Befrienders provides befriending services to isolated and lonely seniors through:
+<ul style="margin: 10px 0; padding-left: 20px; text-align: left;">
+  <li>Home visits by trained volunteers</li>
+  <li>Regular phone calls and check-ins</li>
+  <li>Group activities and outings</li>
+  <li>Emotional support and companionship</li>
+</ul>
+<strong>Contact:</strong> Call <a href="tel:6250-1012" style="color: #667eea;">6250-1012</a><br>
+<strong>Website:</strong> <a href="https://www.lionsbefrienders.org.sg/" target="_blank" style="color: #667eea;">lionsbefrienders.org.sg</a><br><br>
+A volunteer coordinator will reach out to you within 2 working days! 💙`;
+              
+              addChatMessage(volunteerInfo, false);
+            }, 500);
+            return;
+          }
+          
           const message = quickActionMessages[action];
           if (message) {
             sendAIMessage(message);
