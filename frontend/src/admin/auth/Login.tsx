@@ -92,7 +92,7 @@ const Login: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
       }}
     >
       <Container maxWidth="sm">
@@ -112,24 +112,22 @@ const Login: React.FC = () => {
             }}
           >
             <Box
+              component="img"
+              src="/app-icon.jpg"
+              alt="Senior Care Logo"
               sx={{
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                backgroundColor: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                width: 100,
+                height: 100,
+                borderRadius: 2,
                 mb: 2,
+                objectFit: 'cover',
               }}
-            >
-              <AdminPanelSettings sx={{ fontSize: 48, color: 'white' }} />
-            </Box>
+            />
             <Typography component="h1" variant="h4" fontWeight="bold">
               Admin Portal
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              Senior Connect Management System
+              Senior Care Management System
             </Typography>
           </Box>
 

@@ -54,13 +54,26 @@ const Login: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
       }}
     >
       <Container maxWidth="sm">
         <Card sx={{ borderRadius: 3, boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
           <CardContent sx={{ p: 4 }}>
             <Box sx={{ textAlign: 'center', mb: 4 }}>
+              <Box
+                component="img"
+                src="/app-icon.jpg"
+                alt="Senior Care Logo"
+                sx={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 2,
+                  mb: 2,
+                  objectFit: 'cover',
+                  mx: 'auto',
+                }}
+              />
               <Typography variant="h4" fontWeight="bold" gutterBottom>
                 Senior Care Platform
               </Typography>
@@ -146,9 +159,9 @@ const Login: React.FC = () => {
                   mt: 3,
                   mb: 2,
                   py: 1.5,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #5568d3 0%, #63408a 100%)',
+                    background: 'linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)',
                   },
                 }}
               >

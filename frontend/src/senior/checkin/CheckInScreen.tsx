@@ -53,16 +53,16 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
       case "morning":
         return {
           greeting: "Good Morning!",
-          icon: <WbSunnyIcon sx={{ width: 40, height: 40, color: '#f97316' }} />,
+          icon: <WbSunnyIcon sx={{ width: 40, height: 40, color: '#a78bfa' }} />,
           question: "How are you feeling this morning?",
-          color: '#f97316'
+          color: '#a78bfa'
         };
       case "afternoon":
         return {
           greeting: "Good Afternoon!",
-          icon: <CoffeeIcon sx={{ width: 40, height: 40, color: '#ea580c' }} />,
+          icon: <CoffeeIcon sx={{ width: 40, height: 40, color: '#8b5cf6' }} />,
           question: "How are you feeling this afternoon?",
-          color: '#ea580c'
+          color: '#8b5cf6'
         };
       case "evening":
         return {
@@ -121,8 +121,8 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
         <Box sx={{ p: 6 }}>
           {/* Success Header */}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4 }}>
-            <CheckCircleIcon sx={{ width: 60, height: 60, color: '#16a34a', mr: 2 }} />
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#16a34a' }}>
+            <CheckCircleIcon sx={{ width: 60, height: 60, color: '#7c3aed', mr: 2 }} />
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#7c3aed' }}>
               Check-in Complete!
             </Typography>
           </Box>
@@ -147,7 +147,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
                       width: 60,
                       height: 60,
                       bgcolor: completed ? '#f0fdf4' : '#f3f4f6',
-                      border: completed ? '3px solid #16a34a' : '2px solid #d1d5db',
+                      border: completed ? '3px solid #7c3aed' : '2px solid #d1d5db',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -183,7 +183,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
           {/* Celebration for completing all check-ins */}
           {dailyProgress.totalCheckIns === 3 && (
-            <Card sx={{ bgcolor: '#f0fdf4', borderRadius: 4, p: 4, border: '2px solid #16a34a' }}>
+            <Card sx={{ bgcolor: '#faf5ff', borderRadius: 4, p: 4, border: '2px solid #7c3aed' }}>
               <Typography sx={{ fontSize: 18, color: '#166534', textAlign: 'center', fontWeight: 500 }}>
                 🎉 Amazing! You've completed all your check-ins today!
               </Typography>
@@ -227,7 +227,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
                 height: 96,
                 borderRadius: '50%',
                 bgcolor: '#3b82f6',
-                '&:hover': { bgcolor: '#2563eb' },
+                '&:hover': { bgcolor: '#6d28d9' },
                 transition: 'background-color 0.2s',
               }}
             >
@@ -253,7 +253,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
               gap: 4,
               transition: 'all 0.2s',
               bgcolor: selectedMood === 'great' ? '#abfec8ff' : '#b1f8c7ff',
-              border: selectedMood === 'great' ? '2px solid #16a34a' : 'none',
+              border: selectedMood === 'great' ? '2px solid #7c3aed' : 'none',
               '&:hover': {
                 bgcolor: selectedMood === 'great' ? '#abfec8ff' : '#e1fae9ff',
               },
@@ -287,7 +287,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
               gap: 4,
               transition: 'all 0.2s',
               bgcolor: selectedMood === 'okay' ? '#fee478ff' : '#fdeca8ff',
-              border: selectedMood === 'okay' ? '2px solid #eab308' : 'none',
+              border: selectedMood === 'okay' ? '2px solid #7c3aed' : 'none',
               '&:hover': {
                 bgcolor: selectedMood === 'okay' ? '#fee478ff' : '#fff8dbff',
               },
@@ -357,9 +357,9 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
             fontSize: 18,
             fontWeight: 600,
             transition: 'all 0.2s',
-            bgcolor: selectedMood ? '#16a34a' : '#d1d5db',
+            bgcolor: selectedMood ? '#7c3aed' : '#d1d5db',
             '&:hover': {
-              bgcolor: selectedMood ? '#15803d' : '#d1d5db',
+              bgcolor: selectedMood ? '#6d28d9' : '#d1d5db',
             },
             '&:disabled': {
               bgcolor: '#d1d5db',

@@ -29,10 +29,10 @@ const CaregiverApp: React.FC = () => {
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, color: '#7c3aed' },
-    { id: 'analytics', label: 'Analytics', icon: <AnalyticsIcon />, color: '#2563eb' },
-    { id: 'activities', label: 'Activities', icon: <ActivityIcon />, color: '#16a34a' },
-    { id: 'reminders', label: 'Reminders', icon: <ReminderIcon />, color: '#eab308' },
-    { id: 'settings', label: 'Settings', icon: <SettingsIcon />, color: '#ea580c' },
+    { id: 'analytics', label: 'Analytics', icon: <AnalyticsIcon />, color: '#8b5cf6' },
+    { id: 'activities', label: 'Activities', icon: <ActivityIcon />, color: '#a78bfa' },
+    { id: 'reminders', label: 'Reminders', icon: <ReminderIcon />, color: '#6d28d9' },
+    { id: 'settings', label: 'Settings', icon: <SettingsIcon />, color: '#5b21b6' },
   ];
 
   return (
@@ -50,10 +50,26 @@ const CaregiverApp: React.FC = () => {
         elevation={0}
       >
         {/* Header */}
-        <Box sx={{ p: 3, borderBottom: '1px solid #e5e7eb' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827' }}>
-            Caregiver Dashboard
-          </Typography>
+        <Box sx={{ p: 3, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box
+            component="img"
+            src="/app-icon.jpg"
+            alt="Senior Care Logo"
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 1.5,
+              objectFit: 'cover',
+            }}
+          />
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827' }}>
+              Senior Care
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#6b7280' }}>
+              Caregiver Portal
+            </Typography>
+          </Box>
         </Box>
 
         {/* Navigation Items */}

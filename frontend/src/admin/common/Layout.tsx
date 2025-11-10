@@ -80,16 +80,24 @@ const Layout: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           gap: 2,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
           color: 'white',
         }}
       >
-        <Avatar sx={{ bgcolor: 'white', color: 'primary.main', width: 48, height: 48 }}>
-          SC
-        </Avatar>
+        <Box
+          component="img"
+          src="/app-icon.jpg"
+          alt="Senior Care Logo"
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: 1.5,
+            objectFit: 'cover',
+          }}
+        />
         <Box>
           <Typography variant="h6" fontWeight="bold">
-            Senior Connect
+            Senior Care
           </Typography>
           <Typography variant="caption">Admin Portal</Typography>
         </Box>
@@ -107,10 +115,10 @@ const Layout: React.FC = () => {
                   borderRadius: 2,
                   mb: 0.5,
                   '&.Mui-selected': {
-                    backgroundColor: 'primary.light',
+                    backgroundColor: '#7c3aed',
                     color: 'white',
                     '&:hover': {
-                      backgroundColor: 'primary.main',
+                      backgroundColor: '#6d28d9',
                     },
                     '& .MuiListItemIcon-root': {
                       color: 'white',

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Paper, Box, Typography, Button, IconButton } from "@mui/material";
+import { Paper, Box, Typography, Button } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import GroupIcon from "@mui/icons-material/Group";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -90,13 +90,119 @@ const SeniorApp: React.FC = () => {
 
     return (
       <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
+        {/* Top Header Bar */}
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bgcolor: 'white',
+            borderBottom: '1px solid #e5e7eb',
+            px: 3,
+            py: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            zIndex: 999,
+          }}
+        >
+          <Box
+            component="img"
+            src="/app-icon.jpg"
+            alt="Senior Care Logo"
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 1.5,
+              objectFit: 'cover',
+            }}
+          />
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827' }}>
+              Senior Care
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Add padding to account for fixed header */}
+        <Box sx={{ pt: '72px' }} />
+
         {getGameComponent()}
+
+        {/* Logout Button - Bottom Left */}
+        <Button
+          onClick={handleLogout}
+          startIcon={<LogoutIcon sx={{ width: 24, height: 24 }} />}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            bgcolor: '#6b7280',
+            color: 'white',
+            px: 3,
+            py: 2,
+            borderRadius: 3,
+            fontSize: 18,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.15)',
+            zIndex: 1000,
+            textTransform: 'none',
+            '&:hover': {
+              bgcolor: '#4b5563',
+              boxShadow: '0 6px 8px rgba(0, 0, 0, 0.2)',
+            },
+          }}
+        >
+          Logout
+        </Button>
       </Box>
     );
   }
 
   return (
     <Box sx={{ height: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
+      {/* Top Header Bar */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bgcolor: 'white',
+          borderBottom: '1px solid #e5e7eb',
+          px: 3,
+          py: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          zIndex: 999,
+        }}
+      >
+        <Box
+          component="img"
+          src="/app-icon.jpg"
+          alt="Senior Care Logo"
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: 1.5,
+            objectFit: 'cover',
+          }}
+        />
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827' }}>
+            Senior Care
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Add padding to account for fixed header */}
+      <Box sx={{ pt: '72px' }} />
+
       {activeTab === "check-in" && <CheckInScreen onCheckIn={(m) => console.log("Checked in:", m)} />}
       {activeTab === "circle" && <CircleScreen contacts={contacts} />}
       {activeTab === "activities" && (
@@ -136,23 +242,35 @@ const SeniorApp: React.FC = () => {
         Emergency: 911
       </Button>
 
-      {/* Logout Button */}
-      <IconButton
+      {/* Logout Button - Bottom Left */}
+      <Button
         onClick={handleLogout}
+        startIcon={<LogoutIcon sx={{ width: 24, height: 24 }} />}
         sx={{
           position: 'fixed',
-          top: 24,
+          bottom: 110,
           left: 24,
-          bgcolor: 'white',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          bgcolor: '#6b7280',
+          color: 'white',
+          px: 3,
+          py: 2,
+          borderRadius: 3,
+          fontSize: 18,
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.15)',
           zIndex: 1000,
+          textTransform: 'none',
           '&:hover': {
-            bgcolor: '#f5f5f5',
+            bgcolor: '#4b5563',
+            boxShadow: '0 6px 8px rgba(0, 0, 0, 0.2)',
           },
         }}
       >
-        <LogoutIcon />
-      </IconButton>
+        Logout
+      </Button>
 
       {/* Bottom Navigation */}
       <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, borderTop: '1px solid #e5e7eb' }} elevation={0}>
