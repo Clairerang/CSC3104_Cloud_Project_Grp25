@@ -213,9 +213,9 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                       borderRadius: 1,
                       py: 1,
                       textAlign: 'center',
-                      border: '2px solid #7c3aed',
+                      border: '2px solid #16a34a',
                     }}>
-                      <Typography sx={{ fontWeight: 600, color: '#7c3aed', fontSize: 16 }}>
+                      <Typography sx={{ fontWeight: 600, color: '#16a34a', fontSize: 16 }}>
                         ✓ You've accepted this invitation
                       </Typography>
                     </Box>
