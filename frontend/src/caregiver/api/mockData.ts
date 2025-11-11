@@ -84,7 +84,46 @@ export interface AnalyticsData {
       value: number;
       color: string;
     }>;
+    communicationPreference?: string;
   }>;
+}
+
+export interface RecentActivity {
+  id: string;
+  seniorId: string;
+  iconType: 'schedule' | 'phone' | 'medication';
+  text: string;
+  timestamp: string;
+}
+
+export interface SeniorDetails {
+  seniorId: string;
+  healthStatus: string;
+  medications: string;
+  medicationCount: number;
+}
+
+export interface Profile {
+  fullName: string;
+  email: string;
+  phone: string;
+  username: string;
+  address: string;
+}
+
+export interface NotificationSettings {
+  email: boolean;
+  push: boolean;
+  missedCheckIn: boolean;
+}
+
+export interface OverallAnalyticsStats {
+  checkIns: number;
+  calls: number;
+  tasks: number;
+  checkInsChange: string;
+  callsChange: string;
+  tasksChange: string;
 }
 
 // Mock Data
@@ -324,6 +363,7 @@ export const mockAnalyticsData: AnalyticsData = {
         { name: 'Afternoon', value: 45, color: '#22C55E' },
         { name: 'Evening', value: 20, color: '#FACC15' },
       ],
+      communicationPreference: 'Video calls preferred',
     },
     'grandpa-joe': {
       name: 'Grandpa Joe',
@@ -346,6 +386,7 @@ export const mockAnalyticsData: AnalyticsData = {
         { name: 'Afternoon', value: 30, color: '#22C55E' },
         { name: 'Evening', value: 20, color: '#FACC15' },
       ],
+      communicationPreference: 'Phone calls preferred',
     },
     'aunt-margaret': {
       name: 'Aunt Margaret',
@@ -368,6 +409,7 @@ export const mockAnalyticsData: AnalyticsData = {
         { name: 'Afternoon', value: 50, color: '#22C55E' },
         { name: 'Evening', value: 25, color: '#FACC15' },
       ],
+      communicationPreference: 'Mixed communication',
     },
     'uncle-frank': {
       name: 'Uncle Frank',
@@ -390,8 +432,118 @@ export const mockAnalyticsData: AnalyticsData = {
         { name: 'Afternoon', value: 35, color: '#22C55E' },
         { name: 'Evening', value: 25, color: '#FACC15' },
       ],
+      communicationPreference: 'Limited communication',
     },
   },
+};
+
+export const mockRecentActivities: RecentActivity[] = [
+  {
+    id: '1',
+    seniorId: '1',
+    iconType: 'schedule',
+    text: 'Checked in via app - 2 hours ago',
+    timestamp: '2 hours ago',
+  },
+  {
+    id: '2',
+    seniorId: '1',
+    iconType: 'phone',
+    text: 'Phone call with family - Yesterday',
+    timestamp: 'Yesterday',
+  },
+  {
+    id: '3',
+    seniorId: '1',
+    iconType: 'medication',
+    text: 'Took morning medication - Today',
+    timestamp: 'Today',
+  },
+  {
+    id: '4',
+    seniorId: '2',
+    iconType: 'schedule',
+    text: 'Missed check-in - 1 day ago',
+    timestamp: '1 day ago',
+  },
+  {
+    id: '5',
+    seniorId: '2',
+    iconType: 'phone',
+    text: 'Phone call with caregiver - 2 days ago',
+    timestamp: '2 days ago',
+  },
+  {
+    id: '6',
+    seniorId: '3',
+    iconType: 'schedule',
+    text: 'Checked in via app - 30 mins ago',
+    timestamp: '30 mins ago',
+  },
+  {
+    id: '7',
+    seniorId: '3',
+    iconType: 'medication',
+    text: 'Took afternoon medication - Today',
+    timestamp: 'Today',
+  },
+  {
+    id: '8',
+    seniorId: '4',
+    iconType: 'schedule',
+    text: 'Last check-in - 3 days ago',
+    timestamp: '3 days ago',
+  },
+];
+
+export const mockSeniorDetails: Record<string, SeniorDetails> = {
+  '1': {
+    seniorId: '1',
+    healthStatus: 'Good - No concerns',
+    medications: '3 daily medications',
+    medicationCount: 3,
+  },
+  '2': {
+    seniorId: '2',
+    healthStatus: 'Fair - Monitor closely',
+    medications: '2 daily medications',
+    medicationCount: 2,
+  },
+  '3': {
+    seniorId: '3',
+    healthStatus: 'Good - No concerns',
+    medications: '4 daily medications',
+    medicationCount: 4,
+  },
+  '4': {
+    seniorId: '4',
+    healthStatus: 'Needs attention - Follow up required',
+    medications: '1 daily medication',
+    medicationCount: 1,
+  },
+};
+
+export const mockProfile: Profile = {
+  fullName: 'Sarah Johnson',
+  email: 'sarah.j@email.com',
+  phone: '+1 (555) 123-4567',
+  username: 'sarahjohnson',
+  address: '123 Main Street, City, State 12345',
+};
+
+export const mockNotificationSettings: NotificationSettings = {
+  email: true,
+  push: true,
+  missedCheckIn: true,
+};
+
+export const mockOverallAnalyticsStats: OverallAnalyticsStats = {
+  checkIns: 264,
+  calls: 178,
+  tasks: 342,
+  checkInsChange: '+12% from last month',
+  callsChange: '+8% from last month',
+  tasksChange: '+15% from last month',
 };
 
 // API Functions (Mock)
@@ -456,9 +608,11 @@ export const mockApi = {
   },
 
   addReminderItem: (reminder: Omit<ReminderItem, 'id'>): Promise<ReminderItem> => {
+    // Generate a unique ID using timestamp + random number to avoid duplicates
+    const newId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
     const newReminder: ReminderItem = {
       ...reminder,
-      id: Date.now(),
+      id: newId,
     };
     mockReminderItems.push(newReminder);
     return Promise.resolve(newReminder);
@@ -485,6 +639,30 @@ export const mockApi = {
   getAnalyticsData: (): Promise<AnalyticsData> => {
     return Promise.resolve(mockAnalyticsData);
   },
+
+  getOverallAnalyticsStats: (): Promise<OverallAnalyticsStats> => {
+    return Promise.resolve(mockOverallAnalyticsStats);
+  },
+
+  // Profile
+  getProfile: (): Promise<Profile> => {
+    return Promise.resolve(mockProfile);
+  },
+
+  updateProfile: (updates: Partial<Profile>): Promise<Profile> => {
+    Object.assign(mockProfile, updates);
+    return Promise.resolve(mockProfile);
+  },
+
+  // Notification Settings
+  getNotificationSettings: (): Promise<NotificationSettings> => {
+    return Promise.resolve(mockNotificationSettings);
+  },
+
+  updateNotificationSettings: (updates: Partial<NotificationSettings>): Promise<NotificationSettings> => {
+    Object.assign(mockNotificationSettings, updates);
+    return Promise.resolve(mockNotificationSettings);
+  },
 };
 
 // Utility functions
@@ -501,4 +679,29 @@ export const getSeniorsList = () => {
     name: senior.name,
     initials: senior.initials,
   }));
+};
+
+export const getRecentActivitiesBySeniorId = (seniorId: string): RecentActivity[] => {
+  return mockRecentActivities.filter(activity => activity.seniorId === seniorId);
+};
+
+export const getSeniorDetails = (seniorId: string): SeniorDetails | undefined => {
+  return mockSeniorDetails[seniorId];
+};
+
+export const getSeniorIdFromName = (name: string): string | undefined => {
+  const senior = mockSeniors.find(s => s.name === name);
+  return senior?.id;
+};
+
+export const getSeniorNameToIdMap = (): Record<string, string> => {
+  const map: Record<string, string> = {};
+  mockSeniors.forEach(senior => {
+    // Convert name to kebab-case for consistency with analytics data
+    const key = senior.name.toLowerCase().replace(/\s+/g, '-');
+    map[key] = senior.id;
+    // Also add direct name mapping
+    map[senior.name] = senior.id;
+  });
+  return map;
 };
