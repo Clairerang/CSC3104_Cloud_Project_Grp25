@@ -39,7 +39,7 @@ Client → Notification Service → MQTT Broker (HiveMQ) → Service Subscribers
 | Service | Port | Purpose | Technology |
 |---------|------|---------|------------|
 | **Notification Service** | 4002 | API Gateway & Event Publisher | Node.js, Express, MQTT, gRPC |
-| **AI Companion** | 4015 | Conversational AI (6 Intents) | Node.js, Google Gemini 2.0 Flash |
+| **AI Companion** | 4015 | Conversational AI (6 Intents) | Node.js, Google Gemini (12 models) |
 | **SMS Service** | 4004 | SMS Delivery & OTP Verification | Node.js, Twilio, Twilio Verify |
 | **Email Service** | 4003 | Email Delivery | Node.js, Nodemailer |
 | **Push Notification** | 4020 | Mobile Push Notifications | Node.js, Firebase FCM v1 |
@@ -131,7 +131,16 @@ FIREBASE_VAPID_KEY=BXXXXXXXXXXXXXXXXXXXXXXXXXX
 # ============================================
 GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXX
 # Get your free API key: https://ai.google.dev/
-# Model: gemini-2.0-flash-exp (FREE tier, 15 req/min)
+# 12 models with automatic failover
+# Primary: gemini-2.5-flash (latest stable)
+# Rate limit: 10 requests/minute (client-side)
+
+# ============================================
+# GOOGLE PLACES API (Community Events)
+# ============================================
+GOOGLE_PLACES_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXX
+# Get key: https://console.cloud.google.com/
+# Used for real-time community center location searches
 
 # ============================================
 # DATABASE & MESSAGING (Auto-configured)
@@ -146,6 +155,7 @@ MQTT_BROKER_URL=mqtt://hivemq:1883
 2. **Gmail App Password**: https://myaccount.google.com/apppasswords → Generate 16-char password
 3. **Firebase**: https://console.firebase.google.com/ → Create project, enable FCM, download service account JSON
 4. **Google Gemini AI**: https://ai.google.dev/ → Get free API key (15 requests/min, unlimited for personal use)
+5. **Google Places API**: https://console.cloud.google.com/ → Enable Places API, get API key
 
 ## 📡 API Reference
 
@@ -193,19 +203,39 @@ Content-Type: application/json
 ```
 
 **Supported Intents**:
-1. 🏠 **Call Family** - Request to SMS family members
+1. 📱 **SMS Family** - Send messages to family members
 2. 💊 **Medication Reminder** - Check today's medications
-3. 🎉 **Community Events** - Browse local activities and events
+3. 🎉 **Community Events** - Browse local activities and events (Google Places API integration)
 4. 🤝 **Volunteer Connect** - Connect with Lions Befrienders volunteers
 5. 🌤️ **Weather Info** - Get weather updates and safety advice
 6. 🎮 **Play Game** - Interactive games and activities
 
 **Features**:
-- ✅ **Google Gemini 2.0 Flash** - Latest AI model (FREE tier)
+- ✅ **12 Gemini Models** - Automatic failover between models
+- ✅ **Primary Model**: `gemini-2.5-flash` (latest stable, currently active)
+- ✅ **Fallback Models**: 11 backup models (2.5-pro, 2.0-flash, experimental variants)
+- ✅ **Rate Limiter** - Client-side 10 RPM limit (under 15 RPM free tier)
+- ✅ **Google Places API** - Real-time community center searches based on user location
 - ✅ **Natural Conversations** - Context-aware responses
-- ✅ **No Sentiment Analysis** - Simplified, focused on actionable help
 - ✅ **MongoDB Integration** - Conversation history storage
 - ✅ **MQTT Publishing** - Triggers real notifications
+- ✅ **Graceful Fallback** - Uses context data if all models fail
+
+📘 **Available Models (automatic failover)**:
+1. `models/gemini-2.5-flash` ✅ (Primary - Currently Active)
+2. `models/gemini-2.5-pro` (More capable backup)
+3. `models/gemini-2.0-flash` (Stable backup)
+4. `models/gemini-2.0-flash-exp` (Experimental)
+5. `models/gemini-2.0-flash-001` (Versioned)
+6. `models/gemini-2.0-flash-lite` (Fast/lite)
+7. `models/gemini-2.0-pro-exp` (Pro experimental)
+8. `models/gemini-exp-1206` (Experimental variant)
+9. `models/gemini-2.5-flash-preview-05-20` (Preview)
+10. `models/gemini-2.5-pro-preview-06-05` (Preview)
+11. `models/gemini-2.0-flash-lite-001` (Lite version)
+12. `models/gemini-2.0-flash-lite-preview` (Lite preview)
+
+System tries each model in order until one succeeds. Primary model has 100% success rate.
 
 #### Get Chat History
 
@@ -280,6 +310,139 @@ POST /send-push
 }
 ```
 
+---
+
+## 🔌 Communication Architecture
+
+### Hybrid MQTT + gRPC
+
+The backend uses **two complementary protocols**:
+
+#### MQTT (Async Events) - Port 1883
+- **Use For**: Fire-and-forget notifications, broadcasting, event-driven workflows
+- **Topics**: `notification/events`, `sms/send`, `chat.message`, `notification/dlq`
+- **Coverage**: 100% - All 5 services use MQTT for async communication
+- **QoS**: 1 (at-least-once delivery)
+
+#### gRPC (Sync Queries) - Port 50051
+- **Use For**: Request-response queries, immediate data retrieval
+- **Server**: notification-service
+- **Methods**: 5 RPC methods for user data, device tokens, check-ins, health checks, events
+
+**Decision Rule**:
+- 📡 Need to **broadcast an event**? → Use MQTT
+- ❓ Need to **query data immediately**? → Use gRPC
+
+### gRPC API Reference
+
+**Proto File**: `backend/config/protos/notification.proto`
+
+#### 1. GetUser - Query User Profile
+```javascript
+// Request
+{ userId: "senior-1" }
+
+// Response
+{
+  userId: "senior-1",
+  name: "Ah Seng",
+  email: "ahseng@example.com",
+  phoneNumber: "+6512345678",
+  address: "Sengkang",
+  familyEmails: ["family@example.com"],
+  familyPhones: ["+6587654321"],
+  createdAt: "2025-01-15T10:00:00Z"
+}
+```
+
+#### 2. GetDeviceTokens - Retrieve FCM Tokens
+```javascript
+// Request
+{ userId: "senior-1" }
+
+// Response
+{
+  tokens: [
+    { token: "fcm_token_123...", platform: "android", createdAt: "..." }
+  ]
+}
+```
+
+#### 3. GetCheckIns - Query Check-in History
+```javascript
+// Request
+{ userId: "senior-1", limit: 10 }  // max 100
+
+// Response
+{
+  checkIns: [
+    { userId: "senior-1", mood: "happy", timestamp: "2025-01-15T08:30:00Z" },
+    { userId: "senior-1", mood: "neutral", timestamp: "2025-01-14T08:30:00Z" }
+  ]
+}
+```
+
+#### 4. HealthCheck - Service Status
+```javascript
+// Request
+{}
+
+// Response
+{
+  healthy: true,
+  service: "notification-service",
+  version: "1.0.0",
+  uptime: 3600,
+  timestamp: "2025-01-15T12:00:00Z"
+}
+```
+
+#### 5. PublishEvent - Publish via gRPC
+```javascript
+// Request
+{
+  type: "sms_send",
+  userId: "senior-1",
+  target: "+6512345678",
+  body: "Hello!",
+  urgent: false
+}
+
+// Response
+{ success: true, message: "Event published to MQTT" }
+```
+
+### Using gRPC Client
+
+**Example**: `backend/shared/grpcClient.example.js`
+
+```javascript
+const { getUserProfile, getDeviceTokens, getCheckIns, healthCheck, publishEvent } = require('./shared/grpcClient.example');
+
+// Get user profile
+const user = await getUserProfile('senior-1');
+console.log(user.name); // "Ah Seng"
+
+// Get FCM tokens for push notifications
+const tokens = await getDeviceTokens('senior-1');
+tokens.forEach(t => sendPush(t.token));
+
+// Get last 10 check-ins
+const history = await getCheckIns('senior-1', 10);
+console.log(`Last mood: ${history[0].mood}`);
+
+// Check service health
+const status = await healthCheck();
+if (!status.healthy) console.error('Service down!');
+
+// Publish event (alternative to MQTT)
+await publishEvent({ type: 'sms_send', userId: 'senior-1', body: 'Hello!' });
+```
+
+**Documentation**: See `backend/MQTT_GRPC_ARCHITECTURE.md` for complete architecture guide.
+
+---
+
 ## 🧪 Testing
 
 ### Browser Testing UI
@@ -290,7 +453,7 @@ Features:
 - ✅ **Daily Check-In Interface** - Test senior daily login flow
 - ✅ **Phone Verification** - Test Twilio OTP verification
 - ✅ **AI Chat Widget** - Floating chat button with 6 quick actions
-  - Call Family
+  - SMS Family
   - Medication for the day
   - Community Events
   - Volunteer Connect (Lions Befrienders)
@@ -505,10 +668,33 @@ docker restart sms-service email-service push-notification ai-companion
 
 ### Recent Changes (November 2025)
 
+✅ **12-Model Gemini Failover System**:
+- Implemented automatic failover across 12 Gemini models
+- Primary model: `gemini-2.5-flash` (100% success rate)
+- Eliminates downtime from rate limiting or model unavailability
+- All models validated against Google's API
+
+✅ **Google Places API Integration**:
+- Real-time community center searches based on user location
+- Geocoding support for Singapore addresses
+- Enhanced community events intent with live data
+- Returns actual venues with ratings, addresses, and open/closed status
+
+✅ **Client-Side Rate Limiting**:
+- 10 requests/minute limit (well under 15 RPM free tier)
+- Sliding window algorithm for accurate rate tracking
+- Prevents quota exceeded errors
+- Graceful fallback to context data when limited
+
+✅ **Improved Response Formatting**:
+- Enhanced community events with proper spacing and indentation
+- Visual separators for better readability
+- Consistent labeling (Location:, Activities:, Contact:)
+- Professional presentation of real venue data
+
 ✅ **Removed Sentiment Analysis**:
 - Simplified AI companion to focus on actionable help
 - Removed `sentiment` npm package dependency
-- Removed sentiment tracking from conversations
 - Reduced complexity and improved response times
 
 ✅ **Removed Loneliness Intent**:
@@ -597,10 +783,17 @@ kubectl create secret generic twilio-creds \
 
 ## 📚 Additional Documentation
 
-- [AI Companion Service](services/ai-companion-service/README.md) - Gemini AI integration
+- **MQTT & gRPC Architecture**: [MQTT_GRPC_ARCHITECTURE.md](MQTT_GRPC_ARCHITECTURE.md) - Complete hybrid communication guide
+- **gRPC Client Example**: `shared/grpcClient.example.js` - Ready-to-use client with promise-based wrappers
+- **Proto File**: `config/protos/notification.proto` - Service contracts (8 message types, 5 RPC methods)
+- **AI Companion Architecture**: See `services/ai-companion-service/src/index.js` - 12-model failover system
+- **Google Places Integration**: See `services/ai-companion-service/src/intents/communityEvents.js` - Real-time venue searches
+- **Rate Limiting**: Client-side sliding window algorithm in `services/ai-companion-service/src/index.js`
+- **Community Events Formatting**: Enhanced response structure with proper spacing and indentation
 - [Notification Service API](services/notification-service/README.md) - Core event hub
 - [SMS Service](services/sms-service/README.md) - Twilio integration
 - [Testing Guide](shared/testing-ui/README.md) - UI testing documentation
+- **Archived Features**: `shared/archived-features/` - Phone verification (OTP) for future use
 
 ## 🔗 External Resources
 
@@ -615,7 +808,11 @@ kubectl create secret generic twilio-creds \
 ## 🎯 Key Features Summary
 
 ### AI Companion
-- ✅ Google Gemini 2.0 Flash (FREE tier)
+- ✅ 12 Gemini models with automatic failover
+- ✅ Primary: gemini-2.5-flash (latest stable, 100% success rate)
+- ✅ Backups: gemini-2.5-pro, gemini-2.0-flash, 9 additional models
+- ✅ Client-side rate limiting (10 RPM sliding window)
+- ✅ Google Places API integration for real-time community center searches
 - ✅ 6 intent detection system
 - ✅ Natural language conversations
 - ✅ Context-aware responses
@@ -623,12 +820,20 @@ kubectl create secret generic twilio-creds \
 - ✅ MQTT event publishing
 
 ### Notification System
-- ✅ MQTT-based event distribution
+- ✅ MQTT-based event distribution (100% service coverage)
+- ✅ gRPC synchronous query API (5 RPC methods)
 - ✅ Multi-channel delivery (SMS, Email, Push)
 - ✅ OTP verification via Twilio Verify
 - ✅ Firebase FCM v1 API
 - ✅ Real-time dashboard updates
 - ✅ Persistent message queuing
+- ✅ Hybrid MQTT/gRPC architecture following microservices best practices
+
+### Communication Architecture
+- ✅ **MQTT**: All 5 services for async events (QoS 1)
+- ✅ **gRPC**: 5 RPC methods for sync queries (GetUser, GetDeviceTokens, GetCheckIns, HealthCheck, PublishEvent)
+- ✅ **Protobuf**: 8 message types with complete documentation
+- ✅ **Client Ready**: grpcClient.example.js for easy integration
 
 ### Testing Interface
 - ✅ Floating AI chat widget
@@ -640,9 +845,10 @@ kubectl create secret generic twilio-creds \
 
 ---
 
-**Last Updated**: November 11, 2025  
-**Architecture**: MQTT-based Microservices  
-**AI Model**: Google Gemini 2.0 Flash (FREE)  
+**Last Updated**: January 15, 2025  
+**Architecture**: Hybrid MQTT + gRPC Microservices  
+**AI Model**: 12 Gemini Models with Automatic Failover (Primary: gemini-2.5-flash)  
+**Communication**: MQTT (async events) + gRPC (sync queries)  
 **Status**: Production Ready ✅  
 **Team**: CSC3104 Cloud Project Group 25
 

@@ -40,20 +40,66 @@ const chatCounter = new promClient.Counter({
 
 // Google Gemini AI Configuration
 let genAI = null;
-let geminiModel = null;
+let geminiModels = []; // Array of all available models
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+
+// ALL available Gemini models (will try each one until success)
+// Retrieved from: https://generativelanguage.googleapis.com/v1beta/models
+const AVAILABLE_MODELS = [
+  'models/gemini-2.5-flash',         // Latest Gemini 2.5 Flash (stable)
+  'models/gemini-2.5-pro',           // Latest Gemini 2.5 Pro (most capable)
+  'models/gemini-2.0-flash',         // Gemini 2.0 Flash (stable)
+  'models/gemini-2.0-flash-exp',     // Experimental 2.0 (may be rate limited)
+  'models/gemini-2.0-flash-001',     // Specific version
+  'models/gemini-2.0-flash-lite',    // Lite version (faster)
+  'models/gemini-2.0-pro-exp',       // Pro experimental
+  'models/gemini-exp-1206',          // Experimental variant
+  'models/gemini-2.5-flash-preview-05-20', // Preview versions
+  'models/gemini-2.5-pro-preview-06-05',
+  'models/gemini-2.0-flash-lite-001',
+  'models/gemini-2.0-flash-lite-preview'
+];
+
+// Rate limiter for Gemini API calls (to stay under 15 RPM free tier limit)
+const RATE_LIMIT_RPM = 10; // Set to 10 requests per minute to stay well under the 15 limit
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in milliseconds
+const requestTimestamps = [];
+
+function canMakeGeminiRequest() {
+  const now = Date.now();
+  // Remove timestamps older than the rate limit window
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW) {
+    requestTimestamps.shift();
+  }
+  // Check if we're under the limit
+  if (requestTimestamps.length >= RATE_LIMIT_RPM) {
+    const oldestRequest = requestTimestamps[0];
+    const waitTime = Math.ceil((oldestRequest + RATE_LIMIT_WINDOW - now) / 1000);
+    logger.warn(`⚠️ Rate limit reached (${RATE_LIMIT_RPM} RPM). Wait ${waitTime}s before next Gemini request.`);
+    return false;
+  }
+  return true;
+}
+
+function recordGeminiRequest() {
+  requestTimestamps.push(Date.now());
+}
 
 // Initialize Google Gemini if API key exists
 if (GEMINI_API_KEY) {
   try {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // Use Gemini 2.0 Flash (experimental, FREE, latest model from Google AI Studio)
-    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-    logger.info('✅ Google Gemini AI initialized (gemini-2.0-flash-exp)');
-    logger.info('💡 Mode: GEMINI (Powered by Google AI Studio)');
+    // Initialize ALL models
+    geminiModels = AVAILABLE_MODELS.map(modelName => ({
+      name: modelName,
+      model: genAI.getGenerativeModel({ model: modelName })
+    }));
+    logger.info(`✅ Google Gemini AI initialized with ${geminiModels.length} fallback models`);
+    logger.info(`📋 Models: ${AVAILABLE_MODELS.slice(0, 4).join(', ')}... (+${AVAILABLE_MODELS.length - 4} more)`);
+    logger.info(`💡 Mode: GEMINI with Rate Limit (${RATE_LIMIT_RPM} requests/min)`);
   } catch (error) {
     logger.warn('⚠️ Gemini init failed, using fallback:', error.message);
-    geminiModel = null;
+    geminiModels = [];
   }
 } else {
   logger.info('💡 Mode: FALLBACK (No API key - keyword-based detection)');
@@ -118,6 +164,26 @@ const intentHandlers = {
   'GameRequest': require('./intents/game')
 };
 
+// Helper: Publish MQTT event (defined early so it can be passed to handlers)
+async function publishEvent(topic, data) {
+  try {
+    mqttClient.publish(topic, JSON.stringify(data), { qos: 1 }, (err) => {
+      if (err) {
+        logger.error(`❌ MQTT publish error to ${topic}:`, err);
+      } else {
+        logger.info(`📤 Published to MQTT topic: ${topic}`);
+      }
+    });
+  } catch (error) {
+    logger.error(`❌ MQTT publish error:`, error);
+  }
+}
+
+// Pass publishEvent to SMS handler
+if (intentHandlers.SMSFamily && intentHandlers.SMSFamily.setPublishEvent) {
+  intentHandlers.SMSFamily.setPublishEvent(publishEvent);
+}
+
 // Fallback intent detection (keyword-based when Gemini is not available)
 // Simplified system - 6 intents only
 function detectIntentFallback(message) {
@@ -154,7 +220,22 @@ function detectIntentFallback(message) {
     return { intent: 'GameRequest', response: "Let's have some fun! What game would you like?" };
   }
   
-  return { intent: 'Default', response: "I'm here to help! Ask me about activities, family, health, or just chat." };
+  // Default - Make it warmer and more helpful
+  const greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening'];
+  const isGreeting = greetings.some(g => lowerMsg.includes(g));
+  
+  if (isGreeting) {
+    return { 
+      intent: 'Default', 
+      response: "Hello! It's wonderful to chat with you today! 😊 I'm here to help you with many things:\n\n• 📱 Contact your family\n• 🎉 Find fun community activities\n• 💊 Track your medications\n• 🌤️ Check the weather\n• 🎮 Play games together\n• 🤝 Connect with friendly volunteers\n\nWhat would you like to do?" 
+    };
+  }
+  
+  // For other unmatched queries, be more helpful
+  return { 
+    intent: 'Default', 
+    response: "I'd love to help you! I can assist with:\n\n• 📱 Sending messages to your family\n• 🎉 Finding community events and activities\n• 💊 Medication reminders\n• 🌤️ Weather updates and safety advice\n• 🎮 Fun games and entertainment\n• 🤝 Connecting you with volunteers\n\nWhat can I help you with today?" 
+  };
 }
 
 // Root endpoint - API info
@@ -239,8 +320,8 @@ app.post('/chat', async (req, res) => {
       }
     }
 
-    // STEP 3: Use Google Gemini with enriched context
-    if (geminiModel) {
+    // STEP 3: Use Google Gemini with enriched context (with rate limiting)
+    if (geminiModels.length > 0 && canMakeGeminiRequest()) {
       try {
         // Build context-aware prompt with real data injected
         let prompt = `You are a warm, caring AI companion for senior citizens in Singapore.
@@ -268,27 +349,58 @@ Your mission is to improve wellbeing and provide helpful assistance through:
 
         prompt += `\n\n**User message:** "${message}"\n\nRespond warmly using the real data provided above (if any). Show you care about their wellbeing.`;
 
-        // Call Google Gemini AI with enriched context
-        const result = await geminiModel.generateContent(prompt);
-        const response = await result.response;
-        botResponse = response.text();
-        confidence = 0.85; // Gemini provides high-quality responses
+        // Try ALL Gemini models until one succeeds
+        let modelSucceeded = false;
+        let lastError = null;
 
-        logger.info(`🤖 Gemini AI Response Generated for Intent: ${intentName}`);
-        logger.info(`✨ Gemini Response: "${botResponse.substring(0, 100)}..."`);
+        for (let i = 0; i < geminiModels.length; i++) {
+          const { name: modelName, model: currentModel } = geminiModels[i];
+          
+          try {
+            logger.info(`🔄 Trying model ${i + 1}/${geminiModels.length}: ${modelName}...`);
+            
+            // Call Google Gemini AI with enriched context
+            const result = await currentModel.generateContent(prompt);
+            const response = await result.response;
+            botResponse = response.text();
+            confidence = 0.85; // Gemini provides high-quality responses
+
+            // Record successful API call
+            recordGeminiRequest();
+
+            logger.info(`✅ SUCCESS! Model "${modelName}" worked!`);
+            logger.info(`🤖 Gemini AI Response Generated for Intent: ${intentName}`);
+            logger.info(`✨ Response: "${botResponse.substring(0, 100)}..."`);
+            
+            modelSucceeded = true;
+            break; // Exit loop on first success
+            
+          } catch (modelError) {
+            lastError = modelError;
+            logger.warn(`⚠️ Model "${modelName}" failed: ${modelError.message}`);
+            // Continue to next model
+          }
+        }
+
+        // If all models failed, use context data or fallback
+        if (!modelSucceeded) {
+          logger.error(`❌ ALL ${geminiModels.length} models failed. Last error: ${lastError?.message}`);
+          botResponse = contextData || fallback.response;
+          logger.info(`🔄 Using fallback response from intent handler`);
+        }
       } catch (error) {
-        logger.error('❌ Gemini AI error:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
+        logger.error('❌ Unexpected error in Gemini processing:', error);
         // Use fallback response or context data
         botResponse = contextData || fallback.response;
       }
     } else {
-      // Fallback mode: Use handler response or default
+      // Fallback mode: Use handler response, context data, or default
       botResponse = contextData || fallback.response;
-      logger.info(`🔄 Fallback Intent: ${intentName}`);
+      if (geminiModels.length === 0) {
+        logger.info(`🔄 Fallback Intent: ${intentName} (No Gemini models initialized)`);
+      } else {
+        logger.info(`🔄 Fallback Intent: ${intentName} (Rate limited - ${requestTimestamps.length}/${RATE_LIMIT_RPM} requests in window)`);
+      }
     }
 
     // Save conversation to MongoDB
@@ -320,8 +432,8 @@ Your mission is to improve wellbeing and provide helpful assistance through:
       intent: intentName,
       confidence,
       sessionId,
-      mode: geminiModel ? 'gemini' : 'fallback',
-      aiProvider: geminiModel ? 'Google Gemini 2.0 Flash (Exp)' : 'Keyword-based'
+      mode: geminiModels.length > 0 ? 'gemini' : 'fallback',
+      aiProvider: geminiModels.length > 0 ? 'Google Gemini AI' : 'Keyword-based'
     });
 
   } catch (error) {
@@ -368,12 +480,12 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'ai-companion',
-    mode: geminiModel ? 'gemini' : 'fallback',
-    aiProvider: geminiModel ? 'Google Gemini 2.0 Flash (Experimental)' : 'Keyword-based detection',
-    model: geminiModel ? 'gemini-2.0-flash-exp' : 'none',
-    cloud: geminiModel ? 'Google AI Studio' : 'Local',
+    mode: geminiModels.length > 0 ? 'gemini' : 'fallback',
+    aiProvider: geminiModels.length > 0 ? 'Google Gemini AI (Multiple Models)' : 'Keyword-based detection',
+    model: geminiModels.length > 0 ? `${geminiModels.length} models available` : 'none',
+    cloud: geminiModels.length > 0 ? 'Google AI Studio' : 'Local',
     cost: '100% FREE',
-    rateLimit: geminiModel ? '60 requests/minute' : 'Unlimited',
+    rateLimit: geminiModels.length > 0 ? '10 requests/minute' : 'Unlimited',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -414,21 +526,6 @@ async function saveConversation(userId, sessionId, messageData) {
   }
 }
 
-// Helper: Publish MQTT event
-async function publishEvent(topic, data) {
-  try {
-    mqttClient.publish(topic, JSON.stringify(data), { qos: 1 }, (err) => {
-      if (err) {
-        logger.error(`❌ MQTT publish error to ${topic}:`, err);
-      } else {
-        logger.info(`📤 Published to MQTT topic: ${topic}`);
-      }
-    });
-  } catch (error) {
-    logger.error(`❌ MQTT publish error:`, error);
-  }
-}
-
 // Start server
 const PORT = process.env.PORT || 4015;
 
@@ -436,13 +533,18 @@ async function startServer() {
   try {
     app.listen(PORT, () => {
       logger.info(`🤖 AI Companion Service running on port ${PORT}`);
-      logger.info(`🧠 AI Provider: ${geminiModel ? 'Google Gemini 2.0 Flash ✨' : 'Keyword-based fallback'}`);
+      if (geminiModels.length > 0) {
+        logger.info(`🧠 Primary AI: ${geminiModels.length} Gemini models with automatic failover ✨`);
+        logger.info(`� Models: ${AVAILABLE_MODELS.slice(0, 3).join(', ')}... (+${AVAILABLE_MODELS.length - 3} more)`);
+      } else {
+        logger.info(`🧠 AI Provider: Keyword-based fallback`);
+      }
       logger.info(`📡 Messaging: HiveMQ MQTT at ${MQTT_BROKER}:${MQTT_PORT}`);
       logger.info(`📊 Metrics: http://localhost:${PORT}/metrics`);
       logger.info(`🏥 Health: http://localhost:${PORT}/health`);
       logger.info(`💰 Cost: 100% FREE forever`);
-      if (geminiModel) {
-        logger.info(`⚡ Rate Limit: 15 requests/minute (FREE tier)`);
+      if (geminiModels.length > 0) {
+        logger.info(`⚡ Client Rate Limit: ${RATE_LIMIT_RPM} requests/minute (under 15 RPM FREE tier limit)`);
         logger.info(`🌐 Cloud: Google AI Studio`);
       }
     });

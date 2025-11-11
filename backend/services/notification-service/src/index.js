@@ -409,10 +409,10 @@ async function start() {
 
   // NOTE: Mobile push notifications moved to push-notification-service
 
-  // Start gRPC server (PoC) to accept PublishEvent RPCs from other services
+  // Start gRPC server with full RPC support
   try {
     const { startGrpcServer } = require('./grpcServer');
-    startGrpcServer({ publishEvent });
+    startGrpcServer({ publishEvent, models });
   } catch (e) {
     console.warn('gRPC server failed to start (missing deps?):', e && e.message ? e.message : e);
   }

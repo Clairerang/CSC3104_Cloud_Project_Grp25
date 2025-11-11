@@ -1,12 +1,27 @@
 syntax = "proto3";
 package notification;
 
+// Event message structure for notification system
+// Used for gRPC communication between services
+// Note: MQTT is the primary transport for async events (see mqttClient.js)
 message Event {
-  string type = 1;
-  string userId = 2;
-  string mood = 3;
-  string timestamp = 4;
-  repeated string target = 5;
+  string type = 1;          // Event type: sms, email, daily_login, push, chat.message, etc.
+  string userId = 2;        // User identifier
+  string timestamp = 3;     // ISO 8601 timestamp
+  repeated string target = 4; // Target recipients (phone numbers, emails, etc.)
+  
+  // Optional fields (populated based on event type)
+  string to = 5;            // Single recipient (phone/email)
+  string body = 6;          // Message body (SMS/email text)
+  string subject = 7;       // Email subject
+  string title = 8;         // Push notification title
+  string message = 9;       // Generic message field
+  bool urgent = 10;         // Urgent flag for priority handling
+  
+  // Additional metadata
+  string sessionId = 11;    // Chat session ID
+  string intent = 12;       // AI chat intent
+  string from = 13;         // Sender information
 }
 
 message PublishResponse {
@@ -14,6 +29,88 @@ message PublishResponse {
   string message = 2;
 }
 
+// User profile request/response for inter-service queries
+message GetUserRequest {
+  string userId = 1;
+}
+
+message User {
+  string userId = 1;
+  string name = 2;
+  string email = 3;
+  string phoneNumber = 4;
+  string address = 5;
+  repeated string familyEmails = 6;
+  repeated string familyPhones = 7;
+  string createdAt = 8;
+}
+
+message GetUserResponse {
+  bool ok = 1;
+  User user = 2;
+  string error = 3;
+}
+
+// Device token management for push notifications
+message GetDeviceTokensRequest {
+  string userId = 1;
+}
+
+message DeviceToken {
+  string token = 1;
+  string platform = 2;
+  string createdAt = 3;
+}
+
+message GetDeviceTokensResponse {
+  bool ok = 1;
+  repeated DeviceToken tokens = 2;
+  string error = 3;
+}
+
+// Check-in history queries
+message GetCheckInsRequest {
+  string userId = 1;
+  int32 limit = 2;
+}
+
+message CheckIn {
+  string userId = 1;
+  string mood = 2;
+  string timestamp = 3;
+}
+
+message GetCheckInsResponse {
+  bool ok = 1;
+  repeated CheckIn checkins = 2;
+  string error = 3;
+}
+
+// Service health check
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string service = 2;
+  string version = 3;
+  double uptime = 4;
+  string timestamp = 5;
+}
+
+// Notification Service - gRPC API
+// Use for synchronous request-response operations
+// Use MQTT for async event-driven notifications
 service NotificationService {
+  // Publish event (can also use MQTT for async)
   rpc PublishEvent(Event) returns (PublishResponse);
+  
+  // Query operations (synchronous)
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetDeviceTokens(GetDeviceTokensRequest) returns (GetDeviceTokensResponse);
+  rpc GetCheckIns(GetCheckInsRequest) returns (GetCheckInsResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }

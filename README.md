@@ -148,6 +148,7 @@ A cloud-native platform offering:
 | Service | Port | Technology | Purpose |
 |---------|------|------------|---------|
 | **Event Dispatcher** | 4001 | Node.js/Express | Main API gateway, event orchestration |
+| **AI Companion** | 4015 | Node.js/Gemini AI | Conversational AI with 12-model failover |
 | **AI Companion** | 4015 | Node.js/Gemini AI | Conversational AI with real Singapore data |
 | **Push Notification** | 4007 | Node.js/FCM | Firebase push notifications |
 | **SMS Dispatcher** | 4005 | Node.js/Twilio | SMS delivery and OTP verification |
@@ -198,7 +199,8 @@ User Request → Event Dispatcher → MQTT Topic → Dispatchers → External AP
 - **SMS**: Twilio SMS & Verify API
 - **Email**: Gmail SMTP (Nodemailer)
 - **Push**: Firebase Cloud Messaging (FCM)
-- **AI**: Google AI Studio (Gemini API)
+- **AI**: Google AI Studio (Gemini 2.5 Flash with 12-model failover)
+- **Location**: Google Places API (community center searches)
 - **Weather**: Mock Singapore data (production: data.gov.sg API)
 
 ### DevOps & Infrastructure
@@ -215,7 +217,7 @@ CSC3104_Cloud_Project_Grp25/
 ├── backend/                          # Backend microservices
 │   ├── services/
 │   │   ├── event-dispatcher-service/ # Main API gateway
-│   │   ├── ai-companion-service/     # AI chatbot with Gemini
+│   │   ├── ai-companion-service/     # AI chatbot (12 Gemini models + Google Places)
 │   │   ├── sms-dispatcher-service/   # SMS notifications
 │   │   ├── email-dispatcher-service/ # Email notifications
 │   │   └── push-notification-service/# Firebase push
@@ -299,6 +301,9 @@ FIREBASE_VAPID_KEY=BXXXXXXXXXXXXXXX
 # Google AI Studio (https://ai.google.dev/)
 GOOGLE_AI_API_KEY=AIzaSyXXXXXXXXXX
 
+# Google Places API (https://console.cloud.google.com/)
+GOOGLE_PLACES_API_KEY=AIzaSyXXXXXXXXXX
+
 # MongoDB (auto-configured)
 MONGO_URI=mongodb://mongo:27017/notification
 
@@ -329,7 +334,7 @@ Content-Type: application/json
 [Full API Documentation](backend/services/event-dispatcher-service/README.md)
 
 ### AI Companion Service
-Conversational AI with real Singapore data.
+Conversational AI with 12-model failover and real-time data integration.
 
 ```bash
 # Chat with AI
@@ -338,14 +343,22 @@ Content-Type: application/json
 
 {
   "userId": "user123",
-  "message": "What community events in Hougang?"
+  "message": "What community events are near me?"
 }
 
-# Response includes real events:
-# - Senior Exercise Class at Hougang CC
-# - Coffee & Chat Social Gatherings
-# - Arts & Crafts Workshops
+# Response includes real Google Places venues:
+# - The Serangoon Community Club (⭐ 4.2/5, ✅ Open now)
+# - Punggol Community Club (⭐ 4.3/5, ✅ Open now)
+# - Real addresses, ratings, and operating hours
+# - Personalized based on user's profile location
 ```
+
+**Features**:
+- 12 Gemini models with automatic failover
+- Primary: `gemini-2.5-flash` (100% success rate)
+- Google Places API integration for real venue data
+- Client-side rate limiting (10 RPM)
+- Context-aware responses with user location
 
 **Features**:
 - ✅ Real Singapore community events by neighborhood
