@@ -186,7 +186,7 @@ if (intentHandlers.SMSFamily && intentHandlers.SMSFamily.setPublishEvent) {
 
 // Fallback intent detection (keyword-based when Gemini is not available)
 // Simplified system - 6 intents only
-function detectIntentFallback(message) {
+function detectIntentFallback(message, conversationHistory = '') {
   const lowerMsg = message.toLowerCase();
   
   // 1. SMS Family (specific - message + family member)
@@ -198,6 +198,28 @@ function detectIntentFallback(message) {
   // 2. Community Events (activities, things to do, events nearby)
   if (lowerMsg.match(/\b(event|activit(y|ies)|community|group|club|class|workshop|exercise|tai chi|what.*do|happening|near me)\b/)) {
     return { intent: 'CommunityEvents', response: "Let me find community activities for you!" };
+  }
+  
+  // 2b. Location mentions - if user mentions location AND recent conversation was about events
+  const locationKeywords = ['live in', 'live at', 'staying in', 'staying at', 'stay in', 'stay at', 'i am from', 'am from', 'from', 'located in', 'located at', 'in the', 'at the', 'near', 'around'];
+  
+  // Comprehensive list of Singapore areas for regex matching
+  const singaporeAreaPattern = /\b(orchard|bugis|chinatown|marina bay|city hall|raffles place|clarke quay|boat quay|little india|kampong glam|dhoby ghaut|somerset|newton|novena|toa payoh|bishan|ang mo kio|thomson|sin ming|marymount|caldecott|woodlands|yishun|sembawang|admiralty|marsiling|kranji|yew tee|choa chu kang|bukit panjang|bukit batok|hillview|beauty world|king albert park|sixth avenue|tampines|pasir ris|simei|tanah merah|bedok|kembangan|eunos|paya lebar|aljunied|kallang|lavender|boon keng|potong pasir|woodleigh|serangoon|kovan|hougang|buangkok|sengkang|punggol|compassvale|rumbia|bakau|jurong east|jurong west|boon lay|pioneer|joo koon|gul circle|tuas link|tuas west road|tuas crescent|clementi|dover|buona vista|commonwealth|queenstown|redhill|tiong bahru|outram park|telok blangah|harbourfront|farrer park)\b/i;
+  
+  const hasLocationMention = locationKeywords.some(kw => lowerMsg.includes(kw)) || singaporeAreaPattern.test(lowerMsg);
+  const recentlyDiscussedEvents = conversationHistory.toLowerCase().includes('event') || 
+                                   conversationHistory.toLowerCase().includes('activities') ||
+                                   conversationHistory.toLowerCase().includes('community') ||
+                                   conversationHistory.toLowerCase().includes('near me') ||
+                                   conversationHistory.toLowerCase().includes('what can i do') ||
+                                   conversationHistory.toLowerCase().includes('happening');
+  
+  // SMART RULE: If location is mentioned in isolation (short message < 20 words), assume CommunityEvents
+  const wordCount = message.trim().split(/\s+/).length;
+  const isShortLocationMessage = wordCount <= 20 && hasLocationMention;
+  
+  if (hasLocationMention && (recentlyDiscussedEvents || isShortLocationMessage)) {
+    return { intent: 'CommunityEvents', response: "Let me find activities in your area!" };
   }
   
   // 3. Volunteer Connection
@@ -292,10 +314,88 @@ app.post('/chat', async (req, res) => {
     let botResponse = '';
     let confidence = 0;
 
-    // STEP 1: Detect intent FIRST (before calling Gemini)
-    const fallback = detectIntentFallback(message);
-    intentName = fallback.intent;
-    logger.info(`🎯 Detected Intent: ${intentName}`);
+    // STEP 0: Retrieve conversation history for context
+    let conversationHistory = '';
+    try {
+      const existingConversation = await Conversation.findOne({ userId, sessionId }).lean();
+      if (existingConversation && existingConversation.messages && existingConversation.messages.length > 0) {
+        // Get last 5 messages for context (to avoid token overflow)
+        const recentMessages = existingConversation.messages.slice(-5);
+        conversationHistory = recentMessages.map(msg => 
+          `User: ${msg.userMessage}\nAssistant: ${msg.botResponse}`
+        ).join('\n\n');
+        logger.info(`📚 Retrieved ${recentMessages.length} previous messages for context`);
+      }
+    } catch (historyError) {
+      logger.warn(`⚠️ Could not retrieve conversation history: ${historyError.message}`);
+    }
+
+    // STEP 1: Use AI to detect intent and extract information (smarter than keyword matching)
+    let aiDetectedIntent = null;
+    let extractedLocation = null;
+    
+    if (geminiModels.length > 0 && canMakeGeminiRequest()) {
+      try {
+        // Use Gemini to intelligently detect intent and extract information
+        const intentPrompt = `You are an intent classifier for an elderly care AI assistant.
+
+**Available Intents:**
+1. SMSFamily - User wants to contact/message family members
+2. CommunityEvents - User asking about activities, events, things to do, places to go
+3. VolunteerConnect - User wants volunteer visitors or companions
+4. MedicationReminder - User asking about medication/medicine
+5. WeatherInfo - User asking about weather
+6. GameRequest - User wants to play games
+7. Default - General conversation or greetings
+
+**Previous Conversation:**
+${conversationHistory || 'No previous conversation'}
+
+**Current User Message:**
+"${message}"
+
+**CRITICAL RULES:**
+1. If user mentions ONLY a location (like "i live at hougang", "i am from tampines"), check previous conversation:
+   - If previous conversation was about events/activities/things to do → Intent is CommunityEvents
+   - If no previous conversation → Intent is CommunityEvents (they're asking implicitly "what's near me?")
+2. Phrases like "i live at X", "i am from X", "i stay at X" usually mean user wants to find things near that location
+3. ALWAYS extract location from these patterns even if no explicit question is asked
+4. Consider conversation context - users often provide location as a follow-up to their previous request
+
+**Response Format (JSON only):**
+{
+  "intent": "<intent_name>",
+  "location": "<extracted_location_or_null>",
+  "confidence": <0.0_to_1.0>,
+  "reasoning": "<brief_explanation>"
+}`;
+
+        const model = geminiModels[0].model; // Use primary model
+        const result = await model.generateContent(intentPrompt);
+        const responseText = result.response.text();
+        
+        // Extract JSON from response
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          aiDetectedIntent = JSON.parse(jsonMatch[0]);
+          intentName = aiDetectedIntent.intent;
+          extractedLocation = aiDetectedIntent.location;
+          logger.info(`🧠 AI Intent Detection: ${intentName} (confidence: ${aiDetectedIntent.confidence}) ${extractedLocation ? `Location: ${extractedLocation}` : ''}`);
+          if (aiDetectedIntent.reasoning) {
+            logger.info(`💭 Reasoning: ${aiDetectedIntent.reasoning}`);
+          }
+        }
+      } catch (aiError) {
+        logger.warn(`⚠️ AI intent detection failed, using fallback: ${aiError.message}`);
+      }
+    }
+    
+    // STEP 1B: Fallback to keyword-based detection if AI fails
+    if (!aiDetectedIntent) {
+      const fallback = detectIntentFallback(message, conversationHistory);
+      intentName = fallback.intent;
+      logger.info(`🎯 Fallback Intent Detection: ${intentName}`);
+    }
 
     // STEP 2: Run intent handler to fetch context data (events, weather, etc.)
     let contextData = '';
@@ -305,7 +405,8 @@ app.post('/chat', async (req, res) => {
           userId,
           message,
           sessionId,
-          logger
+          logger,
+          extractedLocation // Pass AI-extracted location to handler
         });
 
         // If handler provides response data (real events, weather), use it as context
@@ -345,6 +446,11 @@ Your mission is to improve wellbeing and provide helpful assistance through:
         // Inject real data if available
         if (contextData) {
           prompt += `\n\n**REAL DATA TO USE IN YOUR RESPONSE:**\n${contextData}\n\nUse this real data in your response. Do not ask for information that's already provided above.`;
+        }
+
+        // Inject conversation history if available
+        if (conversationHistory) {
+          prompt += `\n\n**CONVERSATION HISTORY (Recent messages):**\n${conversationHistory}\n\n⚠️ IMPORTANT: This is a CONTINUATION of an existing conversation. The user is following up on previous topics. Reference what was discussed before and build upon it. Do NOT start fresh - acknowledge the context.`;
         }
 
         prompt += `\n\n**User message:** "${message}"\n\nRespond warmly using the real data provided above (if any). Show you care about their wellbeing.`;

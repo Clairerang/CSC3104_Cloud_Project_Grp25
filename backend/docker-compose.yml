@@ -166,7 +166,6 @@ services:
       - MQTT_BROKER=hivemq
       - MQTT_PORT=1883
       - MONGO_URI=mongodb://mongo:27017/ai-companion
-      - GOOGLE_PLACES_API_KEY=AIzaSyDgF4cxUhARv-fZ7vK1X3SrwhogvgEUT08
     ports:
       - "4015:4015"
     restart: unless-stopped

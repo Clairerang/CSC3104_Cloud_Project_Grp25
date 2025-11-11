@@ -116,7 +116,7 @@ function getFallbackEvents(area = 'Singapore', interestType = 'general') {
 }
 
 module.exports = {
-  async handle({ userId, message, logger }) {
+  async handle({ userId, message, logger, extractedLocation = null }) {
     logger.info(`🏘️ Community events requested by ${userId}`);
 
     // Fetch user profile to get their address/location
@@ -153,14 +153,45 @@ module.exports = {
     }
 
     // Extract location override if mentioned in message (overrides profile)
-    const singaporeAreas = ['sengkang', 'hougang', 'tampines', 'bedok', 'serangoon', 'ang mo kio', 'bishan', 'toa payoh', 'queenstown', 'punggol', 'pasir ris'];
+    const singaporeAreas = [
+      // Central Region
+      'orchard', 'bugis', 'chinatown', 'marina bay', 'city hall', 'raffles place', 'clarke quay', 'boat quay',
+      'little india', 'kampong glam', 'dhoby ghaut', 'somerset', 'newton', 'novena', 'toa payoh', 'bishan',
+      'ang mo kio', 'thomson', 'sin ming', 'marymount', 'caldecott',
+      
+      // North Region  
+      'woodlands', 'yishun', 'sembawang', 'admiralty', 'marsiling', 'kranji', 'yew tee', 'choa chu kang',
+      'bukit panjang', 'bukit batok', 'hillview', 'beauty world', 'king albert park', 'sixth avenue',
+      
+      // East Region
+      'tampines', 'pasir ris', 'simei', 'tanah merah', 'bedok', 'kembangan', 'eunos', 'paya lebar', 
+      'aljunied', 'kallang', 'lavender', 'boon keng', 'potong pasir', 'woodleigh', 'serangoon', 
+      'kovan', 'hougang', 'buangkok', 'sengkang', 'punggol', 'compassvale', 'rumbia', 'bakau',
+      
+      // West Region
+      'jurong east', 'jurong west', 'boon lay', 'pioneer', 'joo koon', 'gul circle', 'tuas link',
+      'tuas west road', 'tuas crescent', 'clementi', 'dover', 'buona vista', 'commonwealth', 'queenstown',
+      'redhill', 'tiong bahru', 'outram park', 'chinatown', 'telok blangah', 'harbourfront',
+      
+      // North-East Region
+      'punggol', 'sengkang', 'buangkok', 'hougang', 'kovan', 'serangoon', 'woodleigh', 'potong pasir',
+      'boon keng', 'farrer park', 'little india', 'dhoby ghaut'
+    ];
     let detectedArea = userLocation; // Default to user's profile location
     
-    for (const area of singaporeAreas) {
-      if (lowerMsg.includes(area)) {
-        detectedArea = area;
-        logger.info(`📍 Location override from message: ${detectedArea}`);
-        break;
+    // Priority 1: Use AI-extracted location if available
+    if (extractedLocation) {
+      detectedArea = extractedLocation.toLowerCase();
+      logger.info(`🧠 AI extracted location: ${detectedArea}`);
+    }
+    // Priority 2: Check message for location keywords (fallback)
+    else {
+      for (const area of singaporeAreas) {
+        if (lowerMsg.includes(area)) {
+          detectedArea = area;
+          logger.info(`📍 Location override from message: ${detectedArea}`);
+          break;
+        }
       }
     }
 
