@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -22,36 +22,70 @@ import {
   Delete,
   Save,
 } from '@mui/icons-material';
-import { getSeniorsList } from '../api/mockData';
+import { mockApi, getSeniorsList, Profile, NotificationSettings } from '../api/mockData';
 
 const Settings: React.FC = () => {
-  const [profile, setProfile] = useState({
-    fullName: 'Sarah Johnson',
-    email: 'sarah.j@email.com',
-    phone: '+1 (555) 123-4567',
+  const [profile, setProfile] = useState<Profile>({
+    fullName: '',
+    email: '',
+    phone: '',
+    username: '',
+    address: '',
   });
 
-  const [notifications, setNotifications] = useState({
+  const [notifications, setNotifications] = useState<NotificationSettings>({
     email: true,
     push: true,
     missedCheckIn: true,
   });
 
   const [darkMode, setDarkMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
   const seniors = getSeniorsList();
+
+  // Load data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [profileData, notificationData] = await Promise.all([
+          mockApi.getProfile(),
+          mockApi.getNotificationSettings(),
+        ]);
+        setProfile(profileData);
+        setNotifications(notificationData);
+      } catch (error) {
+        console.error('Error loading settings data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleProfileChange = (field: string, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleNotificationChange = (field: string, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [field]: value }));
+  const handleNotificationChange = async (field: string, value: boolean) => {
+    const updated = { ...notifications, [field]: value };
+    setNotifications(updated);
+    try {
+      await mockApi.updateNotificationSettings(updated);
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+    }
   };
 
-  const handleSaveProfile = () => {
-    // Here you would typically save to API
-    console.log('Profile saved:', profile);
+  const handleSaveProfile = async () => {
+    try {
+      await mockApi.updateProfile(profile);
+      console.log('Profile saved:', profile);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    }
   };
 
   const handleRemoveSenior = (seniorName: string) => {
@@ -85,19 +119,6 @@ const Settings: React.FC = () => {
               Profile Information
             </Typography>
           </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 4 }}>
-            <Avatar sx={{ width: 80, height: 80, bgcolor: '#e3f2fd', color: '#1976d2' }}>
-              <Person sx={{ fontSize: 40 }} />
-            </Avatar>
-            <Button
-              variant="outlined"
-              startIcon={<Edit />}
-              sx={{ borderRadius: 2 }}
-            >
-              Change Photo
-            </Button>
-          </Box>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3, mb: 4 }}>
             <TextField
@@ -105,6 +126,7 @@ const Settings: React.FC = () => {
               value={profile.fullName}
               onChange={(e) => handleProfileChange('fullName', e.target.value)}
               fullWidth
+              disabled={!isEditing}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <TextField
@@ -113,6 +135,7 @@ const Settings: React.FC = () => {
               value={profile.email}
               onChange={(e) => handleProfileChange('email', e.target.value)}
               fullWidth
+              disabled={!isEditing}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <TextField
@@ -120,18 +143,60 @@ const Settings: React.FC = () => {
               value={profile.phone}
               onChange={(e) => handleProfileChange('phone', e.target.value)}
               fullWidth
+              disabled={!isEditing}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            <TextField
+              label="Username"
+              value={profile.username}
+              onChange={(e) => handleProfileChange('username', e.target.value)}
+              fullWidth
+              disabled={!isEditing}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            <TextField
+              label="Address"
+              value={profile.address}
+              onChange={(e) => handleProfileChange('address', e.target.value)}
+              fullWidth
+              disabled={!isEditing}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
           </Box>
 
-          <Button
-            variant="contained"
-            startIcon={<Save />}
-            onClick={handleSaveProfile}
-            sx={{ borderRadius: 2, bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}
-          >
-            Save Changes
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {!isEditing ? (
+              <Button
+                variant="contained"
+                startIcon={<Edit />}
+                onClick={() => setIsEditing(true)}
+                sx={{ borderRadius: 2, bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}
+              >
+                Edit Profile
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<Save />}
+                  onClick={() => {
+                    handleSaveProfile();
+                    setIsEditing(false);
+                  }}
+                  sx={{ borderRadius: 2, bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
+                >
+                  Save Changes
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => setIsEditing(false)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+              </>
+            )}
+          </Box>
         </Card>
 
         {/* Linked Seniors */}
@@ -164,91 +229,10 @@ const Settings: React.FC = () => {
                     {senior.name}
                   </Typography>
                 </Box>
-                <IconButton
-                  size="small"
-                  onClick={() => handleRemoveSenior(senior.name)}
-                  sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}
-                >
-                  <Delete />
-                </IconButton>
               </Paper>
             ))}
           </Box>
-
-          <Button
-            variant="outlined"
-            startIcon={<Add />}
-            onClick={handleAddSenior}
-            fullWidth
-            sx={{ borderRadius: 2 }}
-          >
-            Add Senior
-          </Button>
         </Card>
-
-        {/* Notification Preferences */}
-        <Card sx={{ p: 4, mb: 6 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4 }}>
-            <Notifications sx={{ color: '#6b7280', fontSize: 20 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#111827' }}>
-              Notification Preferences
-            </Typography>
-          </Box>
-
-          {/* <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography sx={{ fontWeight: 500, color: '#111827', mb: 0.5 }}>
-                    Email Notifications
-                  </Typography>
-                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
-                    Receive alerts via email
-                  </Typography>
-                </Box>
-                <Switch
-                  checked={notifications.email}
-                  onChange={(e) => handleNotificationChange('email', e.target.checked)}
-                />
-              </Box>
-            </Paper>
-
-            <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography sx={{ fontWeight: 500, color: '#111827', mb: 0.5 }}>
-                    Push Notifications
-                  </Typography>
-                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
-                    Receive browser notifications
-                  </Typography>
-                </Box>
-                <Switch
-                  checked={notifications.push}
-                  onChange={(e) => handleNotificationChange('push', e.target.checked)}
-                />
-              </Box>
-            </Paper>
-
-            <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography sx={{ fontWeight: 500, color: '#111827', mb: 0.5 }}>
-                    Missed Check-in Alerts
-                  </Typography>
-                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
-                    Alert when seniors miss check-ins
-                  </Typography>
-                </Box>
-                <Switch
-                  checked={notifications.missedCheckIn}
-                  onChange={(e) => handleNotificationChange('missedCheckIn', e.target.checked)}
-                />
-              </Box>
-            </Paper>
-          </Box> */}
-        </Card>
-
       </Box>
     </Box>
   );
