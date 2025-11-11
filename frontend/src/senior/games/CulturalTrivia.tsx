@@ -340,11 +340,11 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
                 return (
                   <Button
                     key={index}
-                    variant={isSelected ? 'contained' : 'outlined'}
+                    // make correct/wrong/options with any selection render as contained so bgcolor is applied consistently
+                    variant={showCorrect || showWrong || isSelected ? 'contained' : 'outlined'}
                     fullWidth
                     size="large"
                     onClick={() => handleAnswerSelect(index)}
-                    disabled={showResult}
                     sx={{
                       minHeight: 70,
                       justifyContent: 'flex-start',
@@ -356,6 +356,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
                         ? '#fba21dff'
                         : 'white',
                       color: showResult && (showCorrect || showWrong) ? 'white' : 'inherit',
+                      pointerEvents: showResult ? 'none' : 'auto',
                       '&:hover': {
                         bgcolor: showCorrect
                           ? '#4caf50'
@@ -415,15 +416,18 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               </Typography>
             </Button>
           )}
-          <Button
-            variant="outlined"
-            fullWidth
-            size="large"
-            onClick={onBack}
-            sx={{ minHeight: 60 }}
-          >
-            Exit Quiz
-          </Button>
+          {/* hide Exit Quiz when showing results for the last question */}
+          {!(showResult && currentQuestion === questions.length - 1) && (
+            <Button
+              variant="outlined"
+              fullWidth
+              size="large"
+              onClick={onBack}
+              sx={{ minHeight: 60 }}
+            >
+              Exit Quiz
+            </Button>
+          )}
         </Stack>
       </Box>
     </Box>

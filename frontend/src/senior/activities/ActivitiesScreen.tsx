@@ -24,6 +24,40 @@ interface Invitation {
   status: 'pending' | 'accepted' | 'declined';
 }
 
+// compute the starting points required for a given level (level start)
+// level 1 starts at 0, level 2 starts at 100, level 3 at 210, etc.
+// sum of increments: 100,110,120,...
+const thresholdForLevel = (level: number) => {
+  if (level <= 1) return 0;
+  const n = level - 1; // number of increments before this level
+  // sum = n*100 + 10 * sum_{i=0..n-1} i = 100*n + 10*(n*(n-1)/2) = 100*n + 5*n*(n-1)
+  return 100 * n + 5 * n * (n - 1);
+};
+
+// derive current level from totalPoints: level 1 = 0..99, level 2 = 100..209, etc.
+const getLevel = (totalPoints: number) => {
+  let level = 1;
+  // advance while next level threshold has been reached
+  while (totalPoints >= thresholdForLevel(level + 1)) {
+    level += 1;
+  }
+  return level;
+};
+
+// return level info including progress toward next level
+const getLevelInfo = (totalPoints: number) => {
+  const level = getLevel(totalPoints);
+  const min = thresholdForLevel(level);
+  const next = thresholdForLevel(level + 1);
+  const gap = next - min;
+  const progress = gap > 0 
+    ? Math.max(0, Math.min(100, Math.round(((totalPoints - min) / gap) * 100))) 
+    : 100;
+  const progressValue = Math.max(0, totalPoints - min);
+  const toNextLevel = gap - progressValue;
+  return { level, min, next, gap, progress, progressValue, toNextLevel };
+};
+
 const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints }) => {
   const [invitations, setInvitations] = useState<Invitation[]>([
     {
@@ -56,6 +90,9 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
     setInvitations(invitations.filter(inv => inv.id !== invitationId));
   };
 
+  // compute level info once for rendering
+  const levelInfo = getLevelInfo(totalPoints);
+  
   return (
     <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
       <Box sx={{ p: 6 }}>
@@ -233,7 +270,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
           p: 4,
           mb: 6,
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
             <Box>
               <Typography sx={{ color: '#374151', mb: 2, fontSize: 20 }}>
                 Your Total Points
@@ -246,30 +283,27 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
               </Box>
             </Box>
             <Box sx={{ textAlign: 'right' }}>
-              <Box sx={{
-                bgcolor: '#7c3aed',
-                color: 'white',
-                px: 4,
-                py: 1,
-                borderRadius: '20px',
-                fontSize: 16,
-                fontWeight: 600,
-                mb: 2,
-              }}>
-                Level {Math.floor(totalPoints / 100) + 1}
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ea580c' }}>
-                <Typography sx={{ fontSize: 24 }}>🔥</Typography>
-                <Typography sx={{ fontWeight: 600 }}>
-                  7 Days
-                </Typography>
-              </Box>
+                <Box sx={{
+                  bgcolor: '#7c3aed',
+                  color: 'white',
+                  px: 4,
+                  py: 1,
+                  borderRadius: '20px',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  mb: 1,
+                }}>
+                  Level {levelInfo.level}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ea580c' }}>
+                  <Typography sx={{ fontSize: 24 }}>🔥</Typography>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    7 Days
+                  </Typography>
+                </Box>
             </Box>
           </Box>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography sx={{ fontSize: 18 }}>Today's Progress</Typography>
-            </Box>
             <Box sx={{
               width: '100%',
               height: 12,
@@ -277,7 +311,12 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
               borderRadius: '6px',
               overflow: 'hidden',
             }}>
-              <Box sx={{ width: '0%', height: '100%', bgcolor: '#16a34a' }} />
+              <Box sx={{ width: `${levelInfo.progress}%`, height: '100%', bgcolor: '#f97316' }} />
+            </Box>
+            <Box sx={{ display: 'flex', right: 0, justifyContent: 'flex-end' , mt: 2 }}>
+              <Typography sx={{ fontSize: 18, textAlign: 'right' }}>
+                {levelInfo.toNextLevel} points to next level
+              </Typography>
             </Box>
           </Box>
         </Card>
