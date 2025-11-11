@@ -44,4 +44,4 @@ README.md
 docs/
 
 # Scripts
-seed.js
+# seed.js - REMOVED from ignore list to enable database seeding in container

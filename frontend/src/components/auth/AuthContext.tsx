@@ -28,33 +28,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    // Mock login - in production, this would call your backend API
-    // For demo purposes, determine role based on email
-    let role: 'admin' | 'caregiver' | 'senior';
+    try {
+      // Call the backend login API
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (email.includes('admin')) {
-      role = 'admin';
-    } else if (email.includes('caregiver') || email.includes('care')) {
-      role = 'caregiver';
-    } else {
-      role = 'senior';
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Login failed');
+      }
+
+      const data = await response.json();
+
+      // Extract user data and token from response
+      const { token, user: userData } = data;
+
+      // Map backend role to frontend role type
+      let role: 'admin' | 'caregiver' | 'senior';
+      if (userData.role === 'admin') {
+        role = 'admin';
+      } else if (userData.role === 'family') {
+        role = 'caregiver'; // Map family to caregiver role in frontend
+      } else {
+        role = 'senior';
+      }
+
+      const user: User = {
+        id: userData.userId,
+        name: userData.profile.name,
+        email: userData.email,
+        role,
+      };
+
+      setUser(user);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token); // Store as 'token' for CheckInScreen
+      localStorage.setItem('authToken', token); // Also store as 'authToken' for compatibility
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-
-    const mockUser: User = {
-      id: '1',
-      name: email.split('@')[0],
-      email,
-      role,
-    };
-
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
-    localStorage.setItem('authToken', 'mock-token-' + Date.now());
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     localStorage.removeItem('authToken');
   };
 

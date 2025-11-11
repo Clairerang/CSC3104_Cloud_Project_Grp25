@@ -8,6 +8,8 @@ import {
   LinearProgress,
   Stack,
   Chip,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -19,59 +21,56 @@ interface MorningStretchProps {
   onBack: () => void;
 }
 
-const stretches = [
-  {
-    id: 1,
-    name: 'Neck Rolls',
-    description: 'Slowly roll your head in a circle, first clockwise, then counter-clockwise',
-    duration: 30,
-    image: '🙆',
-    videoUrl: '/videos/neck-rolls.mp4',
-  },
-  {
-    id: 2,
-    name: 'Shoulder Shrugs',
-    description: 'Lift your shoulders up towards your ears, hold for 3 seconds, then release',
-    duration: 30,
-    image: '💪',
-    videoUrl: '/videos/shoulder-shrugs.mp4',
-  },
-  {
-    id: 3,
-    name: 'Arm Circles',
-    description: 'Extend your arms out to the sides and make small circles',
-    duration: 30,
-    image: '🤸',
-    videoUrl: '/videos/arm-circles.mp4',
-  },
-  {
-    id: 4,
-    name: 'Seated Twist',
-    description: 'Sit up straight and gently twist your torso to the left, then to the right',
-    duration: 30,
-    image: '🧘',
-    videoUrl: '/videos/seated-twist.mp4',
-  },
-  {
-    id: 5,
-    name: 'Ankle Rolls',
-    description: 'Lift one foot and rotate your ankle in circles, then switch feet',
-    duration: 30,
-    image: '🦶',
-    videoUrl: '/videos/ankle-rolls.mp4',
-  },
-];
+interface Exercise {
+  exerciseId: string;
+  name: string;
+  description: string;
+  duration: number;
+  image: string;
+  videoUrl: string;
+  order: number;
+  difficulty: string;
+}
 
 export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
+  const [stretches, setStretches] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(stretches[0].duration);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [completed, setCompleted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Fetch exercises from API
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/games/exercises');
+        const data = await response.json();
+
+        if (data.success && data.exercises.length > 0) {
+          setStretches(data.exercises);
+          setTimeLeft(data.exercises[0].duration);
+          setError(null);
+        } else {
+          setError('No exercises available. Please try again later.');
+        }
+      } catch (err) {
+        console.error('Error fetching exercises:', err);
+        setError('Failed to load exercises. Please check your connection.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExercises();
+  }, []);
+
 useEffect(() => {
-  if (!started || isPaused || completed) return;
+  if (!started || isPaused || completed || stretches.length === 0) return;
 
   const timer = setInterval(() => {
     setTimeLeft((prev) => {
@@ -91,7 +90,7 @@ useEffect(() => {
   }, 1000);
 
   return () => clearInterval(timer);
-}, [started, isPaused, currentStep, completed]);
+}, [started, isPaused, currentStep, completed, stretches]);
 
   // Play video when exercise changes or paused state changes
   useEffect(() => {
@@ -117,6 +116,56 @@ useEffect(() => {
   const handleFinish = () => {
     onComplete();
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom, #c8e6c9, #ffffff)',
+          p: 3,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ color: '#4caf50', mb: 3 }} />
+          <Typography variant="h5" color="text.secondary">
+            Loading exercises...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (error || stretches.length === 0) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom, #c8e6c9, #ffffff)',
+          p: 3,
+        }}
+      >
+        <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={onBack}
+            size="large"
+            sx={{ mb: 3, minHeight: 50 }}
+          >
+            Back to Activities
+          </Button>
+          <Alert severity="error" sx={{ fontSize: 16 }}>
+            {error || 'No exercises available.'}
+          </Alert>
+        </Box>
+      </Box>
+    );
+  }
 
   const currentStretch = stretches[currentStep];
   const progress = ((currentStep + 1) / stretches.length) * 100;
@@ -166,10 +215,24 @@ useEffect(() => {
               variant="outlined"
               size="large"
               onClick={() => {
-                setStarted(false);
-                setCurrentStep(0);
-                setTimeLeft(stretches[0].duration);
-                setCompleted(false);
+                // Refetch exercises for a fresh session
+                setLoading(true);
+                fetch('/api/games/exercises')
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success && data.exercises.length > 0) {
+                      setStretches(data.exercises);
+                      setTimeLeft(data.exercises[0].duration);
+                      setStarted(false);
+                      setCurrentStep(0);
+                      setCompleted(false);
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Error refetching exercises:', err);
+                    setError('Failed to load new exercises.');
+                  })
+                  .finally(() => setLoading(false));
               }}
               sx={{ minHeight: 60 }}
             >
@@ -221,7 +284,7 @@ useEffect(() => {
               <Stack spacing={2}>
                 {stretches.map((stretch, index) => (
                   <Box
-                    key={stretch.id}
+                    key={stretch.exerciseId}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
@@ -323,7 +386,7 @@ useEffect(() => {
               >
                 <video
                   ref={videoRef}
-                  key={currentStretch.id}
+                  key={currentStretch.exerciseId}
                   width="100%"
                   loop
                   muted

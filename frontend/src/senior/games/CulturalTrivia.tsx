@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -8,6 +8,8 @@ import {
   Stack,
   LinearProgress,
   Chip,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -19,37 +21,101 @@ interface CulturalTriviaProps {
   onBack: () => void;
 }
 
-const questions = [
-  {
-    id: 1,
-    question: 'What year did the first person land on the moon?',
-    options: ['1965', '1969', '1972', '1975'],
-    correctAnswer: 1,
-    fact: 'Neil Armstrong and Buzz Aldrin landed on the moon on July 20, 1969!',
-  },
-  {
-    id: 2,
-    question: 'Which famous ship sank in 1912?',
-    options: ['Lusitania', 'Titanic', 'Britannic', 'Olympic'],
-    correctAnswer: 1,
-    fact: 'The RMS Titanic sank on its maiden voyage after hitting an iceberg.',
-  },
-  {
-    id: 3,
-    question: 'Who was the first president of the United States?',
-    options: ['Thomas Jefferson', 'John Adams', 'George Washington', 'Benjamin Franklin'],
-    correctAnswer: 2,
-    fact: 'George Washington served as the first U.S. President from 1789 to 1797.',
-  },
-];
+interface TriviaQuestion {
+  questionId: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  fact: string;
+  category: string;
+  difficulty: string;
+}
 
 export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
+  const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [completed, setCompleted] = useState(false);
+
+  // Fetch trivia questions from API
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/games/trivia?count=5');
+        const data = await response.json();
+
+        if (data.success && data.questions.length > 0) {
+          setQuestions(data.questions);
+          setError(null);
+        } else {
+          setError('No trivia questions available. Please try again later.');
+        }
+      } catch (err) {
+        console.error('Error fetching trivia questions:', err);
+        setError('Failed to load trivia questions. Please check your connection.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, []);
+
+  // Loading state
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
+          p: 3,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ color: '#ff9800', mb: 3 }} />
+          <Typography variant="h5" color="text.secondary">
+            Loading trivia questions...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (error || questions.length === 0) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom, #ffe0b2, #ffffff)',
+          p: 3,
+        }}
+      >
+        <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={onBack}
+            size="large"
+            sx={{ mb: 3, minHeight: 50 }}
+          >
+            Back to Activities
+          </Button>
+          <Alert severity="error" sx={{ fontSize: 16 }}>
+            {error || 'No trivia questions available.'}
+          </Alert>
+        </Box>
+      </Box>
+    );
+  }
 
   const question = questions[currentQuestion];
   const progress = ((currentQuestion + 1) / questions.length) * 100;
@@ -121,12 +187,26 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
               variant="outlined"
               size="large"
               onClick={() => {
-                setStarted(false);
-                setCurrentQuestion(0);
-                setSelectedAnswer(null);
-                setShowResult(false);
-                setScore(0);
-                setCompleted(false);
+                // Refetch questions for a new game
+                setLoading(true);
+                fetch('/api/games/trivia?count=5')
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success && data.questions.length > 0) {
+                      setQuestions(data.questions);
+                      setStarted(false);
+                      setCurrentQuestion(0);
+                      setSelectedAnswer(null);
+                      setShowResult(false);
+                      setScore(0);
+                      setCompleted(false);
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Error refetching questions:', err);
+                    setError('Failed to load new questions.');
+                  })
+                  .finally(() => setLoading(false));
               }}
               sx={{ minHeight: 60 }}
             >

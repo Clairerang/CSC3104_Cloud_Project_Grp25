@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const { User, Relationship, Engagement } = require('./models');
 
 const app = express();
 const port = 8080;
@@ -35,61 +36,6 @@ mongoose.connect(MONGODB_URI, {
 })
 .then(() => console.log('Connected to MongoDB!'))
 .catch(err => console.error('MongoDB connection error:', err));
-
-const userSchema = new mongoose.Schema({
-  userId: { type: String, required: true, unique: true },
-  username: { type: String, required: true },
-  passwordHash: { type: String, required: true },
-  role: { type: String, enum: ['senior', 'family', 'admin'], required: true },
-  profile: {
-    name: String,
-    age: Number,
-    email: String,
-    contact: String
-  },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', userSchema);
-
-const relationshipSchema = new mongoose.Schema({
-  seniorId: { type: String, required: true },
-  linkAccId: { type: String, required: true },
-  relation: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
-});
-
-relationshipSchema.index({ seniorId: 1, linkAccId: 1 }, { unique: true });
-
-const Relationship = mongoose.model('Relationship', relationshipSchema);
-
-
-const engagementSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
-  date: { type: String, required: true }, 
-  checkIn: { type: Boolean, default: false },
-  mood: { 
-    type: String, 
-    enum: ['great', 'okay', 'not-well']
-  },
-  session: {
-    type: String,
-    enum: ['morning', 'afternoon', 'evening']
-  },
-  tasksCompleted: [
-    {
-      type: { type: String },
-      points: { type: Number, default: 0 }
-    }
-  ],
-  totalScore: { type: Number, default: 0 },
-  lastActiveAt: { type: Date, default: Date.now }
-}, { timestamps: true });
-
-engagementSchema.index({ userId: 1, date: 1, session: 1 }, { unique: true });
-
-const Engagement = mongoose.model('Engagement', engagementSchema);
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -527,6 +473,24 @@ app.post('/add-task', authenticateToken, async (req, res) => {
   }
 });
 
+// Get today's engagements for a user
+app.get('/engagements/today', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const today = new Date().toISOString().split('T')[0];
+
+    const engagements = await Engagement.find({ userId, date: today });
+
+    res.status(200).json({
+      success: true,
+      date: today,
+      engagements: engagements
+    });
+  } catch (error) {
+    console.error('Error fetching today\'s engagements:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
 
 //ADMIN
 app.get('/admin/users', authenticateToken, async (req, res) => {

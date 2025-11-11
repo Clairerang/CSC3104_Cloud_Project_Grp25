@@ -6,6 +6,8 @@ import {
   CardContent,
   Typography,
   Stack,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -16,9 +18,19 @@ interface MemoryQuizProps {
   onBack: () => void;
 }
 
-const cards = ['🍎', '🍌', '🍇', '🍓', '🍊', '🍋', '🥝', '🍒'];
+interface MemorySet {
+  setId: string;
+  name: string;
+  cards: string[];
+  theme: string;
+  difficulty: string;
+}
 
 export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
+  const [cards, setCards] = useState<string[]>([]);
+  const [memorySetName, setMemorySetName] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [gameCards, setGameCards] = useState<string[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
   const [matched, setMatched] = useState<number[]>([]);
@@ -27,11 +39,41 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
   const [completed, setCompleted] = useState(false);
   const [showingPreview, setShowingPreview] = useState(false);
 
+  // Fetch memory card set from API
   useEffect(() => {
-    initializeGame();
+    const fetchMemorySet = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/games/memory?difficulty=easy');
+        const data = await response.json();
+
+        if (data.success && data.memorySet) {
+          setCards(data.memorySet.cards);
+          setMemorySetName(data.memorySet.name);
+          setError(null);
+        } else {
+          setError('No memory game available. Please try again later.');
+        }
+      } catch (err) {
+        console.error('Error fetching memory set:', err);
+        setError('Failed to load memory game. Please check your connection.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMemorySet();
   }, []);
 
+  // Initialize game when cards are loaded
+  useEffect(() => {
+    if (cards.length > 0) {
+      initializeGame();
+    }
+  }, [cards]);
+
   const initializeGame = () => {
+    if (cards.length === 0) return;
     const shuffled = [...cards, ...cards]
       .sort(() => Math.random() - 0.5)
       .map((card) => card);
@@ -78,6 +120,56 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
     setFlipped([...flipped, index]);
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom, #e1bee7, #ffffff)',
+          p: 3,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ color: '#9c27b0', mb: 3 }} />
+          <Typography variant="h5" color="text.secondary">
+            Loading memory game...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Error state
+  if (error || cards.length === 0) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom, #e1bee7, #ffffff)',
+          p: 3,
+        }}
+      >
+        <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={onBack}
+            size="large"
+            sx={{ mb: 3, minHeight: 50 }}
+          >
+            Back to Activities
+          </Button>
+          <Alert severity="error" sx={{ fontSize: 16 }}>
+            {error || 'No memory game available.'}
+          </Alert>
+        </Box>
+      </Box>
+    );
+  }
+
   if (completed) {
     return (
       <Box
@@ -123,8 +215,22 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
               variant="outlined"
               size="large"
               onClick={() => {
-                initializeGame();
-                setStarted(false);
+                // Refetch memory set for a new game
+                setLoading(true);
+                fetch('/api/games/memory?difficulty=easy')
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success && data.memorySet) {
+                      setCards(data.memorySet.cards);
+                      setMemorySetName(data.memorySet.name);
+                      setStarted(false);
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Error refetching memory set:', err);
+                    setError('Failed to load new game.');
+                  })
+                  .finally(() => setLoading(false));
               }}
               sx={{ minHeight: 60 }}
             >
@@ -159,10 +265,10 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
             <CardContent>
               <Box sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="h3" gutterBottom sx={{ color: '#7b1fa2' }}>
-                  Memory Match
+                  {memorySetName || 'Memory Match'}
                 </Typography>
                 <Typography variant="h5" color="text.secondary">
-                  Find all matching pairs of fruit!
+                  Find all matching pairs!
                 </Typography>
               </Box>
             </CardContent>

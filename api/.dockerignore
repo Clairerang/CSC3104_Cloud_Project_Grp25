@@ -44,4 +44,4 @@ README.md
 docs/
 
 # Scripts
-populate.js
+# populate.js - REMOVED from ignore list to enable user seeding in container

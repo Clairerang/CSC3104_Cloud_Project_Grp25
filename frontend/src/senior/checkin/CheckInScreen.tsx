@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, Card, Typography, Stack } from "@mui/material";
+import { Box, Button, Card, Typography, Stack, CircularProgress, Alert } from "@mui/material";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import CoffeeIcon from "@mui/icons-material/Coffee";
 import NightlightIcon from "@mui/icons-material/Nightlight";
@@ -13,38 +13,74 @@ interface Props {
 
 const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
   const [selectedMood, setSelectedMood] = useState<Mood>(null);
-  
-  // Initialize state from localStorage for persistence
-  const [dailyProgress, setDailyProgress] = useState<DailyProgress>(() => {
-    const stored = localStorage.getItem('dailyProgress');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Check if it's still the same day
-      if (parsed.date === new Date().toDateString()) {
-        return parsed;
-      }
-    }
-    // Return fresh state if no data or new day
-    return {
-      date: new Date().toDateString(),
-      checkIns: [],
-      totalCheckIns: 0,
-    };
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress>({
+    date: new Date().toDateString(),
+    checkIns: [],
+    totalCheckIns: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Save to localStorage whenever dailyProgress changes
+  // Fetch check-in status from backend
   useEffect(() => {
-    localStorage.setItem('dailyProgress', JSON.stringify(dailyProgress));
-  }, [dailyProgress]);
+    fetchCheckInStatus();
+  }, []);
+
+  const fetchCheckInStatus = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Not authenticated');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/engagements/today', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch check-in status');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Convert backend engagements to CheckIn format
+        const checkIns: CheckIn[] = data.engagements.map((eng: any) => ({
+          id: eng._id,
+          timestamp: eng.lastActiveAt,
+          mood: eng.mood as Mood,
+          session: eng.session as "morning" | "afternoon" | "evening",
+        }));
+
+        setDailyProgress({
+          date: new Date().toDateString(),
+          checkIns: checkIns,
+          totalCheckIns: checkIns.length,
+        });
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Error fetching check-in status:', err);
+      setError('Failed to load check-in status');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Determine current session based on time
   const getCurrentSession = (): "morning" | "afternoon" | "evening" => {
     const hour = new Date().getHours();
     if (hour < 12) return "morning";        // 12 AM - 11:59 AM
-    if (hour < 18) return "afternoon";       // 12 PM - 5:59 PM  
+    if (hour < 18) return "afternoon";       // 12 PM - 5:59 PM
     return "evening";                         // 6 PM - 11:59 PM
   };
-  
+
   const currentSession = getCurrentSession();
 
   // Get greeting and icon based on session
@@ -78,29 +114,53 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
   // Check if user has already checked in for this session
   const hasCheckedInThisSession = dailyProgress.checkIns.some(
-    checkIn => checkIn.session === currentSession
+    (checkIn: CheckIn) => checkIn.session === currentSession
   );
 
   // Handle check-in
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
     if (!selectedMood) return;
 
-    const newCheckIn: CheckIn = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      mood: selectedMood,
-      session: currentSession,
-    };
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
 
-    const updatedProgress: DailyProgress = {
-      ...dailyProgress,
-      checkIns: [...dailyProgress.checkIns, newCheckIn],
-      totalCheckIns: dailyProgress.totalCheckIns + 1,
-    };
+      const response = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          mood: selectedMood,
+          session: currentSession,
+        }),
+      });
 
-    setDailyProgress(updatedProgress);
-    onCheckIn(selectedMood);
-    setSelectedMood(null); // Reset mood selection
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to check in');
+      }
+
+      const data = await response.json();
+      console.log('Check-in successful:', data);
+
+      // Refresh check-in status from backend
+      await fetchCheckInStatus();
+
+      onCheckIn(selectedMood);
+      setSelectedMood(null);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error during check-in:', err);
+      setError(err.message || 'Failed to check in');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Get next check-in time
@@ -110,12 +170,26 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
     return 'tomorrow morning (after 12 AM)';
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error && !hasCheckedInThisSession) {
+    return (
+      <Box sx={{ flex: 1, p: 6 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
+
   // Show post-check-in content if user has checked in for this session
   if (hasCheckedInThisSession) {
-    const completedCheckIn = dailyProgress.checkIns.find(
-      checkIn => checkIn.session === currentSession
-    );
-
     return (
       <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
         <Box sx={{ p: 6 }}>
@@ -135,12 +209,12 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
             </Typography>
             <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
               {['morning', 'afternoon', 'evening'].map((session) => {
-                const checkIn = dailyProgress.checkIns.find(c => c.session === session);
-                const emoji = checkIn?.mood === 'great' ? '😊' : 
-                             checkIn?.mood === 'okay' ? '😐' : 
+                const checkIn = dailyProgress.checkIns.find((c: CheckIn) => c.session === session);
+                const emoji = checkIn?.mood === 'great' ? '😊' :
+                             checkIn?.mood === 'okay' ? '😐' :
                              checkIn?.mood === 'not-well' ? '☹️' : '⚪';
                 const completed = !!checkIn;
-                
+
                 return (
                   <Box key={session} sx={{ textAlign: 'center', flex: 1 }}>
                     <Box sx={{
@@ -158,9 +232,9 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
                     }}>
                       {emoji}
                     </Box>
-                    <Typography sx={{ 
-                      fontSize: 16, 
-                      fontWeight: 600, 
+                    <Typography sx={{
+                      fontSize: 16,
+                      fontWeight: 600,
                       color: completed ? '#1f2937' : '#9ca3af',
                       textTransform: 'capitalize'
                     }}>
@@ -210,10 +284,17 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
             </Box>
           </Box>
         </Box>
-        
+
         <Typography sx={{ color: '#000000ff', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', mb: 2 }}>
           {sessionInfo.question}
         </Typography>
+
+        {/* Error message */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
 
         {/* Microphone Card */}
         <Card sx={{ bgcolor: 'white', borderRadius: 4, boxShadow: 1, p: 8, mb: 6 }}>
@@ -244,6 +325,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
         <Stack spacing={3}>
           <Button
             onClick={() => setSelectedMood('great')}
+            disabled={submitting}
             sx={{
               width: '100%',
               p: 4,
@@ -278,6 +360,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
           <Button
             onClick={() => setSelectedMood('okay')}
+            disabled={submitting}
             sx={{
               width: '100%',
               p: 4,
@@ -312,6 +395,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
           <Button
             onClick={() => setSelectedMood('not-well')}
+            disabled={submitting}
             sx={{
               width: '100%',
               p: 4,
@@ -347,7 +431,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
         <Button
           onClick={handleCheckIn}
-          disabled={!selectedMood}
+          disabled={!selectedMood || submitting}
           sx={{
             width: '100%',
             mt: 6,
@@ -367,7 +451,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
             },
           }}
         >
-          ✓ Check In
+          {submitting ? <CircularProgress size={24} sx={{ color: 'white' }} /> : '✓ Check In'}
         </Button>
       </Box>
     </Box>

@@ -85,6 +85,227 @@ app.get('/health', (req, res) => {
   });
 });
 
+// REST API Endpoints
+
+// Get all available games
+app.get('/games', async (req, res) => {
+  try {
+    const games = await Game.find({ isActive: true }).sort({ name: 1 });
+    res.json({
+      success: true,
+      games
+    });
+  } catch (error) {
+    console.error('Error fetching games:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get trivia questions (random selection)
+app.get('/trivia', async (req, res) => {
+  try {
+    const count = parseInt(req.query.count) || 5;
+    const questions = await TriviaQuestion.aggregate([
+      { $match: { isActive: true } },
+      { $sample: { size: count } }
+    ]);
+    res.json({
+      success: true,
+      questions
+    });
+  } catch (error) {
+    console.error('Error fetching trivia questions:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get memory card sets
+app.get('/memory', async (req, res) => {
+  try {
+    const difficulty = req.query.difficulty || 'easy';
+    const memorySets = await MemorySet.find({
+      isActive: true,
+      difficulty
+    });
+
+    // Randomly select one set if multiple available
+    const randomSet = memorySets.length > 0
+      ? memorySets[Math.floor(Math.random() * memorySets.length)]
+      : null;
+
+    res.json({
+      success: true,
+      memorySet: randomSet,
+      allSets: memorySets
+    });
+  } catch (error) {
+    console.error('Error fetching memory sets:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get exercises
+app.get('/exercises', async (req, res) => {
+  try {
+    const exercises = await Exercise.find({ isActive: true })
+      .sort({ order: 1 });
+    res.json({
+      success: true,
+      exercises
+    });
+  } catch (error) {
+    console.error('Error fetching exercises:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Start a new game session
+app.post('/session/start', async (req, res) => {
+  try {
+    const { userId, gameId, gameType } = req.body;
+
+    if (!userId || !gameId || !gameType) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId, gameId, and gameType are required'
+      });
+    }
+
+    const session = new GameSession({
+      sessionId: require('uuid').v4(),
+      userId,
+      gameId,
+      gameType,
+      startedAt: new Date()
+    });
+
+    await session.save();
+
+    res.json({
+      success: true,
+      session
+    });
+  } catch (error) {
+    console.error('Error starting game session:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Complete a game session
+app.post('/session/complete', async (req, res) => {
+  try {
+    const {
+      sessionId,
+      score,
+      moves,
+      correctAnswers,
+      totalQuestions,
+      metadata
+    } = req.body;
+
+    const session = await GameSession.findOne({ sessionId });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+
+    // Calculate points based on game type
+    let pointsEarned = 0;
+    const game = await Game.findOne({ gameId: session.gameId });
+
+    if (game) {
+      pointsEarned = game.points;
+
+      // Bonus points for excellent performance
+      if (session.gameType === 'trivia' && correctAnswers === totalQuestions) {
+        pointsEarned += 5; // Perfect score bonus
+      } else if (session.gameType === 'memory' && moves <= 15) {
+        pointsEarned += 5; // Efficient completion bonus
+      }
+    }
+
+    // Update session
+    session.completedAt = new Date();
+    session.isCompleted = true;
+    session.score = score;
+    session.pointsEarned = pointsEarned;
+    session.moves = moves;
+    session.correctAnswers = correctAnswers;
+    session.totalQuestions = totalQuestions;
+    session.metadata = metadata || {};
+
+    await session.save();
+
+    res.json({
+      success: true,
+      session,
+      pointsEarned
+    });
+  } catch (error) {
+    console.error('Error completing game session:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get user's game history
+app.get('/history/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const history = await GameSession.find({
+      userId,
+      isCompleted: true
+    })
+      .sort({ completedAt: -1 })
+      .limit(limit);
+
+    // Calculate stats
+    const stats = {
+      totalGames: history.length,
+      totalPoints: history.reduce((sum, s) => sum + s.pointsEarned, 0),
+      gamesByType: {
+        trivia: history.filter(s => s.gameType === 'trivia').length,
+        memory: history.filter(s => s.gameType === 'memory').length,
+        stretch: history.filter(s => s.gameType === 'stretch').length
+      }
+    };
+
+    res.json({
+      success: true,
+      history,
+      stats
+    });
+  } catch (error) {
+    console.error('Error fetching game history:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Games Service running on port ${PORT}`);

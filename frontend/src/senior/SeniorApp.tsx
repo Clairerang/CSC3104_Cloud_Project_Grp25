@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Paper, Box, Typography, Button } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
@@ -21,12 +21,22 @@ import { StackTower } from "./games/StackTower";
 
 type Tab = "check-in" | "circle" | "activities";
 
+// Map game types from DB to local IDs for routing
+const GAME_TYPE_TO_ID: { [key: string]: string } = {
+  'stretch': '1',
+  'memory': '2',
+  'trivia': '3',
+  'recipe': '4',
+  'tower': '5',
+};
+
 const SeniorApp: React.FC = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState<number>(850);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   const handleLogout = () => {
     logout();
@@ -42,13 +52,51 @@ const SeniorApp: React.FC = () => {
     { id: "6", name: "David", initials: "DJ", relationship: "Brother", lastCall: "3 days ago", phoneNumber: '+65 65498721' },
   ]);
 
-  const activities: Activity[] = [
-    { id: "1", title: "Morning Stretch", description: "5 gentle stretching exercises", points: 10, category: "Exercise" },
-    { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
-    { id: "3", title: "Cultural Trivia", description: "Answer 3 questions about local history", points: 15, category: "Learning" },
-    // { id: "4", title: "Share a Recipe", description: "Post your favorite family recipe", points: 20, category: "Social" },
-    { id: "5", title: "Stack Tower", description: "Stack blocks perfectly to build a tall tower!", points: 20, category: "Casual"},
-  ];
+  // Fetch activities from database
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const response = await fetch('/api/games/games');
+        const data = await response.json();
+
+        if (data.success && data.games) {
+          // Map database games to Activity format
+          const mappedActivities: Activity[] = data.games.map((game: any) => {
+            const localId = GAME_TYPE_TO_ID[game.type] || game.gameId;
+
+            // Map game types to categories
+            const categoryMap: { [key: string]: string } = {
+              'stretch': 'Exercise',
+              'memory': 'Mental',
+              'trivia': 'Learning',
+              'recipe': 'Social',
+              'tower': 'Casual',
+            };
+
+            return {
+              id: localId,
+              title: game.name,
+              description: game.description,
+              points: game.points,
+              category: categoryMap[game.type] || 'Learning',
+            };
+          });
+
+          setActivities(mappedActivities);
+        }
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+        // Fallback to basic activities if fetch fails
+        setActivities([
+          { id: "1", title: "Morning Stretch", description: "5 gentle stretching exercises", points: 10, category: "Exercise" },
+          { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
+          { id: "3", title: "Cultural Trivia", description: "Answer questions about history", points: 15, category: "Learning" },
+        ]);
+      }
+    };
+
+    fetchActivities();
+  }, []);
 
   const handleEmergencyCall = () => {
     console.log("Emergency call initiated");
