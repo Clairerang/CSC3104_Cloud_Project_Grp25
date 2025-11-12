@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Dialog,
@@ -16,6 +16,7 @@ import { Senior, getSeniorDetails } from '../api/mockData';
 import SeniorDetailsHeader from './SeniorDetailsHeader';
 import SeniorInfoCard from './SeniorInfoCard';
 import RecentActivityList from './RecentActivityList';
+import DialingModal from './DialingModal';
 
 interface SeniorDetailsDialogProps {
   senior: Senior | null;
@@ -24,9 +25,26 @@ interface SeniorDetailsDialogProps {
 }
 
 const SeniorDetailsDialog: React.FC<SeniorDetailsDialogProps> = ({ senior, open, onClose }) => {
+  const [dialingOpen, setDialingOpen] = useState(false);
+  const [callType, setCallType] = useState<'voice' | 'video'>('voice');
+
   const seniorDetails = senior ? getSeniorDetails(senior.id) : undefined;
   const healthStatus = seniorDetails?.healthStatus || 'No data available';
   const medications = seniorDetails?.medications || 'No data available';
+
+  const handleVideoCall = () => {
+    setCallType('video');
+    setDialingOpen(true);
+  };
+
+  const handleVoiceCall = () => { 
+    setCallType('voice');
+    setDialingOpen(true);
+  };
+
+  const handleCloseDialing = () => {
+    setDialingOpen(false);
+  };
 
   return (
     <Dialog
@@ -61,6 +79,7 @@ const SeniorDetailsDialog: React.FC<SeniorDetailsDialogProps> = ({ senior, open,
           variant="contained"
           startIcon={<VideoCall />}
           sx={{ flex: 1 }}
+          onClick={handleVideoCall}
         >
           Video Call
         </Button>
@@ -68,10 +87,19 @@ const SeniorDetailsDialog: React.FC<SeniorDetailsDialogProps> = ({ senior, open,
           variant="contained"
           startIcon={<Phone />}
           sx={{ flex: 1 }}
+          onClick={handleVoiceCall}
         >
           Call Now
         </Button>
       </DialogActions>
+
+      {/* Dialing Modal */}
+      <DialingModal
+        open={dialingOpen}
+        onClose={handleCloseDialing}
+        senior={senior}
+        callType={callType}
+      />
     </Dialog>
   );
 };

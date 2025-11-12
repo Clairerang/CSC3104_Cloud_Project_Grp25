@@ -184,7 +184,7 @@ const Dashboard: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
             <Timeline sx={{ color: '#1976d2' }} />
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Weekly Engagement Overview
+              Weekly Check-In Overview
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
