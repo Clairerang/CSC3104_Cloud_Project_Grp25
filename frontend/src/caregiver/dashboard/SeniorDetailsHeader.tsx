@@ -1,9 +1,9 @@
 import React from 'react';
 import { Box, Typography, DialogTitle } from '@mui/material';
-import { Senior } from '../api/mockData';
+import { CaregiverSeniorCard } from '../types/caregiver';
 
 interface SeniorDetailsHeaderProps {
-  senior: Senior | null;
+  senior: CaregiverSeniorCard | null;
 }
 
 const SeniorDetailsHeader: React.FC<SeniorDetailsHeaderProps> = ({ senior }) => {

@@ -375,13 +375,27 @@ app.delete('/remove-relation', authenticateToken, async (req, res, next) => {
     next(error);
   }
 });
-//view relations for senior and admin
+// view relations for senior, admin, or linked caregivers
 app.get('/relations/:userId', authenticateToken, async (req, res, next) => {
   try {
     const requester = req.user;
     const { userId } = req.params;
 
-    if (requester.userId !== userId && requester.role !== 'admin') {
+    const isSelf = requester.userId === userId;
+    const isAdmin = requester.role === 'admin';
+    let isLinkedCaregiver = false;
+
+    if (!isSelf && !isAdmin) {
+      isLinkedCaregiver = await Relationship.exists({
+        seniorId: userId,
+        linkAccId: requester.userId
+      });
+      if (!isLinkedCaregiver) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
+    if (!isSelf && !isAdmin && !isLinkedCaregiver) {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -406,6 +420,107 @@ app.get('/relations/:userId', authenticateToken, async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error fetching relations:", error);
+    next(error);
+  }
+});
+
+// caregiver-specific routes
+app.get('/caregiver/seniors', authenticateToken, async (req, res, next) => {
+  try {
+    const caregiverId = req.user.userId;
+    const allowedRoles = ['family'];
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only caregivers can access linked seniors.' });
+    }
+
+    const relationships = await Relationship.find({ linkAccId: caregiverId }).lean();
+
+    if (!relationships.length) {
+      return res.status(200).json({
+        caregiverId,
+        seniors: []
+      });
+    }
+
+    const seniorIds = relationships.map(rel => rel.seniorId);
+    const seniors = await User.find(
+      { userId: { $in: seniorIds } },
+      '-passwordHash'
+    ).lean();
+
+    const seniorsById = seniors.reduce((acc, senior) => {
+      acc[senior.userId] = senior;
+      return acc;
+    }, {});
+
+    const result = relationships
+      .filter(rel => seniorsById[rel.seniorId])
+      .map(rel => ({
+        seniorId: rel.seniorId,
+        relation: rel.relation,
+        senior: seniorsById[rel.seniorId]
+      }));
+
+    res.status(200).json({
+      caregiverId,
+      seniors: result
+    });
+  } catch (error) {
+    console.error('Error fetching caregiver seniors:', error);
+    next(error);
+  }
+});
+
+app.get('/caregiver/seniors/:seniorId/summary', authenticateToken, async (req, res, next) => {
+  try {
+    const caregiverId = req.user.userId;
+    const allowedRoles = ['family'];
+    const { seniorId } = req.params;
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only caregivers can access senior summaries.' });
+    }
+
+    const relationshipExists = await Relationship.exists({
+      seniorId,
+      linkAccId: caregiverId
+    });
+
+    if (!relationshipExists) {
+      return res.status(403).json({ error: 'Access denied. Senior is not linked to caregiver.' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const todayEngagements = await Engagement.find(
+      { userId: seniorId, date: today }
+    ).lean();
+
+    const totalPointsAggregation = await Engagement.aggregate([
+      { $match: { userId: seniorId } },
+      { $group: { _id: '$userId', totalPoints: { $sum: '$totalScore' } } }
+    ]);
+
+    const totalPoints = totalPointsAggregation.length
+      ? totalPointsAggregation[0].totalPoints
+      : 0;
+
+    const lastEngagement = await Engagement.findOne(
+      { userId: seniorId },
+      {},
+      { sort: { lastActiveAt: -1 } }
+    ).lean();
+
+    res.status(200).json({
+      seniorId,
+      today,
+      totalPoints,
+      todayEngagements,
+      lastActiveAt: lastEngagement?.lastActiveAt || null
+    });
+  } catch (error) {
+    console.error('Error fetching caregiver senior summary:', error);
     next(error);
   }
 });

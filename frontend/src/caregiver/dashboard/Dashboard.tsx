@@ -1,43 +1,137 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Card, 
-  IconButton, 
-  Button,
+import {
+  Box,
+  Typography,
+  Card,
+  IconButton,
   Chip,
   LinearProgress,
+  Alert as MuiAlert,
+  CircularProgress,
 } from '@mui/material';
-import {
-  Close,
-  Timeline,
-} from '@mui/icons-material';
-import { mockApi, Senior, Alert } from '../api/mockData';
+import { Close, Timeline } from '@mui/icons-material';
+import { mockApi, Alert } from '../api/mockData';
+import { caregiverApi, CaregiverSeniorItem, SeniorSummaryResponse } from '../api/client';
+import { CaregiverSeniorCard, SeniorStatus } from '../types/caregiver';
 import SeniorDetailsDialog from './SeniorDetailsDialog';
 
+const mapStatus = (summary: SeniorSummaryResponse, lastActiveAt: string | null): SeniorStatus => {
+  if (summary.todayEngagements.some((engagement) => engagement.checkIn)) {
+    return 'Active';
+  }
+
+  if (!lastActiveAt) {
+    return 'Inactive';
+  }
+
+  const lastActive = new Date(lastActiveAt);
+  const hoursSinceActive = (Date.now() - lastActive.getTime()) / (1000 * 60 * 60);
+
+  if (hoursSinceActive <= 24) {
+    return 'Missed Check-In';
+  }
+
+  return 'Inactive';
+};
+
+const formatLastActive = (lastActiveAt: string | null): string => {
+  if (!lastActiveAt) return 'No check-ins yet';
+
+  const lastActive = new Date(lastActiveAt);
+  const diffMs = Date.now() - lastActive.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+  if (diffHours < 1) {
+    const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+};
+
+const computeEngagementScore = (totalPoints: number): number => {
+  if (totalPoints <= 0) return 0;
+  return Math.min(100, Math.round(totalPoints));
+};
+
+const getInitials = (name?: string, fallback?: string) => {
+  const source = name || fallback || 'Senior';
+  const matches = source.match(/\b\w/g);
+  return matches ? matches.join('').slice(0, 2).toUpperCase() : source.slice(0, 2).toUpperCase();
+};
+
+const enrichSenior = (
+  item: CaregiverSeniorItem,
+  summary: SeniorSummaryResponse
+): CaregiverSeniorCard => {
+  const profile = item.senior.profile || {};
+  const lastActiveAt = summary.lastActiveAt;
+
+  return {
+    id: item.seniorId,
+    userId: item.seniorId,
+    name: profile.name || item.senior.username,
+    initials: getInitials(profile.name, item.senior.username),
+    status: mapStatus(summary, lastActiveAt),
+    lastCheckIn: formatLastActive(lastActiveAt),
+    isOnline: !!(lastActiveAt && Date.now() - new Date(lastActiveAt).getTime() < 2 * 60 * 60 * 1000),
+    engagement: computeEngagementScore(summary.totalPoints),
+    relation: item.relation,
+    email: profile.email,
+    contact: profile.contact,
+    totalPoints: summary.totalPoints,
+    lastActiveAt,
+    todayEngagements: summary.todayEngagements,
+    latestMood: summary.todayEngagements.find((engagement) => engagement.mood)?.mood,
+  };
+};
+
 const Dashboard: React.FC = () => {
-  const [seniors, setSeniors] = useState<Senior[]>([]);
+  const [seniors, setSeniors] = useState<CaregiverSeniorCard[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-
-  const [selectedSenior, setSelectedSenior] = useState<Senior | null>(null);
+  const [selectedSenior, setSelectedSenior] = useState<CaregiverSeniorCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loadingSeniors, setLoadingSeniors] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load data from API
   useEffect(() => {
-    const loadData = async () => {
+    const loadAlerts = async () => {
       try {
-        const [seniorsData, alertsData] = await Promise.all([
-          mockApi.getSeniors(),
-          mockApi.getAlerts(),
-        ]);
-        setSeniors(seniorsData);
+        const alertsData = await mockApi.getAlerts();
         setAlerts(alertsData);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
+      } catch (err) {
+        console.error('Error loading alerts:', err);
       }
     };
 
-    loadData();
+    const loadSeniors = async () => {
+      setLoadingSeniors(true);
+      setError(null);
+      try {
+        const response = await caregiverApi.getSeniors();
+        const enriched = await Promise.all(
+          response.seniors.map(async (item) => {
+            const summary = await caregiverApi.getSeniorSummary(item.seniorId);
+            return enrichSenior(item, summary);
+          })
+        );
+        setSeniors(enriched);
+      } catch (err) {
+        console.error('Error loading caregiver seniors:', err);
+        setError('Unable to load linked seniors. Please try again later.');
+        setSeniors([]);
+      } finally {
+        setLoadingSeniors(false);
+      }
+    };
+
+    loadAlerts();
+    loadSeniors();
   }, []);
 
   const dismissAlert = async (id: string) => {
@@ -49,7 +143,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleSeniorClick = (senior: Senior) => {
+  const handleSeniorClick = (senior: CaregiverSeniorCard) => {
     setSelectedSenior(senior);
     setIsDialogOpen(true);
   };
@@ -109,73 +203,86 @@ const Dashboard: React.FC = () => {
             Senior Overview
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
-            {seniors.map((senior) => (
-              <Box key={senior.id}>
-                <Card
-                  sx={{
-                    p: 3,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: 3,
-                    },
-                  }}
-                  onClick={() => handleSeniorClick(senior)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box sx={{ position: 'relative' }}>
-                        <Box
-                          sx={{
-                            width: 48,
-                            height: 48,
-                            bgcolor: '#1976d2',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontWeight: 600,
-                            fontSize: 16,
-                          }}
-                        >
-                          {senior.initials}
-                        </Box>
-                        {senior.isOnline && (
+            {loadingSeniors ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                <CircularProgress />
+              </Box>
+            ) : error ? (
+              <MuiAlert severity="error">{error}</MuiAlert>
+            ) : seniors.length === 0 ? (
+              <MuiAlert severity="info">No seniors are linked to this caregiver yet.</MuiAlert>
+            ) : (
+              seniors.map((senior) => (
+                <Box key={senior.id}>
+                  <Card
+                    sx={{
+                      p: 3,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: 3,
+                      },
+                    }}
+                    onClick={() => handleSeniorClick(senior)}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ position: 'relative' }}>
                           <Box
                             sx={{
-                              position: 'absolute',
-                              bottom: 0,
-                              right: 0,
-                              width: 12,
-                              height: 12,
-                              bgcolor: '#4caf50',
+                              width: 48,
+                              height: 48,
+                              bgcolor: '#1976d2',
                               borderRadius: '50%',
-                              border: '2px solid white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'white',
+                              fontWeight: 600,
+                              fontSize: 16,
                             }}
-                          />
-                        )}
-                      </Box>
-                      <Box>
-                        <Typography sx={{ fontWeight: 600, fontSize: 16, mb: 0.5 }}>
-                          {senior.name}
-                        </Typography>
-                        <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
-                          Last check-in: {senior.lastCheckIn}
-                        </Typography>
+                          >
+                            {senior.initials}
+                          </Box>
+                          {senior.isOnline && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                                width: 12,
+                                height: 12,
+                                bgcolor: '#4caf50',
+                                borderRadius: '50%',
+                                border: '2px solid white',
+                              }}
+                            />
+                          )}
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 600, fontSize: 16, mb: 0.5 }}>
+                            {senior.name}
+                          </Typography>
+                          <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
+                            Last activity: {senior.lastCheckIn}
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: '#9ca3af' }}>
+                            Relation: {senior.relation}
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
-                  </Box>
-                  <Chip
-                    label={senior.status}
-                    color={getStatusColor(senior.status) as any}
-                    size="small"
-                    sx={{ fontWeight: 500 }}
-                  />
-                </Card>
-              </Box>
-            ))}
+                    <Chip
+                      label={senior.status}
+                      color={getStatusColor(senior.status) as any}
+                      size="small"
+                      sx={{ fontWeight: 500 }}
+                    />
+                  </Card>
+                </Box>
+              ))
+            )}
           </Box>
         </Box>
 
@@ -187,33 +294,43 @@ const Dashboard: React.FC = () => {
               Weekly Check-In Overview
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {seniors.map((senior) => (
-              <Box key={senior.id}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                    {senior.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {senior.engagement}%
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={senior.engagement}
-                  sx={{
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: '#e5e7eb',
-                    '& .MuiLinearProgress-bar': {
-                      backgroundColor: getEngagementColor(senior.engagement),
+          {loadingSeniors ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+              <CircularProgress size={32} />
+            </Box>
+          ) : seniors.length === 0 ? (
+            <Typography sx={{ color: '#6b7280' }}>
+              Link a senior account to see their engagement trends.
+            </Typography>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {seniors.map((senior) => (
+                <Box key={senior.id}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                      {senior.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {senior.engagement}%
+                    </Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={senior.engagement}
+                    sx={{
+                      height: 8,
                       borderRadius: 4,
-                    },
-                  }}
-                />
-              </Box>
-            ))}
-          </Box>
+                      backgroundColor: '#e5e7eb',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: getEngagementColor(senior.engagement),
+                        borderRadius: 4,
+                      },
+                    }}
+                  />
+                </Box>
+              ))}
+            </Box>
+          )}
         </Card>
 
 

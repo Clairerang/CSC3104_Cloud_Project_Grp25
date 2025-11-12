@@ -16,12 +16,12 @@ import {
   Videocam,
   VideocamOff,
 } from '@mui/icons-material';
-import { Senior } from '../api/mockData';
+import { CaregiverSeniorCard } from '../types/caregiver';
 
 interface DialingModalProps {
   open: boolean;
   onClose: () => void;
-  senior: Senior | null;
+  senior: CaregiverSeniorCard | null;
   callType: 'voice' | 'video'; // 'voice' for call, 'video' for video call
 }
 
