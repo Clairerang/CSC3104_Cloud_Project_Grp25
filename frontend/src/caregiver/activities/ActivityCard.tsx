@@ -48,6 +48,23 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
     }
   };
 
+  const getStatusBackgroundColor = () => {
+    switch (activity.status) {
+      case 'pending':
+        return '#fef3c7'; // light amber
+      case 'accepted':
+        return '#dbeafe'; // light blue
+      case 'rejected':
+        return '#fee2e2'; // light red
+      case 'completed':
+        return '#d1fae5'; // light green
+      case 'cancelled':
+        return '#f3f4f6'; // light gray
+      default:
+        return '#f3f4f6'; // default light gray
+    }
+  };
+
   const getStatusLabel = () => {
     switch (activity.status) {
       case 'pending':
@@ -161,7 +178,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
     <Paper
       sx={{
         p: 3,
-        bgcolor: '#ffffff',
+        bgcolor: getStatusBackgroundColor(),
         border: '1px solid #e5e7eb',
         borderRadius: 2,
         '&:hover': { boxShadow: 2 },
