@@ -50,15 +50,54 @@ const engagementSchema = new mongoose.Schema({
     }
   ],
   totalScore: { type: Number, default: 0 },
-  lastActiveAt: { type: Date, default: Date.now }
+  lastActiveAt: { type: Date, default: Date.now },
+  streak: { type: Number, default: 0 }
 }, { timestamps: true });
 
 engagementSchema.index({ userId: 1, date: 1, session: 1 }, { unique: true });
 
 const Engagement = mongoose.model('Engagement', engagementSchema);
 
+// Invitations Schema
+const invitationSchema = new mongoose.Schema({
+  invitationId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  seniorId: {
+    type: String,
+    required: true
+  },
+  familyId: {
+    type: String,
+    default: null
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  dateTime: {            
+    type: Date,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'accepted', 'declined'],
+    default: 'pending'
+  }
+}, { timestamps: true });
+
+const Invitation = mongoose.model('Invitation', invitationSchema);
+
+
 module.exports = {
   User,
   Relationship,
-  Engagement
+  Engagement,
+  Invitation
 };
