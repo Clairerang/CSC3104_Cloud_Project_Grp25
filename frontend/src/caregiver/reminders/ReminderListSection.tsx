@@ -17,7 +17,6 @@ interface ReminderListSectionProps {
   title: string;
   reminders: ReminderItem[];
   isActive: boolean;
-  onToggle: (id: number) => void;
   onDelete: (id: number) => void;
   formatTime: (time: string) => string;
   frequencyLabels: Record<string, string>;
@@ -31,7 +30,6 @@ const ReminderListSection: React.FC<ReminderListSectionProps> = ({
   title,
   reminders,
   isActive,
-  onToggle,
   onDelete,
   formatTime,
   frequencyLabels,
@@ -126,7 +124,6 @@ const ReminderListSection: React.FC<ReminderListSectionProps> = ({
               key={reminder.id}
               reminder={reminder}
               isActive={isActive}
-              onToggle={onToggle}
               onDelete={onDelete}
               formatTime={formatTime}
               frequencyLabels={frequencyLabels}

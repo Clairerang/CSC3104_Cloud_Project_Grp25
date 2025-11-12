@@ -88,34 +88,7 @@ const Reminders: React.FC = () => {
     }
   };
 
-  const toggleReminder = async (id: number) => {
-    let previousState: ReminderItem[] = [];
-    
-    try {
-      // Get current state and optimistically update
-      setReminders(prev => {
-        previousState = prev;
-        const reminder = prev.find(r => r.id === id);
-        if (reminder) {
-          return prev.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r);
-        }
-        return prev;
-      });
-      
-      const reminder = previousState.find(r => r.id === id);
-      if (reminder) {
-        const updatedReminder = await mockApi.updateReminderItem(id, { isActive: !reminder.isActive });
-        setReminders(prev => prev.map(r => r.id === id ? updatedReminder : r));
-      }
-    } catch (error) {
-      console.error('Error toggling reminder:', error);
-      // Revert optimistic update on error
-      setReminders(previousState);
-    }
-  };
 
-  const activeReminders = filteredReminders.filter(r => r.isActive);
-  const inactiveReminders = filteredReminders.filter(r => !r.isActive);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -180,12 +153,11 @@ const Reminders: React.FC = () => {
           frequencyLabels={frequencyLabels}
         />
 
-        {/* Active Reminders */}
+        {/* Reminders */}
         <ReminderListSection
-          title="Active Reminders for Elderly"
-          reminders={activeReminders}
+          title="Reminders for Elderly"
+          reminders={filteredReminders}
           isActive={true}
-          onToggle={toggleReminder}
           onDelete={deleteReminder}
           formatTime={formatTime}
           frequencyLabels={frequencyLabels}
@@ -193,21 +165,6 @@ const Reminders: React.FC = () => {
           onFilterChange={setSelectedElderlyFilter}
           seniors={seniors}
           showFilter={true}
-        />
-
-        {/* Inactive Reminders */}
-        <ReminderListSection
-          title="Inactive Reminders for Elderly"
-          reminders={inactiveReminders}
-          isActive={false}
-          onToggle={toggleReminder}
-          onDelete={deleteReminder}
-          formatTime={formatTime}
-          frequencyLabels={frequencyLabels}
-          selectedElderlyFilter={selectedElderlyFilter}
-          onFilterChange={setSelectedElderlyFilter}
-          seniors={seniors}
-          showFilter={false}
         />
       </Box>
     </Box>

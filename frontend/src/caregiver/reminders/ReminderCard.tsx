@@ -8,8 +8,6 @@ import {
 } from '@mui/material';
 import {
   Delete,
-  CheckCircle,
-  Schedule,
   AccessTime,
 } from '@mui/icons-material';
 import { ReminderItem } from '../api/mockData';
@@ -17,7 +15,6 @@ import { ReminderItem } from '../api/mockData';
 interface ReminderCardProps {
   reminder: ReminderItem;
   isActive: boolean;
-  onToggle: (id: number) => void;
   onDelete: (id: number) => void;
   formatTime: (time: string) => string;
   frequencyLabels: Record<string, string>;
@@ -26,7 +23,6 @@ interface ReminderCardProps {
 const ReminderCard: React.FC<ReminderCardProps> = ({
   reminder,
   isActive,
-  onToggle,
   onDelete,
   formatTime,
   frequencyLabels,
@@ -140,18 +136,6 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton
-            size="small"
-            onClick={() => onToggle(reminder.id)}
-            sx={{
-              color: isActive ? '#f44336' : '#4caf50',
-              '&:hover': {
-                bgcolor: isActive ? '#ffebee' : '#e8f5e8',
-              },
-            }}
-          >
-            {isActive ? <Schedule /> : <CheckCircle />}
-          </IconButton>
           <IconButton
             size="small"
             onClick={() => onDelete(reminder.id)}
