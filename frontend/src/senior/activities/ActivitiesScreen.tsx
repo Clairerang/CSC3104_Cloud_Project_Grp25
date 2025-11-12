@@ -21,7 +21,7 @@ interface Invitation {
   date: string;
   time: string;
   message: string;
-  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
+  status: 'pending' | 'accepted' | 'declined' ;
 }
 
 // compute the starting points required for a given level (level start)
