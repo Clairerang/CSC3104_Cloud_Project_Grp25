@@ -58,17 +58,19 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
       const data = await response.json();
 
       if (data.success) {
-        // Convert backend engagements to CheckIn format
-        const checkIns: CheckIn[] = data.engagements.map((eng: any) => ({
-          id: eng._id,
-          timestamp: eng.lastActiveAt,
-          mood: eng.mood as Mood,
-          session: eng.session as "morning" | "afternoon" | "evening",
-        }));
+        const order = ['morning','afternoon','evening'];
+        const checkIns: CheckIn[] = data.engagements
+          .map((eng: any) => ({
+            id: eng._id,
+            timestamp: eng.lastActiveAt,
+            mood: eng.mood as Mood,
+            session: eng.session as "morning" | "afternoon" | "evening",
+          }))
+          .sort((a, b) => order.indexOf(a.session) - order.indexOf(b.session));
 
         setDailyProgress({
           date: new Date().toDateString(),
-          checkIns: checkIns,
+          checkIns,
           totalCheckIns: checkIns.length,
         });
         setError(null);
@@ -270,24 +272,8 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
       const data = await response.json();
       console.log('Check-in successful:', data);
 
-      // update local daily progress to mark session as checked in
-      const newCheckIn: CheckIn = {
-        id: data.engagementId || Math.random().toString(36).slice(2),
-        timestamp: new Date().toISOString(),
-        mood,
-        session: currentSession,
-      };
-
-      setDailyProgress(prev => {
-        const already = prev.checkIns.some(c => c.session === currentSession);
-        if (already) return { ...prev };
-        const updated = [...prev.checkIns, newCheckIn];
-        return {
-          ...prev,
-          checkIns: updated,
-          totalCheckIns: updated.length,
-        };
-      });
+      // Refresh check-in status from backend
+      await fetchCheckInStatus();
 
       onCheckIn(mood);
       setSelectedMood(null);
@@ -404,21 +390,48 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
                 return (
                   <Box key={session} sx={{ textAlign: 'center', flex: 1 }}>
-                    <Box sx={{
-                      width: 60,
-                      height: 60,
-                      bgcolor: completed ? '#f0fdf4' : '#f3f4f6',
-                      border: completed ? '3px solid #16a34a' : '2px solid #d1d5db',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 28,
-                      mx: 'auto',
-                      mb: 2
-                    }}>
-                      {emoji}
-                    </Box>
+                    {/*
+                      Use the actual mood to choose colors when a session is completed.
+                      great -> green, okay -> amber, not-well -> red. Fallback to neutral.
+                    */}
+                    {(() => {
+                      const mood = checkIn?.mood;
+                      const isCompleted = !!checkIn;
+                      const bgColor = mood === 'great'
+                        ? '#f0fdf4'     // light green
+                        : mood === 'okay'
+                        ? '#fffbeb'     // light amber
+                        : mood === 'not-well'
+                        ? '#fff1f2'     // light red
+                        : (isCompleted ? '#f3f4f6' : '#f3f4f6');
+                      const borderColor = mood === 'great'
+                        ? '#16a34a'
+                        : mood === 'okay'
+                        ? '#eab308'
+                        : mood === 'not-well'
+                        ? '#ef4444'
+                        : '#d1d5db';
+                      const borderWidth = isCompleted ? 3 : 2;
+
+                      return (
+                        <Box sx={{
+                          width: 60,
+                          height: 60,
+                          bgcolor: bgColor,
+                          border: `${borderWidth}px solid ${borderColor}`,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 28,
+                          mx: 'auto',
+                          mb: 2
+                        }}>
+                          {emoji}
+                        </Box>
+                      );
+                    })()}
+                    
                     <Typography sx={{
                       fontSize: 16,
                       fontWeight: 600,

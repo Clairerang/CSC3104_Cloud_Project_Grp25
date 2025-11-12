@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Paper, Box, Typography, Button } from "@mui/material";
+import { Paper, Box, Typography, Button, Modal } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import GroupIcon from "@mui/icons-material/Group";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PhoneIcon from "@mui/icons-material/Phone";
 import LogoutIcon from "@mui/icons-material/Logout";
+import EndCallIcon from "@mui/icons-material/CallEnd";
+import CommentIcon from '@mui/icons-material/Comment';
 import { useAuth } from "../components/auth/AuthContext";
 
 import {  Contact, Activity } from "../types";
@@ -37,6 +39,9 @@ const SeniorApp: React.FC = () => {
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState<number>(850);
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  // New state for emergency modal
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -91,6 +96,7 @@ const SeniorApp: React.FC = () => {
           { id: "1", title: "Morning Stretch", description: "5 gentle stretching exercises", points: 10, category: "Exercise" },
           { id: "2", title: "Memory Quiz", description: "Complete today's brain teaser", points: 15, category: "Mental" },
           { id: "3", title: "Cultural Trivia", description: "Answer questions about history", points: 15, category: "Learning" },
+          { id: "5", title: "Stack Tower", description: "Stack blocks perfectly to build a tall tower!", points: 20, category: "Casual"},
         ]);
       }
     };
@@ -138,6 +144,18 @@ const handleEditContact = (updatedContact: Contact) => {
 
 const handleDeleteContact = (contactToDelete: Contact) => {
   setContacts(contacts.filter(c => c.id !== contactToDelete.id));
+};
+
+// New helpers to open/close emergency modal
+const openEmergencyModal = () => {
+  // store any required context here if needed later
+  setShowEmergencyModal(true);
+  console.log("Navigating to emergency modal");
+};
+
+const closeEmergencyModal = () => {
+  setShowEmergencyModal(false);
+  console.log("Ending emergency call");
 };
 
   // If a game is active, show the game screen
@@ -194,6 +212,33 @@ const handleDeleteContact = (contactToDelete: Contact) => {
               Senior Care
             </Typography>
           </Box>
+
+          {/* Emergency 911 button */}
+          <Box sx={{ flex: 1 }} />
+
+          <Button
+            onClick={() => { openEmergencyModal(); handleEmergencyCall(); }}
+            startIcon={<PhoneIcon sx={{ width: 20, height: 20 }} />}
+            sx={{
+              bgcolor: '#dc2626',
+              color: 'white',
+              px: 3,
+              py: 1,
+              borderRadius: 2,
+              fontSize: 14,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              boxShadow: '0 3px 5px rgba(0,0,0,0.12)',
+              textTransform: 'none',
+              '&:hover': {
+                bgcolor: '#b91c1c',
+              },
+            }}
+          >
+            Emergency: 911
+          </Button>
         </Box>
 
         {/* Add padding to account for fixed header */}
@@ -230,6 +275,59 @@ const handleDeleteContact = (contactToDelete: Contact) => {
         >
           Logout
         </Button>
+
+        {/* Emergency Modal */}
+        <Modal
+          open={showEmergencyModal}
+          onClose={closeEmergencyModal}
+          aria-labelledby="emergency-modal-title"
+          aria-describedby="emergency-modal-description"
+        >
+          <Box
+            sx={{
+              position: 'absolute' as const,
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              bgcolor: 'background.paper',
+              boxShadow: 24,
+              p: 4,
+              borderRadius: 2,
+              width: 600,
+              height: 420,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              textAlign: 'center',
+            }}
+          >
+            <Typography id="emergency-modal-title" variant="h6" sx={{ mb: 2 }}>
+              Dialling 911...
+            </Typography>
+            <Typography id="emergency-modal-description" sx={{ mb: 3 }}>
+              Please wait while the call connects.
+            </Typography>
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>              
+              <Button
+                onClick={closeEmergencyModal}
+                sx={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: '50%',
+                  bgcolor: '#ef4444',
+                  '&:hover': { bgcolor: '#dc2626' },
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <EndCallIcon sx={{ width: 30, height: 30 }} />
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
       </Box>
     );
   }
@@ -269,6 +367,33 @@ const handleDeleteContact = (contactToDelete: Contact) => {
             Senior Care
           </Typography>
         </Box>
+
+        {/* Emergency 911 button */}
+        <Box sx={{ flex: 1 }} />
+
+        <Button
+          onClick={() => { openEmergencyModal(); handleEmergencyCall(); }}
+          startIcon={<PhoneIcon sx={{ width: 20, height: 20 }} />}
+          sx={{
+            bgcolor: '#dc2626',
+            color: 'white',
+            px: 3,
+            py: 1,
+            borderRadius: 2,
+            fontSize: 14,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            boxShadow: '0 3px 5px rgba(0,0,0,0.12)',
+            textTransform: 'none',
+            '&:hover': {
+              bgcolor: '#b91c1c',
+            },
+          }}
+        >
+          Emergency: 911
+        </Button>
       </Box>
 
       {/* Add padding to account for fixed header */}
@@ -284,34 +409,6 @@ const handleDeleteContact = (contactToDelete: Contact) => {
         />
       )}
 
-      {/* Floating Emergency Button */}
-      <Button
-        onClick={handleEmergencyCall}
-        sx={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          bgcolor: '#dc2626',
-          color: 'white',
-          px: 4,
-          py: 2,
-          borderRadius: 3,
-          fontSize: 16,
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          zIndex: 1000,
-          '&:hover': {
-            bgcolor: '#b91c1c',
-            boxShadow: '0 6px 8px rgba(0, 0, 0, 0.15)',
-          },
-        }}
-      >
-        <PhoneIcon sx={{ width: 20, height: 20 }} />
-        Emergency: 911
-      </Button>
 
       {/* Logout Button - Bottom Left */}
       <Button
@@ -341,6 +438,34 @@ const handleDeleteContact = (contactToDelete: Contact) => {
         }}
       >
         Logout
+      </Button>
+
+      {/* Chat bot */}
+      <Button
+        aria-label="open-messages"
+        onClick={() => console.log('Open messages')}
+        sx={{
+          position: 'fixed',
+          bottom: 110,
+          right: 24,
+          width: 60,
+          height: 60,
+          borderRadius: '50%',
+          bgcolor: '#0ea5a4',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          '&:hover': {
+            bgcolor: '#028489',
+            boxShadow: '0 6px 8px rgba(0,0,0,0.2)',
+          },
+          textTransform: 'none',
+        }}
+      >
+        <CommentIcon sx={{ width: 28, height: 28 }} />
       </Button>
 
       {/* Bottom Navigation */}
@@ -400,6 +525,58 @@ const handleDeleteContact = (contactToDelete: Contact) => {
           </Box>
         </Box>
       </Paper>
+
+      {/* Emergency Modal (also present when not in a game) */}
+      <Modal
+        open={showEmergencyModal}
+        onClose={closeEmergencyModal}
+        aria-labelledby="emergency-modal-title"
+        aria-describedby="emergency-modal-description"
+      >
+        <Box
+          sx={{
+            position: 'absolute' as const,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+            width: 600,
+            height: 420,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            textAlign: 'center',
+          }}
+        >
+          <Typography id="emergency-modal-title" variant="h6" sx={{ mb: 2 }}>
+            Dialling 911...
+          </Typography>
+          <Typography id="emergency-modal-description" sx={{ mb: 3 }}>
+            Please wait while the call connects.
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>              
+              <Button
+                onClick={closeEmergencyModal}
+                sx={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: '50%',
+                  bgcolor: '#ef4444',
+                  '&:hover': { bgcolor: '#dc2626' },
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <EndCallIcon sx={{ width: 30, height: 30 }} />
+              </Button>
+            </Box>
+        </Box>
+      </Modal>
     </Box>
   );
 };

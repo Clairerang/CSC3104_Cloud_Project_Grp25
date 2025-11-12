@@ -286,6 +286,9 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
                   <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
                     {contact.relationship}
                   </Typography>
+                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
+                    Last call: {contact.lastCall}
+                  </Typography>
                 </Box>
               </Button>
             ))}
