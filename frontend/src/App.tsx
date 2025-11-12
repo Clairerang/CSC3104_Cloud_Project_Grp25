@@ -6,6 +6,7 @@ import { AuthProvider } from './components/auth/AuthContext';
 
 // Unified Auth Components
 import Login from './components/auth/Login';
+import Signup from './components/auth/Signup';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Admin Portal Components
@@ -30,8 +31,9 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Login Route */}
+            {/* Auth Routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
 
             {/* Root redirect to login */}
             <Route path="/" element={<Navigate to="/login" replace />} />

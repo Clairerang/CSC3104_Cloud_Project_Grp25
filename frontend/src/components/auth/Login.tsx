@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -17,12 +17,24 @@ import { useAuth } from './AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Check for success message from signup
+    const state = location.state as { message?: string };
+    if (state?.message) {
+      setSuccess(state.message);
+      // Clear the message from location state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +97,12 @@ const Login: React.FC = () => {
             {error && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
+              </Alert>
+            )}
+
+            {success && (
+              <Alert severity="success" sx={{ mb: 3 }}>
+                {success}
               </Alert>
             )}
 
@@ -167,6 +185,22 @@ const Login: React.FC = () => {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </Button>
+
+              <Box sx={{ textAlign: 'center', mt: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Don't have an account?{' '}
+                  <Link
+                    to="/signup"
+                    style={{
+                      color: '#7c3aed',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Create Account
+                  </Link>
+                </Typography>
+              </Box>
             </form>
           </CardContent>
         </Card>

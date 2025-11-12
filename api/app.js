@@ -64,8 +64,14 @@ app.get('/about', (req, res) => {
 
 
 // auth
-app.post('/register', async (req, res) => {
+// Admin-only endpoint for creating users (including admins)
+app.post('/register', authenticateToken, async (req, res) => {
   try {
+    // Only admins can use this endpoint
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only administrators can create users. Please use the public signup for senior/family accounts.' });
+    }
+
     const { username, password, role, profile } = req.body;
     if (
       !username ||
@@ -81,9 +87,9 @@ app.post('/register', async (req, res) => {
       });
     }
 
-    const validRoles = ['senior', 'family'];
+    const validRoles = ['senior', 'family', 'admin'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: "Invalid role. Must be 'senior' or 'family'" });
+      return res.status(400).json({ error: "Invalid role. Must be 'senior', 'family', or 'admin'" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -178,6 +184,81 @@ app.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Signup endpoint (alias to register)
+app.post('/signup', async (req, res) => {
+  try {
+    const { username, email, password, role, profile } = req.body;
+    if (
+      !username ||
+      !password ||
+      !role ||
+      !profile?.name ||
+      profile?.age === undefined ||
+      !profile?.email ||
+      !profile?.contact
+    ) {
+      return res.status(400).json({
+        error: "All fields are required: username, password, role, name, age, email, contact"
+      });
+    }
+
+    // Public signup only allows senior and family roles
+    const validRoles = ['senior', 'family'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: "Invalid role. Public signup only allows 'senior' or 'family' accounts. Admin accounts must be created by administrators." });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(profile.email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [
+        { username },
+        { "profile.email": profile.email }
+      ]
+    });
+
+    if (existingUser) {
+      if (existingUser.username === username) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      if (existingUser.profile?.email === profile.email) {
+        return res.status(400).json({ error: "Email already exists" });
+      }
+    }
+
+    const userId = uuidv4();
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({
+      userId,
+      username,
+      passwordHash: hashedPassword,
+      role,
+      profile: {
+        name: profile?.name || "",
+        age: profile?.age || null,
+        email: profile.email,
+        contact: profile?.contact || ""
+      },
+    });
+
+    await newUser.save();
+
+    res.status(201).json({
+      success: true,
+      message: `User ${username} created successfully`,
+      userId
+    });
+
+  } catch (error) {
+    console.error("Error creating user:", error);
     res.status(500).json({ error: "Server error" });
   }
 });

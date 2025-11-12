@@ -1,16 +1,16 @@
 # Multi-stage build for optimized production image
 
 # Stage 1: Build the React application
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Install dependencies
-RUN npm ci --legacy-peer-deps
+RUN npm install --force
 
 # Copy source code
 COPY . .

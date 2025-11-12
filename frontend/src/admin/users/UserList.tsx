@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import { User } from '../../types/index';
+import CreateUserModal from './CreateUserModal';
 
 const UserList: React.FC = () => {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ const UserList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -176,6 +178,10 @@ const UserList: React.FC = () => {
     setPage(0);
   };
 
+  const handleUserCreated = () => {
+    fetchUsers(); // Refresh the user list
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -198,7 +204,7 @@ const UserList: React.FC = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => navigate('/users/new')}
+          onClick={() => setCreateModalOpen(true)}
         >
           Add User
         </Button>

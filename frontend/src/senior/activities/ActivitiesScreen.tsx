@@ -18,8 +18,7 @@ interface Invitation {
   id: string;
   from: string;
   title: string;
-  date: string;
-  time: string;
+  dateTime: string;
   message: string;
   status: 'pending' | 'accepted' | 'declined' ;
 }
@@ -64,8 +63,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
       id: "1",
       from: "Sarah",
       title: "Family Dinner",
-      date: "10/26/2025",
-      time: "18:00",
+      dateTime: "2025-10-26T18:00:00",
       message: "Hi Mom! Would love to have dinner together this Saturday. Miss you! ❤️",
       status: 'accepted',
     },
@@ -73,8 +71,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
       id: "2",
       from: "Michael",
       title: "Doctor Appointment",
-      date: "10/28/2025",
-      time: "10:00",
+      dateTime: "2025-10-28T10:00:00",
       message: "Scheduled your checkup with Dr. Lee. I will pick you up at 9:30 AM.",
       status: 'pending',
     },
@@ -180,13 +177,13 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: 16 }}>📅</Typography>
                           <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
-                            {invitation.date}
+                            {invitation.dateTime ? new Date(invitation.dateTime).toLocaleDateString() : 'N/A'}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: 16 }}>🕐</Typography>
                           <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
-                            {invitation.time}
+                            {invitation.dateTime ? new Date(invitation.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                           </Typography>
                         </Box>
                       </Box>

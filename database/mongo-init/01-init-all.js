@@ -13,6 +13,7 @@ var adminId = UUID().toString();
 var triviaGameId = UUID().toString();
 var memoryGameId = UUID().toString();
 var stretchGameId = UUID().toString();
+var towerGameId = UUID().toString();
 
 var triviaSessionId = UUID().toString();
 var memorySessionId = UUID().toString();
@@ -33,6 +34,9 @@ var memorySet1Id = UUID().toString();
 var memorySet2Id = UUID().toString();
 var memorySet3Id = UUID().toString();
 
+var invitation1Id = UUID().toString();
+var invitation2Id = UUID().toString();
+
 // Switch to / Create desired database
 db = db.getSiblingDB('senior_care');
 
@@ -45,14 +49,16 @@ db.createCollection('gamesessions');
 db.createCollection('exercises');
 db.createCollection('triviaquestions');
 db.createCollection('memorysets');
+db.createCollection('invitations');
 
 // Cloud Seed Data
 // ---- Users ----
+// All users have password: "password123"
 db.users.insertMany([
     {
         userId: seniorId1,
         username: "mary_smith",
-        passwordHash: "$2$10$marySeedPasswordHashExample1234567", 
+        passwordHash: "$2b$10$4rpqad3FJyRil4P8wVLwM.DmAmuzVO/IsqjiK.6N/9QpYx6Wka8zK",
         role: "senior",
         profile: {
             name: "Mary Smith",
@@ -66,7 +72,7 @@ db.users.insertMany([
     {
         userId: seniorId2,
         username: "joe_tan",
-        passwordHash: "$2$10$joeSeedPasswordHashExample1234567", 
+        passwordHash: "$2b$10$4rpqad3FJyRil4P8wVLwM.DmAmuzVO/IsqjiK.6N/9QpYx6Wka8zK",
         role: "senior",
         profile: {
             name: "Joe Tan",
@@ -80,7 +86,7 @@ db.users.insertMany([
     {
         userId: familyId1,
         username: "anna_smith",
-        passwordHash: "$2$10$annaSeedPasswordHashExample1234567", 
+        passwordHash: "$2b$10$4rpqad3FJyRil4P8wVLwM.DmAmuzVO/IsqjiK.6N/9QpYx6Wka8zK",
         role: "family",
         profile: {
             name: "Anna Smith",
@@ -94,7 +100,7 @@ db.users.insertMany([
     {
         userId: familyId2,
         username: "lucas_tan",
-        passwordHash: "$2$13$lucasSeedPasswordHashExample1234567", 
+        passwordHash: "$2b$10$4rpqad3FJyRil4P8wVLwM.DmAmuzVO/IsqjiK.6N/9QpYx6Wka8zK",
         role: "family",
         profile: {
             name: "Lucas Tan",
@@ -108,7 +114,7 @@ db.users.insertMany([
     {
         userId: adminId,
         username: "admin_main",
-        passwordHash: "$2$13$adminSeedPasswordHashExample1234567", 
+        passwordHash: "$2b$10$4rpqad3FJyRil4P8wVLwM.DmAmuzVO/IsqjiK.6N/9QpYx6Wka8zK",
         role: "admin",
         profile: {
             name: "System Admin",
@@ -216,6 +222,17 @@ db.games.insertMany([
         description: "Gently stretching exercise to start the day.",
         points: 5,
         difficulty: "easy",
+        isActive: true,
+        createdAt: new Date("2025-11-01T14:30:00.000Z"),
+        updatedAt: new Date("2025-11-01T14:30:00.000Z")
+    },
+    {
+        gameId: towerGameId,
+        name: "Stack Tower",
+        type: "tower",
+        description: "Stack blocks perfectly to build a tall tower!",
+        points: 20,
+        difficulty: "medium",
         isActive: true,
         createdAt: new Date("2025-11-01T14:30:00.000Z"),
         updatedAt: new Date("2025-11-01T14:30:00.000Z")
@@ -408,6 +425,30 @@ db.memorysets.insertMany([
     theme: 'nature',
     difficulty: 'medium',
     isActive: true,
+    createdAt: now
+  }
+]);
+
+// Invitations
+db.invitations.insertMany([
+  {
+    invitationId: invitation1Id,
+    seniorId: seniorId1,
+    familyId: familyId1,
+    title: "Family Dinner",
+    description: "Hi Mom! Would love to have dinner together this Saturday. Miss you! ❤️",
+    dateTime: new Date("2025-11-15T18:00:00.000Z"),
+    status: "pending",
+    createdAt: now
+  },
+  {
+    invitationId: invitation2Id,
+    seniorId: seniorId1,
+    familyId: familyId1,
+    title: "Doctor Appointment",
+    description: "Scheduled your checkup with Dr. Lee. I will pick you up at 9:30 AM.",
+    dateTime: new Date("2025-11-16T10:00:00.000Z"),
+    status: "pending",
     createdAt: now
   }
 ]);

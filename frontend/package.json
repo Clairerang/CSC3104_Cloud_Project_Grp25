@@ -48,5 +48,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "resolutions": {
+    "ajv": "8.17.1",
+    "ajv-keywords": "5.1.0"
   }
 }
