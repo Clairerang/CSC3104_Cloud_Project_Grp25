@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { Box, Button, Card, Typography, Stack, CircularProgress, Alert } from "@mui/material";
+import React, { useState, useEffect, useRef } from "react";
+import { Box, Button, Card, Typography, Stack, CircularProgress, Alert, IconButton } from "@mui/material";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import CoffeeIcon from "@mui/icons-material/Coffee";
 import NightlightIcon from "@mui/icons-material/Nightlight";
 import MicIcon from "@mui/icons-material/Mic";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import type { Mood, CheckIn, DailyProgress } from "../../types";
+import VoiceConfirmModal from "./VoiceConfirmModal";
 
 interface Props {
   onCheckIn: (mood: Mood) => void;
@@ -21,6 +22,13 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Voice states
+  const [recognizing, setRecognizing] = useState(false);
+  const [transcript, setTranscript] = useState<string>("");
+  const [detectedMood, setDetectedMood] = useState<Mood | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   // Fetch check-in status from backend
   useEffect(() => {
@@ -50,17 +58,19 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
       const data = await response.json();
 
       if (data.success) {
-        // Convert backend engagements to CheckIn format
-        const checkIns: CheckIn[] = data.engagements.map((eng: any) => ({
-          id: eng._id,
-          timestamp: eng.lastActiveAt,
-          mood: eng.mood as Mood,
-          session: eng.session as "morning" | "afternoon" | "evening",
-        }));
+        const order = ['morning','afternoon','evening'];
+        const checkIns: CheckIn[] = data.engagements
+          .map((eng: any) => ({
+            id: eng._id,
+            timestamp: eng.lastActiveAt,
+            mood: eng.mood as Mood,
+            session: eng.session as "morning" | "afternoon" | "evening",
+          }))
+          .sort((a, b) => order.indexOf(a.session) - order.indexOf(b.session));
 
         setDailyProgress({
           date: new Date().toDateString(),
-          checkIns: checkIns,
+          checkIns,
           totalCheckIns: checkIns.length,
         });
         setError(null);
@@ -117,9 +127,122 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
     (checkIn: CheckIn) => checkIn.session === currentSession
   );
 
-  // Handle check-in
-  const handleCheckIn = async () => {
-    if (!selectedMood) return;
+  // Voice recognition helper
+  const getSpeechRecognition = () => {
+    const win = window as any;
+    return win.webkitSpeechRecognition || win.SpeechRecognition || null;
+  };
+
+  const parseMoodFromText = (text: string): Mood | null => {
+    if (!text) return null;
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes("great")) {
+      return "great";
+    }
+    if (lowerText.includes("okay")) {
+      return "okay";
+    }
+    if (lowerText.includes("not well")) {
+      return "not-well";
+    }
+    
+    return null;
+  };
+
+  const startRecognition = () => {
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) {
+      setError("Speech recognition not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    setTranscript("");
+    setDetectedMood(null);
+
+    try {
+      const recognition = new SpeechRecognition();
+      // attach a helper field on the instance to keep the latest transcript accessible across handlers
+      recognition.latestTranscript = "";
+      recognitionRef.current = recognition;
+      
+      recognition.lang = "en-US";
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setRecognizing(true);
+        setError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = "";
+        let finalTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+
+        const currentTranscript = (finalTranscript || interimTranscript).trim();
+        // store latest transcript on the recognition instance to avoid stale state in onend
+        if (recognitionRef.current) recognitionRef.current.latestTranscript = currentTranscript;
+        setTranscript(currentTranscript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event);
+        setError("Voice recognition error. Please try again.");
+        setRecognizing(false);
+      };
+
+      recognition.onend = () => {
+        setRecognizing(false);
+        const finalText = (recognitionRef.current?.latestTranscript || "").trim();
+        setTranscript(finalText);
+        const mood = parseMoodFromText(finalText);
+        setDetectedMood(mood);
+        setModalOpen(true);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error("Failed to start recognition:", err);
+      setError("Could not start voice recording");
+      setRecognizing(false);
+    }
+  };
+
+  const stopRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.warn("Error stopping recognition:", err);
+        setRecognizing(false);
+        const latest = recognitionRef.current?.latestTranscript || transcript;
+        const mood = parseMoodFromText(latest);
+        setDetectedMood(mood);
+        setTranscript(latest);
+        setModalOpen(true);
+      }
+    } else {
+      const mood = parseMoodFromText(transcript);
+      setDetectedMood(mood);
+      setModalOpen(true);
+    }
+  };
+
+  // submit check in
+  const submitCheckIn = async (mood: Mood) => {
+    if (!mood) {
+      setError("Could not detect mood. Please record again or select manually.");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -136,7 +259,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          mood: selectedMood,
+          mood,
           session: currentSession,
         }),
       });
@@ -152,7 +275,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
       // Refresh check-in status from backend
       await fetchCheckInStatus();
 
-      onCheckIn(selectedMood);
+      onCheckIn(mood);
       setSelectedMood(null);
       setError(null);
     } catch (err: any) {
@@ -160,6 +283,56 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
       setError(err.message || 'Failed to check in');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // existing handleCheckIn now delegates to submitCheckIn
+  const handleCheckIn = async () => {
+    if (!selectedMood) return;
+    await submitCheckIn(selectedMood);
+  };
+
+  // Handlers for modal actions
+  const handleModalRecordAgain = () => {
+    setModalOpen(false);
+    setTranscript("");
+    setDetectedMood(null);
+    // Optionally restart recognition immediately
+    // setTimeout(() => startRecognition(), 100);
+  };
+
+  const handleModalConfirm = async () => {
+    setModalOpen(false);
+    if (detectedMood) {
+      // local update so UI reflects checked-in immediately
+      setSelectedMood(detectedMood);
+
+      const newCheckIn: CheckIn = {
+        id: 'local-' + Math.random().toString(36).slice(2),
+        timestamp: new Date().toISOString(),
+        mood: detectedMood,
+        session: currentSession,
+      };
+
+      setDailyProgress(prev => {
+        const already = prev.checkIns.some(c => c.session === currentSession);
+        if (already) return prev;
+        const updated = [...prev.checkIns, newCheckIn];
+        return {
+          ...prev,
+          checkIns: updated,
+          totalCheckIns: updated.length,
+        };
+      });
+
+      onCheckIn(detectedMood);
+
+      // attempt to persist in background; submitCheckIn will detect already present and avoid duplicate
+      submitCheckIn(detectedMood).catch(() => {
+        // error handled inside submitCheckIn; keep optimistic state
+      });
+    } else {
+      setError("Could not detect mood. Please try again or select manually.");
     }
   };
 
@@ -217,21 +390,48 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
                 return (
                   <Box key={session} sx={{ textAlign: 'center', flex: 1 }}>
-                    <Box sx={{
-                      width: 60,
-                      height: 60,
-                      bgcolor: completed ? '#f0fdf4' : '#f3f4f6',
-                      border: completed ? '3px solid #16a34a' : '2px solid #d1d5db',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 28,
-                      mx: 'auto',
-                      mb: 2
-                    }}>
-                      {emoji}
-                    </Box>
+                    {/*
+                      Use the actual mood to choose colors when a session is completed.
+                      great -> green, okay -> amber, not-well -> red. Fallback to neutral.
+                    */}
+                    {(() => {
+                      const mood = checkIn?.mood;
+                      const isCompleted = !!checkIn;
+                      const bgColor = mood === 'great'
+                        ? '#f0fdf4'     // light green
+                        : mood === 'okay'
+                        ? '#fffbeb'     // light amber
+                        : mood === 'not-well'
+                        ? '#fff1f2'     // light red
+                        : (isCompleted ? '#f3f4f6' : '#f3f4f6');
+                      const borderColor = mood === 'great'
+                        ? '#16a34a'
+                        : mood === 'okay'
+                        ? '#eab308'
+                        : mood === 'not-well'
+                        ? '#ef4444'
+                        : '#d1d5db';
+                      const borderWidth = isCompleted ? 3 : 2;
+
+                      return (
+                        <Box sx={{
+                          width: 60,
+                          height: 60,
+                          bgcolor: bgColor,
+                          border: `${borderWidth}px solid ${borderColor}`,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 28,
+                          mx: 'auto',
+                          mb: 2
+                        }}>
+                          {emoji}
+                        </Box>
+                      );
+                    })()}
+                    
                     <Typography sx={{
                       fontSize: 16,
                       fontWeight: 600,
@@ -272,6 +472,15 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
   // Show check-in form if user hasn't checked in for this session
   return (
     <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
+      <VoiceConfirmModal
+        open={modalOpen}
+        mood={detectedMood}
+        transcript={transcript}
+        onClose={() => setModalOpen(false)}
+        onRecordAgain={handleModalRecordAgain}
+        onConfirm={handleModalConfirm}
+      />
+
       <Box sx={{ p: 6 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -301,20 +510,72 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
           <Typography align="center" sx={{ color: '#6b7280', mb: 6, fontSize: 20 }}>
             Press and hold the microphone and tell me how you're doing
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <Button
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+            {recognizing && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: '-32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    bgcolor: '#ff4d4f',
+                    borderRadius: '50%',
+                    boxShadow: '0 0 8px rgba(255, 77, 79, 0.6)',
+                    animation: 'pulse 1s infinite',
+                  }}
+                />
+                <Typography sx={{ color: '#ef4444', fontSize: 14 }}>
+                  Listening...
+                </Typography>
+              </Box>
+            )}
+
+            <IconButton
+              onMouseDown={startRecognition}
+              onMouseUp={stopRecognition}
+              onMouseLeave={() => {
+                if (recognizing) stopRecognition();
+              }}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                startRecognition();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                stopRecognition();
+              }}
               sx={{
                 width: 96,
                 height: 96,
                 borderRadius: '50%',
-                bgcolor: '#3b82f6',
-                '&:hover': { bgcolor: '#2563eb' },
+                bgcolor: recognizing ? '#ef4444' : '#3b82f6',
+                '&:hover': {
+                  bgcolor: recognizing ? '#dc2626' : '#2563eb',
+                },
                 transition: 'background-color 0.2s',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              <MicIcon sx={{ width: 40, height: 40, color: 'white' }} />
-            </Button>
+              <MicIcon sx={{ width: 40, height: 40 }} />
+            </IconButton>
           </Box>
+
+          {transcript && (
+            <Typography align="center" sx={{ color: '#6b7280', mt: 4, fontSize: 16 }}>
+              Detected: "{transcript}"
+            </Typography>
+          )}
         </Card>
 
         <Typography align="center" sx={{ color: '#6b7280', mb: 4, fontSize: 20 }}>

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
-import { Box, Typography, Card, Stack, Button } from "@mui/material";
+import React, { useState, useRef } from "react";
+import { Box, Typography, Card, Stack, Button, IconButton } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import PhoneIcon from "@mui/icons-material/Phone";
 import StarIcon from "@mui/icons-material/Star";
+import DialingPlaceholderModal from "./DialingPlaceholderModal";
 import type { Contact } from "../../types";
 import ContactDetailModal from "./ContactDetailModal";
 import CreateNewContactModal from "./CreateNewContactModal";
@@ -21,6 +22,67 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
 
+  // Voice recognition for quick call
+  const recognitionRef = useRef<any>(null);
+  const [recording, setRecording] = useState(false);
+  const [recognizedText, setRecognizedText] = useState('');
+
+  // dialing placeholder modal state (used for voice/video calls)
+  const [dialingOpen, setDialingOpen] = useState(false);
+  const [dialingContact, setDialingContact] = useState<Contact | null>(null);
+  const [dialingType, setDialingType] = useState<'voice' | 'video'>('voice');
+
+  const createRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+    const rec = new SpeechRecognition();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (ev: any) => {
+      const text = ev.results[0][0].transcript.toLowerCase();
+      setRecognizedText(text);
+      // very simple parsing: "call [name]" or "video call [name]"
+      if (text.includes('call')) {
+        const isVideo = text.includes('video');
+        const words = text.split(/\s+/);
+        // naive name extraction: take last 2 words after 'call' / 'video call'
+        const callIndex = words.lastIndexOf('call');
+        const nameParts = words.slice(callIndex + 1);
+        const nameQuery = nameParts.join(' ').trim();
+        const found = contacts.find(c => c.name.toLowerCase().includes(nameQuery) || c.name.toLowerCase().startsWith(nameQuery));
+        if (found) {
+          setDialingContact(found);
+          setDialingType(isVideo ? 'video' : 'voice');
+          setDialingOpen(true);
+        } else {
+          // fallback: if no name found but single contact, call first
+          if (contacts.length === 1) {
+            setDialingContact(contacts[0]);
+            setDialingType(isVideo ? 'video' : 'voice');
+            setDialingOpen(true);
+          }
+        }
+      }
+    };
+    rec.onerror = () => setRecording(false);
+    rec.onend = () => setRecording(false);
+    return rec;
+  };
+
+  const startRecognition = () => {
+    if (recording) return;
+    const rec = createRecognition();
+    if (!rec) return;
+    recognitionRef.current = rec;
+    try { rec.start(); setRecording(true); setRecognizedText(''); } catch { setRecording(false); }
+  };
+  const stopRecognition = () => {
+    const rec = recognitionRef.current;
+    if (rec) { try { rec.stop(); } catch {} recognitionRef.current = null; }
+    setRecording(false);
+  };
+
   const handleContactClick = (contact: Contact) => {
     setSelectedContact(contact);
     setModalOpen(true);
@@ -33,15 +95,15 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
   };
 
   const handleVoiceCall = (contact: Contact) => {
-    console.log("Voice calling:", contact.name);
-    setModalOpen(false);
-    // Add your voice call logic here
+    setDialingContact(contact);
+    setDialingType('voice');
+    setDialingOpen(true);
   };
 
   const handleVideoCall = (contact: Contact) => {
-    console.log("Video calling:", contact.name);
-    setModalOpen(false);
-    // Add your video call logic here
+    setDialingContact(contact);
+    setDialingType('video');
+    setDialingOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -75,6 +137,11 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
     setSelectedContact(null);
   };
 
+  const closeDialing = () => {
+    setDialingOpen(false);
+    setDialingContact(null);
+  };
+
   return (
     <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
       <Box sx={{ p: 6 }}>
@@ -96,10 +163,6 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
           </Typography>
         </Box>
 
-        {/* <Typography sx={{ color: '#6b7280', mb: 3, fontSize: 20 }}>
-          Tap anyone to connect
-        </Typography> */}
-
         {/* Voice Search Card */}
         <Card sx={{
           background: 'linear-gradient(135deg, #dbeafe 0%, #fce7f3 100%)',
@@ -107,23 +170,70 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
           p: 6,
           mb: 6,
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 2 }}>
-            <Typography sx={{ fontSize: 24 }}>🔍</Typography>
-            <Typography sx={{ color: '#6b7280', fontSize: 20 }}>Say a name to call</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              <Typography sx={{ fontSize: 24 }}>🔍</Typography>
+              <Typography sx={{ color: '#6b7280', fontSize: 20 }}>Press and hold the microphone and say a name to call</Typography>
+            </Box>
+            
+            {recording && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    mt: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      bgcolor: '#ff4d4f',
+                      borderRadius: '50%',
+                      boxShadow: '0 0 8px rgba(255, 77, 79, 0.6)',
+                      animation: 'pulse 1s infinite',
+                    }}
+                  />
+                  <Typography sx={{ color: '#ef4444', fontSize: 14 }}>
+                    Listening...
+                  </Typography>
+                </Box>
+              )}
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', position: 'relative', width: '100%' }}>              
+
+              {/* Centered mic button */}
+              <IconButton
+                onMouseDown={startRecognition}
+                onTouchStart={(e) => { e.preventDefault(); startRecognition(); }}
+                onMouseUp={stopRecognition}
+                onMouseLeave={() => { if (recording) stopRecognition(); }}
+                onTouchEnd={(e) => { e.preventDefault(); stopRecognition(); }}
+                sx={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: '50%',
+                  bgcolor: recording ? '#ef4444' : '#3b82f6',
+                  '&:hover': { bgcolor: recording ? '#dc2626' : '#2563eb' },
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <MicIcon sx={{ width: 30, height: 30 }} />
+              </IconButton>
+            </Box>
+
+            {/* Detected text below the button*/}
+            {recognizedText && (
+              <Typography align="center" sx={{ color: '#6b7280', mt: 4, fontSize: 16 }}>
+                Detected: "{recognizedText}"
+              </Typography>
+            )}
           </Box>
-          <Button sx={{
-            ml: 'auto',
-            width: 56,
-            height: 56,
-            bgcolor: '#3b82f6',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            '&:hover': { bgcolor: '#2563eb' },
-          }}>
-            <MicIcon sx={{ width: 24, height: 24, color: 'white' }} />
-          </Button>
         </Card>
 
         {/* Favorites Section */}
@@ -175,6 +285,9 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
                   </Typography>
                   <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
                     {contact.relationship}
+                  </Typography>
+                  <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
+                    Last call: {contact.lastCall}
                   </Typography>
                 </Box>
               </Button>
@@ -264,28 +377,17 @@ const CircleScreen: React.FC<Props> = ({ contacts, onAddContact, onEditContact, 
                 </Button>
               </Card>
             ))}
+
           </Stack>
         </Box>
 
-        {/* Emergency Button */}
-        {/* <Button sx={{
-          width: '100%',
-          mt: 6,
-          bgcolor: '#dc2626',
-          color: 'white',
-          p: 5,
-          borderRadius: 4,
-          fontSize: 20,
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 3,
-          '&:hover': { bgcolor: '#b91c1c' },
-        }}>
-          <PhoneIcon sx={{ width: 24, height: 24 }} />
-          Emergency: 911
-        </Button> */}
+        <DialingPlaceholderModal
+          open={dialingOpen}
+          onClose={closeDialing}
+          contact={dialingContact}
+          type={dialingType}
+        />
+        
       </Box>
 
       {/* Contact Detail Modal */}

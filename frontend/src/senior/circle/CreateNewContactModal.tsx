@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import type { Contact } from "../../types";
+import { relative } from "path";
 
 interface Props {
   open: boolean;
@@ -31,6 +32,7 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
 
   const [errors, setErrors] = useState({
     name: "",
+    relationship: "",
     phoneNumber: "",
   });
 
@@ -51,11 +53,16 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
   const validateForm = () => {
     const newErrors = {
       name: "",
+      relationship: "",
       phoneNumber: "",
     };
 
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
+    }
+
+    if (!formData.relationship.trim()) {
+      newErrors.relationship = "Relationship is required";
     }
 
     if (!formData.phoneNumber.trim()) {
@@ -99,6 +106,7 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
     });
     setErrors({
       name: "",
+      relationship: "",
       phoneNumber: "",
     });
     onClose();
@@ -151,8 +159,11 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
           <TextField
             label="Relationship"
             fullWidth
+            required
             value={formData.relationship}
             onChange={(e) => handleChange("relationship", e.target.value)}
+            error={!!errors.relationship}
+            helperText={errors.relationship}
             placeholder="e.g., Son, Daughter, Friend"
             sx={{
               "& .MuiOutlinedInput-root": {
@@ -170,7 +181,7 @@ const CreateNewContactModal: React.FC<Props> = ({ open, onClose, onSave }) => {
             onChange={(e) => handleChange("phoneNumber", e.target.value)}
             error={!!errors.phoneNumber}
             helperText={errors.phoneNumber}
-            placeholder="e.g., +1 234 567 8900"
+            placeholder="e.g., +65 81234567"
             sx={{
               "& .MuiOutlinedInput-root": {
                 fontSize: 18,

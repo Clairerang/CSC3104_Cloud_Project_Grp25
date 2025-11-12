@@ -21,7 +21,7 @@ interface Invitation {
   date: string;
   time: string;
   message: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' ;
 }
 
 // compute the starting points required for a given level (level start)
@@ -64,17 +64,17 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
       id: "1",
       from: "Sarah",
       title: "Family Dinner",
-      date: "Saturday, Oct 26",
-      time: "6:00 PM",
+      date: "10/26/2025",
+      time: "18:00",
       message: "Hi Mom! Would love to have dinner together this Saturday. Miss you! ❤️",
-      status: 'pending',
+      status: 'accepted',
     },
     {
       id: "2",
       from: "Michael",
       title: "Doctor Appointment",
-      date: "Monday, Oct 28",
-      time: "10:00 AM",
+      date: "10/28/2025",
+      time: "10:00",
       message: "Scheduled your checkup with Dr. Lee. I will pick you up at 9:30 AM.",
       status: 'pending',
     },
