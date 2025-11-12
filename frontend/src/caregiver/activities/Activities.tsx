@@ -15,7 +15,6 @@ import ActivityListSection from './ActivityListSection';
 const Activities: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
   const seniors = getSeniorsList();
 
@@ -43,7 +42,7 @@ const Activities: React.FC = () => {
       ...activityData,
       type: 'visit' as Activity['type'], // Default type for API compatibility
       seniorInitials: seniorData.initials,
-      status: 'upcoming' as const,
+      status: 'pending' as const,
     };
     
     const newActivityItem = await mockApi.addActivity(newActivity);
@@ -57,34 +56,8 @@ const Activities: React.FC = () => {
     });
   };
 
-  const handleUpdateActivity = async (activityData: Omit<Activity, 'id' | 'seniorInitials' | 'status' | 'type'>) => {
-    if (!editingActivity) {
-      throw new Error('No activity being edited');
-    }
-
-    const seniorData = seniors.find(s => s.name === activityData.senior);
-    if (!seniorData) {
-      throw new Error('Selected senior not found');
-    }
-
-    const updates = {
-      ...activityData,
-      type: editingActivity.type, // Preserve existing type for API compatibility
-      seniorInitials: seniorData.initials,
-    };
-
-    const updatedActivity = await mockApi.updateActivity(editingActivity.id, updates);
-    setActivities(prev => prev.map(activity => 
-      activity.id === editingActivity.id ? updatedActivity : activity
-    ));
-  };
-
   const handleSubmit = async (activityData: Omit<Activity, 'id' | 'seniorInitials' | 'status' | 'type'>) => {
-    if (editingActivity) {
-      await handleUpdateActivity(activityData);
-    } else {
-      await handleAddActivity(activityData);
-    }
+    await handleAddActivity(activityData);
   };
 
   const deleteActivity = async (id: number) => {
@@ -97,17 +70,14 @@ const Activities: React.FC = () => {
   };
 
   const startEditActivity = (activity: Activity) => {
-    setEditingActivity(activity);
     setIsDialogOpen(true);
   };
 
   const handleOpenDialog = () => {
-    setEditingActivity(null);
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
-    setEditingActivity(null);
     setIsDialogOpen(false);
   };
 
@@ -130,8 +100,10 @@ const Activities: React.FC = () => {
     }
   };
 
-  const upcomingActivities = activities.filter(a => a.status === 'upcoming');
+  const upcomingActivities = activities.filter(a => ['pending', 'accepted'].includes(a.status));
+  const rejectedActivities = activities.filter(a => a.status === 'rejected');
   const completedActivities = activities.filter(a => a.status === 'completed');
+  const cancelledActivities = activities.filter(a => a.status === 'cancelled');
 
   return (
     <Box sx={{ height: '100%', overflowY: 'auto', bgcolor: '#f9fafb' }}>
@@ -162,7 +134,6 @@ const Activities: React.FC = () => {
           onClose={handleCloseDialog}
           onSubmit={handleSubmit}
           seniors={seniors}
-          editingActivity={editingActivity}
         />
 
         {/* Upcoming Activities */}
@@ -170,19 +141,37 @@ const Activities: React.FC = () => {
           title="Upcoming Activities"
           activities={upcomingActivities}
           isCompleted={false}
-          onEdit={startEditActivity}
           onDelete={deleteActivity}
           onMarkCompleted={markAsCompleted}
         />
+
+        {/* Rejected Activities */}
+        {rejectedActivities.length > 0 && (
+          <ActivityListSection
+            title="Rejected Activities"
+            activities={rejectedActivities}
+            isCompleted={false}
+            onDelete={deleteActivity}
+          />
+        )}
 
         {/* Completed Activities */}
         <ActivityListSection
           title="Recently Completed"
           activities={completedActivities}
           isCompleted={true}
-          onEdit={startEditActivity}
           onDelete={deleteActivity}
         />
+
+        {/* Cancelled Activities */}
+        {cancelledActivities.length > 0 && (
+          <ActivityListSection
+            title="Cancelled Activities"
+            activities={cancelledActivities}
+            isCompleted={true}
+            onDelete={deleteActivity}
+          />
+        )}
       </Box>
     </Box>
   );

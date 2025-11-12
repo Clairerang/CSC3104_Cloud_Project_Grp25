@@ -21,7 +21,6 @@ interface ActivityFormDialogProps {
   onClose: () => void;
   onSubmit: (activity: Omit<Activity, 'id' | 'seniorInitials' | 'status' | 'type'>) => Promise<void>;
   seniors: Array<{ name: string; initials: string }>;
-  editingActivity?: Activity | null;
 }
 
 const ActivityFormDialog: React.FC<ActivityFormDialogProps> = ({
@@ -29,7 +28,6 @@ const ActivityFormDialog: React.FC<ActivityFormDialogProps> = ({
   onClose,
   onSubmit,
   seniors,
-  editingActivity,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -42,17 +40,9 @@ const ActivityFormDialog: React.FC<ActivityFormDialogProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Populate form when editing
+  // Populate form when opening
   useEffect(() => {
-    if (editingActivity) {
-      setFormData({
-        title: editingActivity.title,
-        senior: editingActivity.senior,
-        date: editingActivity.date,
-        time: editingActivity.time,
-        description: editingActivity.description,
-      });
-    } else {
+    if (open) {
       setFormData({
         title: '',
         senior: '',
@@ -63,7 +53,7 @@ const ActivityFormDialog: React.FC<ActivityFormDialogProps> = ({
     }
     setErrors({});
     setSubmitError(null);
-  }, [editingActivity, open]);
+  }, [open]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -145,7 +135,7 @@ const ActivityFormDialog: React.FC<ActivityFormDialogProps> = ({
       fullWidth
     >
       <DialogTitle sx={{ fontWeight: 600, fontSize: 20 }}>
-        {editingActivity ? 'Edit Activity' : 'Schedule New Activity'}
+        Schedule New Activity
       </DialogTitle>
       <DialogContent>
         {submitError && (
@@ -251,8 +241,8 @@ const ActivityFormDialog: React.FC<ActivityFormDialogProps> = ({
           startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
         >
           {isSubmitting 
-            ? (editingActivity ? 'Updating...' : 'Adding...') 
-            : (editingActivity ? 'Update Activity' : 'Schedule Activity')
+            ? 'Adding...' 
+            : 'Schedule Activity'
           }
         </Button>
       </DialogActions>

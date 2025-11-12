@@ -70,7 +70,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
             >
               {reminder.senior}
             </Typography>
-            <Chip
+            {/* <Chip
               label="Elderly"
               size="small"
               sx={{
@@ -80,7 +80,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                 fontSize: 10,
                 height: isActive ? 20 : 18,
               }}
-            />
+            /> */}
           </Box>
 
           <Typography

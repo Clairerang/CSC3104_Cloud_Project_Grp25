@@ -30,7 +30,7 @@ export interface Activity {
   time: string;
   type: 'video-call' | 'phone-call' | 'visit' | 'exercise' | 'hobby' | 'social';
   description: string;
-  status: 'upcoming' | 'completed' | 'missed';
+  status: 'pending' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
 }
 
 export interface ReminderItem {
@@ -222,7 +222,7 @@ export const mockActivities: Activity[] = [
     time: '14:00',
     type: 'video-call',
     description: 'Regular catch-up video call to discuss the week',
-    status: 'upcoming',
+    status: 'pending',
   },
   {
     id: 2,
@@ -233,7 +233,7 @@ export const mockActivities: Activity[] = [
     time: '08:00',
     type: 'exercise',
     description: 'Daily morning walk in the park',
-    status: 'upcoming',
+    status: 'accepted',
   },
   {
     id: 3,
@@ -244,7 +244,7 @@ export const mockActivities: Activity[] = [
     time: '10:00',
     type: 'hobby',
     description: 'Help with garden maintenance',
-    status: 'upcoming',
+    status: 'rejected',
   },
   {
     id: 4,

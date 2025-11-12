@@ -12,7 +12,6 @@ interface ActivityListSectionProps {
   title: string;
   activities: Activity[];
   isCompleted?: boolean;
-  onEdit: (activity: Activity) => void;
   onDelete: (id: number) => void;
   onMarkCompleted?: (id: number) => void;
 }
@@ -21,7 +20,6 @@ const ActivityListSection: React.FC<ActivityListSectionProps> = ({
   title,
   activities,
   isCompleted = false,
-  onEdit,
   onDelete,
   onMarkCompleted,
 }) => {
@@ -53,7 +51,6 @@ const ActivityListSection: React.FC<ActivityListSectionProps> = ({
               key={activity.id}
               activity={activity}
               isCompleted={isCompleted}
-              onEdit={onEdit}
               onDelete={onDelete}
               onMarkCompleted={onMarkCompleted}
             />
