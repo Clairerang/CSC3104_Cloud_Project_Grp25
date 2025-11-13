@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001',
+  baseURL: process.env.REACT_APP_API_URL || '',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -12,7 +12,9 @@ const apiClient = axios.create({
 // Request interceptor for adding auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+    console.log('API Interceptor: Request to', config.url);
+    console.log('API Interceptor: Token found:', token ? token.substring(0, 20) + '...' : 'NONE');
     if (token) {
       // assign Authorization header without changing the headers type
       (config.headers as any).Authorization = `Bearer ${token}`;
@@ -28,83 +30,92 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      localStorage.removeItem('authToken');
-      window.location.href = '/admin/login';
+  localStorage.removeItem('token');
+  localStorage.removeItem('adminToken');
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('user');
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
-// High-level API object used across the admin UI
+// API object used across the admin UI
 export const api = {
   auth: {
     login: (credentials: { email: string; password: string }) =>
-      apiClient.post('/api/v1/auth/login', credentials),
-    logout: () => apiClient.post('/api/v1/auth/logout'),
-    verifyToken: () => apiClient.get('/api/v1/auth/verify'),
+      apiClient.post('/api/login', credentials),
+    logout: () => apiClient.post('/api/logout'),
+    verifyToken: () => apiClient.get('/api/verify'),
   },
 
   users: {
-    getAll: (params?: any) => apiClient.get('/api/v1/users', { params }),
-    getById: (id: string) => apiClient.get(`/api/v1/users/${id}`),
-    create: (data: any) => apiClient.post('/api/v1/users', data),
-    update: (id: string, data: any) => apiClient.put(`/api/v1/users/${id}`, data),
-    delete: (id: string) => apiClient.delete(`/api/v1/users/${id}`),
+    getAll: (params?: any) => apiClient.get('/api/admin/users', { params }),
+    getById: (id: string) => apiClient.get(`/api/users/${id}`),
+    create: (data: any) => apiClient.post('/api/register', data),
+    update: (id: string, data: any) => apiClient.put(`/api/admin/update-user/${id}`, data),
+    delete: (id: string) => apiClient.delete(`/api/admin/users/${id}`),
     updateStatus: (id: string, status: 'active' | 'inactive') =>
-      apiClient.patch(`/api/v1/users/${id}/status`, { status }),
-    resetPassword: (id: string) => apiClient.post(`/api/v1/users/${id}/reset-password`),
-    getStats: () => apiClient.get('/api/v1/users/stats'),
+      apiClient.patch(`/api/admin/users/${id}/status`, { status }),
+    resetPassword: (id: string) => apiClient.post(`/api/admin/users/${id}/reset-password`),
+    getStats: () => apiClient.get('/api/admin/stats/usercount'),
   },
 
   engagement: {
-    getStats: () => apiClient.get('/api/v1/engagement/stats'),
+    getStats: () => apiClient.get('/api/admin/stats/today'),
     getByUser: (userId: string, params?: any) =>
-      apiClient.get(`/api/v1/engagement/user/${userId}`, { params }),
-    getCheckIns: (params?: any) => apiClient.get('/api/v1/engagement/checkins', { params }),
+      apiClient.get(`/api/engagements/user/${userId}`, { params }),
+    getCheckIns: (params?: any) => apiClient.get('/api/engagements/today', { params }),
     getRecentActivity: (limit: number = 10) =>
-      apiClient.get('/api/v1/engagement/recent', { params: { limit } }),
+      apiClient.get('/api/engagements/recent', { params: { limit } }),
     getTrends: (period: 'day' | 'week' | 'month') =>
-      apiClient.get('/api/v1/engagement/trends', { params: { period } }),
+      apiClient.get('/api/admin/stats/weekly-engagement', { params: { period } }),
   },
 
   gamification: {
     getLeaderboard: (limit: number = 10) =>
-      apiClient.get('/api/v1/gamification/leaderboard', { params: { limit } }),
-    getUserBadges: (userId: string) => apiClient.get(`/api/v1/gamification/users/${userId}/badges`),
-    getStats: () => apiClient.get('/api/v1/gamification/stats'),
-    createChallenge: (data: any) => apiClient.post('/api/v1/gamification/challenges', data),
-    getChallenges: () => apiClient.get('/api/v1/gamification/challenges'),
+      apiClient.get('/api/leaderboard', { params: { limit } }),
+    getUserBadges: (userId: string) => apiClient.get(`/api/users/${userId}/badges`),
+    getStats: () => apiClient.get('/api/gamification/stats'),
+    createChallenge: (data: any) => apiClient.post('/api/challenges', data),
+    getChallenges: () => apiClient.get('/api/challenges'),
   },
 
   notifications: {
-    getAll: (params?: any) => apiClient.get('/api/v1/notifications', { params }),
-    getById: (id: string) => apiClient.get(`/api/v1/notifications/${id}`),
-    markAsRead: (id: string) => apiClient.patch(`/api/v1/notifications/${id}/read`),
-    getAlerts: () => apiClient.get('/api/v1/notifications/alerts'),
-    sendBulk: (data: any) => apiClient.post('/api/v1/notifications/bulk', data),
+    getAll: (params?: any) => apiClient.get('/api/notifications', { params }),
+    getById: (id: string) => apiClient.get(`/api/notifications/${id}`),
+    markAsRead: (id: string) => apiClient.patch(`/api/notifications/${id}/read`),
+    getAlerts: () => apiClient.get('/api/notifications/alerts'),
+    sendBulk: (data: any) => apiClient.post('/api/notifications/bulk', data),
+  },
+
+  health: {
+    getOverall: () => apiClient.get('/api/health'),
+    getService: (service: string) => apiClient.get(`/api/health/${service}`),
+    getAllServices: () => apiClient.get('/api/health/services'),
   },
 
   system: {
-    getHealth: () => apiClient.get('/health'),
-    getServiceHealth: (service: string) => apiClient.get(`/health/${service}`),
-    getAllServices: () => apiClient.get('/health/services'),
-    getLogs: (params?: any) => apiClient.get('/api/v1/system/logs', { params }),
-    getMetrics: () => apiClient.get('/api/v1/system/metrics'),
+    getHealth: () => apiClient.get('/api/health'),
+    getServiceHealth: (service: string) => apiClient.get(`/api/health/${service}`),
+    getAllServices: () => apiClient.get('/api/health/services'),
+    getLogs: (params?: any) => apiClient.get('/api/system/logs', { params }),
+    getMetrics: () => apiClient.get('/api/system/metrics'),
   },
 
   analytics: {
-    getDashboard: () => apiClient.get('/api/v1/analytics/dashboard'),
-    getUserEngagement: (params?: any) => apiClient.get('/api/v1/analytics/user-engagement', { params }),
-    getSystemUsage: () => apiClient.get('/api/v1/analytics/system-usage'),
+    getDashboard: () => apiClient.get('/api/admin/stats/today'),
+    getUserEngagement: (params?: any) => apiClient.get('/api/admin/stats/weekly-engagement', { params }),
+    getSystemUsage: () => apiClient.get('/api/admin/stats/usercount'),
     exportData: (type: string, params?: any) =>
-      apiClient.get(`/api/v1/analytics/export/${type}`, { params, responseType: 'blob' }),
+      apiClient.get(`/api/analytics/export/${type}`, { params, responseType: 'blob' }),
   },
 
   settings: {
-    getAll: () => apiClient.get('/api/v1/settings'),
-    update: (data: any) => apiClient.put('/api/v1/settings', data),
-    getEmailConfig: () => apiClient.get('/api/v1/settings/email'),
-    updateEmailConfig: (data: any) => apiClient.put('/api/v1/settings/email', data),
+    getAll: () => apiClient.get('/api/settings'),
+    update: (data: any) => apiClient.put('/api/settings', data),
+    getEmailConfig: () => apiClient.get('/api/settings/email'),
+    updateEmailConfig: (data: any) => apiClient.put('/api/settings/email', data),
   },
 };
 

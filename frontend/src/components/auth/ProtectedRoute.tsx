@@ -1,19 +1,43 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { Box, CircularProgress } from '@mui/material';
 
 interface ProtectedRouteProps {
   allowedRoles?: ('admin' | 'caregiver' | 'senior')[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+
+  console.log('ProtectedRoute: Checking access', {
+    user,
+    isAuthenticated,
+    loading,
+    allowedRoles,
+    currentPath: window.location.pathname
+  });
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (!isAuthenticated) {
+    console.log('ProtectedRoute: Not authenticated, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+    console.log('ProtectedRoute: User role not allowed', {
+      userRole: user.role,
+      allowedRoles,
+      redirectingTo: user.role === 'admin' ? '/admin/dashboard' : user.role === 'caregiver' ? '/caregiver' : '/senior'
+    });
     // Redirect to appropriate dashboard based on user role
     switch (user.role) {
       case 'admin':
@@ -27,6 +51,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
     }
   }
 
+  console.log('ProtectedRoute: Access granted');
   return <Outlet />;
 };
 

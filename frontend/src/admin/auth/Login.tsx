@@ -13,10 +13,11 @@ import {
   IconButton,
 } from '@mui/material';
 import { Visibility, VisibilityOff, AdminPanelSettings } from '@mui/icons-material';
-import { api } from '../services/api';
+import { useAuth } from '../../components/auth/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,53 +28,14 @@ const Login: React.FC = () => {
     setError('');
     setLoading(true);
 
-    // Check if using mock data for development
-    const useMockData = process.env.REACT_APP_USE_MOCK_DATA === 'true';
-
-    if (useMockData) {
-      // MOCK AUTHENTICATION (for development without backend)
-      setTimeout(() => {
-        const mockUser = {
-          id: 'admin-1',
-          name: 'Admin User',
-          email: credentials.email,
-          role: 'admin',
-        };
-        const mockToken = 'mock-jwt-token-' + Date.now();
-
-        localStorage.setItem('adminToken', mockToken);
-        localStorage.setItem('adminUser', JSON.stringify(mockUser));
-
-        navigate('/dashboard');
-        setLoading(false);
-      }, 1000); // Simulate network delay
-    } else {
-      // REAL API AUTHENTICATION (when backend is ready)
-      try {
-        const response = await api.auth.login(credentials);
-        const { token, user } = response.data;
-
-        // Check if user is admin
-        if (user.role !== 'admin') {
-          setError('Access denied. Admin privileges required.');
-          setLoading(false);
-          return;
-        }
-
-        // Store auth data
-        localStorage.setItem('adminToken', token);
-        localStorage.setItem('adminUser', JSON.stringify(user));
-
-        // Redirect to dashboard
-        navigate('/dashboard');
-      } catch (err: any) {
-        setError(
-          err.response?.data?.message ||
-          'Login failed. Please check your credentials.'
-        );
-      } finally {
-        setLoading(false);
-      }
+    try {
+      await login(credentials.email, credentials.password);
+      // Login successful, redirect to admin dashboard
+      navigate('/admin/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
     }
   };
 

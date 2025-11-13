@@ -42,15 +42,20 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
+      const userData = await login(email, password);
 
-      // Determine redirect based on email/role
-      if (email.includes('admin')) {
+      // Redirect based on actual user role from backend
+      const userRole = userData?.role;
+
+      if (userRole === 'admin') {
         navigate('/admin/dashboard');
-      } else if (email.includes('caregiver') || email.includes('care')) {
+      } else if (userRole === 'caregiver') {
         navigate('/caregiver');
-      } else {
+      } else if (userRole === 'senior') {
         navigate('/senior');
+      } else {
+        // Fallback if role is unknown
+        navigate('/login');
       }
     } catch (err) {
       setError('Invalid credentials. Please try again.');

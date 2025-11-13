@@ -46,6 +46,7 @@ const UserList: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     fetchUsers();
@@ -55,62 +56,50 @@ const UserList: React.FC = () => {
     filterUsers();
   }, [searchTerm, roleFilter, users]);
 
+  // Update relative times every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUpdateTrigger(prev => prev + 1);
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-refresh data from server every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchUsers();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchUsers = async () => {
     try {
+      console.log('Fetching users...');
       const response = await api.users.getAll();
-      setUsers(response.data);
-      setFilteredUsers(response.data);
+      console.log('API Response:', response.data);
+
+      // Transform backend data to frontend format
+      const transformedUsers: User[] = response.data.map((user: any) => ({
+        id: user.userId || user._id,
+        name: user.profile?.name || user.username,
+        email: user.profile?.email || '',
+        role: user.role,
+        status: 'active', // Default to active since backend doesn't have status field
+        createdAt: user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : '',
+        lastActive: user.lastActiveAt || user.updatedAt || user.createdAt,
+        phoneNumber: user.profile?.contact || '',
+      }));
+
+      console.log('Transformed users:', transformedUsers);
+      setUsers(transformedUsers);
+      setFilteredUsers(transformedUsers);
     } catch (error) {
-      // Mock data if API fails
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          name: 'Mary Johnson',
-          email: 'mary.j@email.com',
-          role: 'senior',
-          status: 'active',
-          createdAt: '2024-01-15',
-          lastActive: new Date(Date.now() - 2 * 3600000).toISOString(),
-        },
-        {
-          id: '2',
-          name: 'Robert Chen',
-          email: 'robert.c@email.com',
-          role: 'senior',
-          status: 'active',
-          createdAt: '2024-02-20',
-          lastActive: new Date(Date.now() - 5 * 3600000).toISOString(),
-        },
-        {
-          id: '3',
-          name: 'Sarah Williams',
-          email: 'sarah.w@email.com',
-          role: 'family',
-          status: 'active',
-          createdAt: '2024-01-10',
-          lastActive: new Date(Date.now() - 1 * 3600000).toISOString(),
-        },
-        {
-          id: '4',
-          name: 'John Davis',
-          email: 'john.d@email.com',
-          role: 'senior',
-          status: 'active',
-          createdAt: '2024-03-05',
-          lastActive: new Date(Date.now() - 24 * 3600000).toISOString(),
-        },
-        {
-          id: '5',
-          name: 'Linda Martinez',
-          email: 'linda.m@email.com',
-          role: 'family',
-          status: 'active',
-          createdAt: '2024-02-14',
-          lastActive: new Date(Date.now() - 3 * 3600000).toISOString(),
-        },
-      ];
-      setUsers(mockUsers);
-      setFilteredUsers(mockUsers);
+      console.error('Error fetching users:', error);
+      // Show empty state on error
+      setUsers([]);
+      setFilteredUsers([]);
     } finally {
       setLoading(false);
     }
@@ -150,22 +139,33 @@ const UserList: React.FC = () => {
     }
   };
 
+  const getRoleLabel = (role: string) => {
+    if (role === 'family' || role === 'caregiver') return 'Family/Caregiver';
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
   const getStatusColor = (status: string) => {
     return status === 'active' ? 'success' : 'default';
   };
 
   const formatLastActive = (lastActive?: string) => {
     if (!lastActive) return 'Never';
-    
+
     const date = new Date(lastActive);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
-    
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    if (diffWeeks < 4) return `${diffWeeks} ${diffWeeks === 1 ? 'week' : 'weeks'} ago`;
+    if (diffMonths < 12) return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago`;
     return date.toLocaleDateString();
   };
 
@@ -276,10 +276,10 @@ const UserList: React.FC = () => {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Chip
-                      label={user.role}
+                      label={getRoleLabel(user.role)}
                       color={getRoleColor(user.role) as any}
                       size="small"
-                      sx={{ textTransform: 'capitalize' }}
+                      sx={{ textTransform: 'none' }}
                     />
                   </TableCell>
                   <TableCell>
@@ -318,6 +318,13 @@ const UserList: React.FC = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </TableContainer>
+
+      {/* Create User Modal */}
+      <CreateUserModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onUserCreated={handleUserCreated}
+      />
     </Box>
   );
 };

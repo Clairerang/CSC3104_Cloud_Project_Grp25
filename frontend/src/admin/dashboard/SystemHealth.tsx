@@ -28,56 +28,28 @@ const SystemHealth: React.FC = () => {
 
   const checkServicesHealth = async () => {
     try {
-      // Use mock data for demonstration
-      const mockServices: ServiceHealth[] = [
-        {
-          id: 'user-service',
-          name: 'user-service',
-          displayName: 'User Service',
-          status: 'online',
-          uptime: 99.8,
-          responseTime: 45,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3001',
-        },
-        {
-          id: 'engagement-service',
-          name: 'engagement-service',
-          displayName: 'Engagement Service',
-          status: 'online',
-          uptime: 99.5,
-          responseTime: 52,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3002',
-        },
-        {
-          id: 'gamification-service',
-          name: 'gamification-service',
-          displayName: 'Gamification Service',
-          status: 'online',
-          uptime: 99.9,
-          responseTime: 38,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3003',
-        },
-        {
-          id: 'notification-service',
-          name: 'notification-service',
-          displayName: 'Notification Service',
-          status: 'online',
-          uptime: 98.7,
-          responseTime: 65,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3004',
-        },
-      ];
+      const response = await api.health.getAllServices();
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setServices(mockServices);
+      // Transform backend response to frontend format
+      const transformedServices: ServiceHealth[] = response.data.services.map((service: any) => ({
+        id: service.id,
+        name: service.id,
+        displayName: service.name,
+        status: service.status,
+        uptime: service.uptime,
+        responseTime: typeof service.responseTime === 'string'
+          ? parseInt(service.responseTime) || 0
+          : service.responseTime,
+        lastChecked: service.lastChecked,
+        endpoint: service.endpoint,
+      }));
+
+      setServices(transformedServices);
       setLoading(false);
     } catch (error) {
       console.error('Error loading service health:', error);
+      // Fallback to empty array on error
+      setServices([]);
       setLoading(false);
     }
   };

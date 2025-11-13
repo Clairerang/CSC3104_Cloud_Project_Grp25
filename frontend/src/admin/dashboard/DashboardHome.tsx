@@ -36,32 +36,57 @@ const DashboardHome: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Mock data for dashboard
-      const mockStats: DashboardStats = {
-        totalUsers: 460,
-        activeUsers: 235,
-        totalCheckIns: 1847,
+      // Fetch real data from backend APIs
+      const [userCountResponse, todayStatsResponse] = await Promise.all([
+        api.users.getStats(),
+        api.engagement.getStats(),
+      ]);
+
+      const userCount = userCountResponse.data;
+      const todayStats = todayStatsResponse.data;
+
+      const dashboardStats: DashboardStats = {
+        totalUsers: userCount.total || 0,
+        activeUsers: todayStats.activeUsers || 0,
+        totalCheckIns: todayStats.totalCheckIns || 0,
         systemHealth: 'healthy',
         users: {
-          totalSeniors: 150,
-          totalFamilies: 300,
-          totalAdmins: 10,
-          activeToday: 125,
+          totalSeniors: userCount.seniors || 0,
+          totalFamilies: userCount.family || 0,
+          totalAdmins: userCount.admins || 0,
+          activeToday: todayStats.activeUsers || 0,
         },
         engagement: {
-          checkInsToday: 89,
+          checkInsToday: todayStats.checkIns || 0,
         },
         alerts: {
-          unresolved: 3,
+          unresolved: 0,
         },
       };
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setStats(mockStats);
+      setStats(dashboardStats);
     } catch (err: any) {
-      setError('Failed to load dashboard data');
-      console.error(err);
+      console.error('Failed to load dashboard data:', err);
+      // Fallback to default data if API fails
+      setStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        totalCheckIns: 0,
+        systemHealth: 'healthy',
+        users: {
+          totalSeniors: 0,
+          totalFamilies: 0,
+          totalAdmins: 0,
+          activeToday: 0,
+        },
+        engagement: {
+          checkInsToday: 0,
+        },
+        alerts: {
+          unresolved: 0,
+        },
+      });
+      setError('Failed to load dashboard data. Showing empty state.');
     } finally {
       setLoading(false);
     }

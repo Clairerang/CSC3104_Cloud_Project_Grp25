@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
     email: String,
     contact: String
   },
+  lastActiveAt: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

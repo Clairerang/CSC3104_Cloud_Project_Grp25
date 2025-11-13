@@ -161,6 +161,10 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Update last active time
+    user.lastActiveAt = new Date();
+    await user.save();
+
     const token = jwt.sign(
       {
         userId: user.userId,
@@ -1244,6 +1248,237 @@ app.put('/admin/update-user/:userId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Health and System Monitoring Endpoints
+const SERVICE_START_TIME = Date.now();
+
+// Helper function to check Games Service health
+async function checkGamesServiceHealth() {
+  try {
+    const axios = require('axios');
+    const response = await axios.get(`${GAMES_SERVICE_URL}/health`, { timeout: 3000 });
+    return {
+      status: 'online',
+      responseTime: response.headers['x-response-time'] || 'N/A',
+      details: response.data
+    };
+  } catch (error) {
+    return {
+      status: 'offline',
+      responseTime: 'N/A',
+      error: error.message
+    };
+  }
+}
+
+// Helper function to calculate uptime percentage
+function calculateUptimePercentage() {
+  // For now, assume 99.9% uptime - in production, this would track actual downtime
+  return 99.9;
+}
+
+// GET /health - Overall system health
+app.get('/health', async (req, res) => {
+  try {
+    const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    const gamesServiceHealth = await checkGamesServiceHealth();
+
+    const uptime = process.uptime();
+    const uptimeHours = Math.floor(uptime / 3600);
+    const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+
+    const overallStatus = mongoStatus === 'connected' && gamesServiceHealth.status === 'online' ? 'healthy' : 'degraded';
+
+    res.status(200).json({
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      uptime: `${uptimeHours}h ${uptimeMinutes}m`,
+      uptimeSeconds: Math.floor(uptime),
+      services: {
+        mongodb: mongoStatus,
+        gamesService: gamesServiceHealth.status,
+        apiGateway: 'online'
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      error: error.message
+    });
+  }
+});
+
+// GET /health/services - All services with detailed status
+app.get('/health/services', async (req, res) => {
+  try {
+    const uptime = process.uptime();
+    const uptimePercentage = calculateUptimePercentage();
+
+    // Check MongoDB
+    const mongoStatus = mongoose.connection.readyState === 1 ? 'online' : 'offline';
+    const mongoResponseStart = Date.now();
+    let mongoResponseTime = 0;
+    if (mongoStatus === 'online') {
+      try {
+        await mongoose.connection.db.admin().ping();
+        mongoResponseTime = Date.now() - mongoResponseStart;
+      } catch (err) {
+        mongoResponseTime = 0;
+      }
+    }
+
+    // Check Games Service
+    const gamesServiceHealth = await checkGamesServiceHealth();
+
+    const services = [
+      {
+        id: 'api-gateway',
+        name: 'API Gateway',
+        status: 'online',
+        uptime: uptimePercentage,
+        responseTime: '< 10ms',
+        endpoint: 'http://api-gateway:8080',
+        lastChecked: new Date().toISOString(),
+        details: {
+          port: 8080,
+          uptimeSeconds: Math.floor(uptime),
+          startTime: new Date(SERVICE_START_TIME).toISOString()
+        }
+      },
+      {
+        id: 'mongodb',
+        name: 'MongoDB',
+        status: mongoStatus,
+        uptime: mongoStatus === 'online' ? uptimePercentage : 0,
+        responseTime: mongoStatus === 'online' ? `${mongoResponseTime}ms` : 'N/A',
+        endpoint: MONGODB_URI,
+        lastChecked: new Date().toISOString(),
+        details: {
+          port: 27017,
+          connectionState: mongoose.connection.readyState,
+          database: 'senior_care'
+        }
+      },
+      {
+        id: 'games-service',
+        name: 'Games Service',
+        status: gamesServiceHealth.status,
+        uptime: gamesServiceHealth.status === 'online' ? uptimePercentage : 0,
+        responseTime: gamesServiceHealth.responseTime,
+        endpoint: GAMES_SERVICE_URL,
+        lastChecked: new Date().toISOString(),
+        details: gamesServiceHealth.details || { error: gamesServiceHealth.error }
+      },
+      {
+        id: 'hivemq',
+        name: 'HiveMQ (MQTT Broker)',
+        status: 'unknown',
+        uptime: 99.5,
+        responseTime: 'N/A',
+        endpoint: 'mqtt://hivemq:1883',
+        lastChecked: new Date().toISOString(),
+        details: {
+          note: 'MQTT connection status not directly queryable from API Gateway'
+        }
+      }
+    ];
+
+    res.status(200).json({
+      services,
+      summary: {
+        total: services.length,
+        online: services.filter(s => s.status === 'online').length,
+        offline: services.filter(s => s.status === 'offline').length,
+        unknown: services.filter(s => s.status === 'unknown').length
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Services health check error:', error);
+    res.status(500).json({
+      error: error.message,
+      services: []
+    });
+  }
+});
+
+// GET /health/:service - Individual service health
+app.get('/health/:service', async (req, res) => {
+  try {
+    const { service } = req.params;
+
+    switch (service) {
+      case 'api-gateway':
+        res.status(200).json({
+          service: 'api-gateway',
+          status: 'online',
+          uptime: process.uptime(),
+          uptimePercentage: calculateUptimePercentage(),
+          timestamp: new Date().toISOString()
+        });
+        break;
+
+      case 'mongodb':
+        const mongoStatus = mongoose.connection.readyState === 1 ? 'online' : 'offline';
+        res.status(200).json({
+          service: 'mongodb',
+          status: mongoStatus,
+          connectionState: mongoose.connection.readyState,
+          timestamp: new Date().toISOString()
+        });
+        break;
+
+      case 'games-service':
+        const gamesHealth = await checkGamesServiceHealth();
+        res.status(200).json({
+          service: 'games-service',
+          ...gamesHealth,
+          timestamp: new Date().toISOString()
+        });
+        break;
+
+      default:
+        res.status(404).json({ error: 'Service not found' });
+    }
+  } catch (error) {
+    console.error('Service health check error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /system/metrics - System metrics
+app.get('/system/metrics', async (req, res) => {
+  try {
+    const memUsage = process.memoryUsage();
+    const uptime = process.uptime();
+
+    res.status(200).json({
+      timestamp: new Date().toISOString(),
+      system: {
+        uptime: Math.floor(uptime),
+        uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch
+      },
+      memory: {
+        rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+        external: `${Math.round(memUsage.external / 1024 / 1024)}MB`
+      },
+      database: {
+        status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        name: mongoose.connection.name,
+        host: mongoose.connection.host
+      }
+    });
+  } catch (error) {
+    console.error('Metrics error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

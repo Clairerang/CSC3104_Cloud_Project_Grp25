@@ -47,65 +47,43 @@ const ServiceMonitor: React.FC = () => {
         api.system.getAllServices(),
         api.system.getMetrics(),
       ]);
-      setServices(servicesRes.data);
-      setMetrics(metricsRes.data);
-    } catch (error) {
-      // Mock data
-      setServices([
-        {
-          id: 'user-service-1',
-          name: 'user-service',
-          displayName: 'User Service',
-          status: 'online',
-          uptime: 99.8,
-          responseTime: 45,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3001',
-          version: 'v1.2.0',
-        },
-        {
-          id: 'engagement-service-1',
-          name: 'engagement-service',
-          displayName: 'Engagement Service',
-          status: 'online',
-          uptime: 99.5,
-          responseTime: 52,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3002',
-          version: 'v1.1.3',
-        },
-        {
-          id: 'gamification-service-1',
-          name: 'gamification-service',
-          displayName: 'Gamification Service',
-          status: 'online',
-          uptime: 99.9,
-          responseTime: 38,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3003',
-          version: 'v1.0.5',
-        },
-        {
-          id: 'notification-service-1',
-          name: 'notification-service',
-          displayName: 'Notification Service',
-          status: 'online',
-          uptime: 98.7,
-          responseTime: 65,
-          lastChecked: new Date().toISOString(),
-          endpoint: 'http://localhost:3004',
-          version: 'v1.1.0',
-        },
-      ]);
+
+      // Transform services data
+      const transformedServices: ServiceHealth[] = servicesRes.data.services.map((service: any) => ({
+        id: service.id,
+        name: service.id,
+        displayName: service.name,
+        status: service.status,
+        uptime: service.uptime,
+        responseTime: typeof service.responseTime === 'string'
+          ? parseInt(service.responseTime.replace('ms', '').replace('< ', '')) || 0
+          : service.responseTime,
+        lastChecked: service.lastChecked,
+        endpoint: service.endpoint,
+        version: service.details?.version || 'N/A',
+      }));
+
+      setServices(transformedServices);
+
+      // Transform metrics data
+      const avgResponseTime = transformedServices
+        .filter(s => s.responseTime > 0)
+        .reduce((sum, s) => sum + (s.responseTime as number), 0) /
+        (transformedServices.filter(s => s.responseTime > 0).length || 1);
+
       setMetrics({
-        cpu: 35,
-        memory: 62,
-        disk: 48,
-        activeConnections: 145,
-        requestsPerMinute: 850,
-        averageResponseTime: 48,
-        errorRate: 0.02,
+        cpu: 0, // Not available from backend yet
+        memory: 0, // Will be parsed from backend response
+        disk: 0,
+        activeConnections: 0,
+        requestsPerMinute: 0,
+        averageResponseTime: Math.round(avgResponseTime),
+        errorRate: 0,
       });
+    } catch (error) {
+      console.error('Error fetching service data:', error);
+      setServices([]);
+      setMetrics(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
