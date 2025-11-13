@@ -39,13 +39,13 @@ Edit `backend/config/secrets/.env`:
 # ===== REQUIRED FOR DEMO =====
 
 # Google Gemini AI (for chatbot)
-GEMINI_API_KEY=paste-your-key-here
+GEMINI_API_KEY=AIzaSyDK2TenTk5i0RcIkaaj1zSv2Rn7u2LdtPw
 
 # Firebase (for push notifications)
-FIREBASE_API_KEY=paste-your-firebase-api-key
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-FIREBASE_APP_ID=your-app-id
+FIREBASE_API_KEY=AIzaSyCaaeofdbvrENHDYla-UduaaperESzxD9A
+FIREBASE_PROJECT_ID=cloud-project-grp25
+FIREBASE_MESSAGING_SENDER_ID=795685759252
+FIREBASE_APP_ID=1:795685759252:web:f28407740ff265be6eba01
 
 # ===== ALREADY CONFIGURED =====
 # These are set to mock mode - no action needed
