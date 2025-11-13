@@ -38,7 +38,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
   const fetchCheckInStatus = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) {
         setError('Not authenticated');
         setLoading(false);
@@ -246,7 +246,7 @@ const CheckInScreen: React.FC<Props> = ({ onCheckIn }) => {
 
     try {
       setSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) {
         setError('Not authenticated');
         return;

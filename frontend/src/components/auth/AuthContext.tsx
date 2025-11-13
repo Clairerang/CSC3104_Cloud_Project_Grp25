@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface User {
   id: string;
@@ -22,9 +22,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user on mount
-    const storedUser = localStorage.getItem('user');
-    console.log('AuthContext: Restoring user from localStorage:', storedUser);
+    // Check for stored user on mount (using sessionStorage for per-tab isolation)
+    const storedUser = sessionStorage.getItem('user');
+    console.log('AuthContext: Restoring user from sessionStorage:', storedUser);
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       console.log('AuthContext: Parsed user data:', parsedUser);
@@ -32,42 +32,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setLoading(false);
 
-    // Listen for storage changes from other tabs
-    const handleStorageChange = (e: StorageEvent) => {
-      console.log('AuthContext: Storage changed in another tab', e.key);
-      if (e.key === 'user') {
-        if (e.newValue) {
-          const newUser = JSON.parse(e.newValue);
-          console.log('AuthContext: User changed in another tab, updating to:', newUser);
-          setUser(newUser);
-          // Redirect to appropriate dashboard based on new user role
-          if (newUser.role === 'admin') {
-            window.location.href = '/admin/dashboard';
-          } else if (newUser.role === 'caregiver') {
-            window.location.href = '/caregiver';
-          } else if (newUser.role === 'senior') {
-            window.location.href = '/senior';
-          }
-        } else {
-          // User was removed (logged out in another tab)
-          console.log('AuthContext: User logged out in another tab');
-          setUser(null);
-          window.location.href = '/login';
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
-  // Clear any existing session data first
-  localStorage.removeItem('user');
-  localStorage.removeItem('token');
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('adminToken');
+  // Clear any existing session data first (using sessionStorage for per-tab sessions)
+  sessionStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('authToken');
+  sessionStorage.removeItem('adminToken');
       setUser(null);
 
       // Call the backend login API
@@ -111,9 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('AuthContext: Stored token:', token.substring(0, 20) + '...');
 
     setUser(user);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token); // Store as 'token' for CheckInScreen
-    localStorage.setItem('authToken', token); // Also store as 'authToken' for compatibility
+    sessionStorage.setItem('user', JSON.stringify(user));
+    sessionStorage.setItem('token', token); // Store as 'token' for CheckInScreen
+    sessionStorage.setItem('authToken', token); // Also store as 'authToken' for compatibility
 
       // Force a small delay to ensure localStorage is written before any API calls
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -127,9 +100,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('adminToken');
   };
 
   return (

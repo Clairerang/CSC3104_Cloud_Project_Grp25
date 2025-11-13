@@ -12,7 +12,7 @@ const apiClient = axios.create({
 // Request interceptor for adding auth token
 apiClient.interceptors.request.use(
   (config) => {
-  const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+  const token = sessionStorage.getItem('token') || sessionStorage.getItem('adminToken');
     console.log('API Interceptor: Request to', config.url);
     console.log('API Interceptor: Token found:', token ? token.substring(0, 20) + '...' : 'NONE');
     if (token) {
@@ -30,10 +30,10 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
-  localStorage.removeItem('token');
-  localStorage.removeItem('adminToken');
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('adminToken');
+  sessionStorage.removeItem('authToken');
+  sessionStorage.removeItem('user');
       window.location.href = '/login';
     }
     return Promise.reject(error);

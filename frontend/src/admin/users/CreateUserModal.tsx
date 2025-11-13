@@ -83,7 +83,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) {
         setError('Not authenticated');
         return;
