@@ -1,0 +1,322 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Phone Verification & Urgent SMS - Complete Flow</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px; 
+      max-width: 800px; 
+      margin: 0 auto;
+      background: #f5f5f5;
+    }
+    .card { 
+      background: white;
+      padding: 25px; 
+      border-radius: 10px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    h1 { margin-top: 0; color: #333; }
+    h2 { color: #555; margin-top: 0; }
+    label { 
+      display: block; 
+      margin: 12px 0 6px; 
+      font-weight: 600;
+      color: #444;
+    }
+    input { 
+      width: 100%; 
+      padding: 10px; 
+      font-size: 15px; 
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #9c27b0;
+    }
+    button { 
+      padding: 12px 20px; 
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px 10px 10px 0;
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-primary { background: #9c27b0; color: white; }
+    .btn-success { background: #4caf50; color: white; }
+    .btn-danger { background: #f44336; color: white; }
+    .log { 
+      margin-top: 15px; 
+      background: #f9f9f9; 
+      padding: 12px; 
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+    }
+    .log-entry { margin: 4px 0; }
+    .success { color: #2e7d32; }
+    .error { color: #c62828; }
+    .info { color: #1565c0; }
+    #otpSection { display: none; }
+    #urgentSection { display: none; }
+    .verified-badge {
+      display: inline-block;
+      background: #4caf50;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 15px;
+      font-size: 13px;
+      margin-left: 10px;
+    }
+    .phone-list {
+      margin: 15px 0;
+      padding: 0;
+      list-style: none;
+    }
+    .phone-item {
+      padding: 10px;
+      background: #f5f5f5;
+      margin: 5px 0;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>📱 Phone Verification & Urgent SMS System</h1>
+  
+  <!-- Step 1: User Setup -->
+  <div class="card">
+    <h2>Step 1: User Setup</h2>
+    <label>User ID</label>
+    <input id="userId" placeholder="e.g. senior-123" value="test-user-001" />
+    <button class="btn-primary" onclick="loadUserPhones()">Load My Verified Phones</button>
+    <div id="phoneList"></div>
+  </div>
+
+  <!-- Step 2: Verify New Phone -->
+  <div class="card">
+    <h2>Step 2: Verify New Phone Number (OTP)</h2>
+    <p>Add a new phone number by verifying it with OTP</p>
+    
+    <label>Phone Number (E.164 format)</label>
+    <input id="newPhone" placeholder="+6598765787" value="+65" />
+    
+    <button class="btn-primary" onclick="sendOTP()">📤 Send OTP Code</button>
+    
+    <div id="otpSection">
+      <label>Enter 6-Digit Code</label>
+      <input id="otpCode" placeholder="123456" maxlength="6" />
+      <button class="btn-success" onclick="verifyOTP()">✅ Verify & Save</button>
+    </div>
+    
+    <div class="log" id="verifyLog"></div>
+  </div>
+
+  <!-- Step 3: Send Urgent SMS -->
+  <div class="card" id="urgentSection">
+    <h2>Step 3: Send Urgent SMS</h2>
+    <p>Send urgent SMS to all verified phone numbers (no OTP needed!)</p>
+    
+    <label>Urgent Message</label>
+    <input id="urgentMessage" placeholder="e.g. Emergency alert - user needs assistance" />
+    
+    <button class="btn-danger" onclick="sendUrgentSMS()">🚨 Send Urgent SMS</button>
+    
+    <div class="log" id="urgentLog"></div>
+  </div>
+
+  <script>
+    let currentPhone = null;
+    
+    function log(msg, type = 'info', logId = 'verifyLog') {
+      const el = document.getElementById(logId);
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.insertBefore(entry, el.firstChild);
+    }
+    
+    // Load user's verified phones
+    async function loadUserPhones() {
+      const userId = document.getElementById('userId').value.trim();
+      if (!userId) return alert('Please enter a User ID');
+      
+      localStorage.setItem('current_userId', userId);
+      log('Loading verified phones for ' + userId);
+      
+      try {
+        const res = await fetch(`http://localhost:4002/verify-phone/list?userId=${userId}`);
+        const data = await res.json();
+        
+        if (data.ok && data.phones && data.phones.length > 0) {
+          log(`Found ${data.phones.length} verified phone(s)`, 'success');
+          document.getElementById('urgentSection').style.display = 'block';
+          
+          // Display list
+          let html = '<ul class="phone-list">';
+          data.phones.forEach(p => {
+            html += `<li class="phone-item">
+              <span>${p.phoneNumber} <span class="verified-badge">✓ Verified</span></span>
+              <small>Added: ${new Date(p.verifiedAt).toLocaleDateString()}</small>
+            </li>`;
+          });
+          html += '</ul>';
+          document.getElementById('phoneList').innerHTML = html;
+        } else {
+          log('No verified phones found. Add one below!', 'info');
+          document.getElementById('phoneList').innerHTML = '<p style="color:#666;">No verified phones yet.</p>';
+        }
+      } catch (err) {
+        log('Error loading phones: ' + err.message, 'error');
+      }
+    }
+    
+    // Send OTP
+    async function sendOTP() {
+      const phone = document.getElementById('newPhone').value.trim();
+      if (!phone || !phone.startsWith('+')) {
+        return alert('Please enter phone in E.164 format (+country code + number)');
+      }
+      
+      log('Sending OTP to ' + phone);
+      
+      try {
+        const res = await fetch('http://localhost:4004/verify/send', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ to: phone, channel: 'sms' })
+        });
+        const data = await res.json();
+        
+        if (data.ok && data.status === 'pending') {
+          currentPhone = phone;
+          document.getElementById('otpSection').style.display = 'block';
+          document.getElementById('otpCode').focus();
+          log('✅ OTP sent! Check your SMS', 'success');
+        } else {
+          log('❌ Failed: ' + (data.message || data.error || JSON.stringify(data)), 'error');
+        }
+      } catch (err) {
+        log('❌ Error: ' + err.message, 'error');
+      }
+    }
+    
+    // Verify OTP and save to database
+    async function verifyOTP() {
+      const code = document.getElementById('otpCode').value.trim();
+      if (!code) return alert('Please enter the OTP code');
+      if (!currentPhone) return alert('Please send OTP first');
+      
+      log('Verifying code...');
+      
+      try {
+        const res = await fetch('http://localhost:4004/verify/check', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ to: currentPhone, code })
+        });
+        const data = await res.json();
+        
+        if (data.ok && data.verified) {
+          log('✅ Code verified!', 'success');
+          
+          // Save to database
+          const userId = localStorage.getItem('current_userId') || document.getElementById('userId').value.trim();
+          log('Saving verified phone to database...');
+          
+          const saveRes = await fetch('http://localhost:4002/verify-phone/save', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ 
+              userId, 
+              phoneNumber: currentPhone,
+              relationship: 'self'
+            })
+          });
+          const saveData = await saveRes.json();
+          
+          if (saveData.ok) {
+            log('✅✅✅ SUCCESS! Phone verified and saved to database!', 'success');
+            log('You can now send urgent SMS without verification', 'success');
+            
+            // Reset and reload
+            document.getElementById('otpSection').style.display = 'none';
+            document.getElementById('otpCode').value = '';
+            currentPhone = null;
+            
+            // Reload phone list
+            await loadUserPhones();
+          } else {
+            log('⚠️ Verified but failed to save: ' + saveData.error, 'error');
+          }
+        } else {
+          log('❌ Invalid code', 'error');
+        }
+      } catch (err) {
+        log('❌ Error: ' + err.message, 'error');
+      }
+    }
+    
+    // Send urgent SMS to all verified phones
+    async function sendUrgentSMS() {
+      const userId = localStorage.getItem('current_userId') || document.getElementById('userId').value.trim();
+      const message = document.getElementById('urgentMessage').value.trim();
+      
+      if (!userId || !message) {
+        return alert('Please enter user ID and message');
+      }
+      
+      log('Sending urgent SMS...', 'info', 'urgentLog');
+      
+      try {
+        const res = await fetch('http://localhost:4002/send-urgent-sms', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ userId, message })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          log(`✅ ${data.message}`, 'success', 'urgentLog');
+          log('SMS queued to: ' + JSON.stringify(data.published), 'success', 'urgentLog');
+          document.getElementById('urgentMessage').value = '';
+        } else {
+          log('❌ Failed: ' + data.error, 'error', 'urgentLog');
+        }
+      } catch (err) {
+        log('❌ Error: ' + err.message, 'error', 'urgentLog');
+      }
+    }
+    
+    // Auto-load on page load if userId exists
+    window.onload = () => {
+      const saved = localStorage.getItem('current_userId');
+      if (saved) {
+        document.getElementById('userId').value = saved;
+        loadUserPhones();
+      }
+    };
+  </script>
+</body>
+</html>

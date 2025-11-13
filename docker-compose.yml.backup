@@ -1,0 +1,141 @@
+services:
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: senior-care-frontend:latest
+    container_name: senior-care-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=/api
+    depends_on:
+      - api-gateway
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # HiveMQ MQTT Broker
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: hivemq-broker
+    ports:
+      - "1883:1883"      # MQTT
+      - "8000:8000"      # WebSocket
+    volumes:
+      - hivemq-data:/opt/hivemq/data
+      - hivemq-log:/opt/hivemq/log
+    networks:
+      - senior-care-network
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "hivemq.jar"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # MongoDB Database (Single Instance for All Services)
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: senior_care
+    volumes:
+      - mongodb-data:/data/db
+      - ./database/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # API Gateway (Main API with MQTT & Proxy)
+  api-gateway:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: senior-care-api-gateway:latest
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      MONGODB_URI: mongodb://mongodb:27017/senior_care
+      MQTT_BROKER_URL: mqtt://hivemq:1883
+      GAMES_SERVICE_URL: http://games-service:8081
+      JWT_SECRET: secret1234@
+      SERVICE_NAME: api-gateway
+      NODE_ENV: production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      hivemq:
+        condition: service_healthy
+      games-service:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Games Microservice (Internal - not exposed to frontend directly)
+  games-service:
+    build:
+      context: ./games-service
+      dockerfile: Dockerfile
+    image: senior-care-games-service:latest
+    container_name: games-service
+    expose:
+      - "8081"
+    environment:
+      PORT: 8081
+      MONGODB_URI: mongodb://mongodb:27017/senior_care
+      MQTT_BROKER_URL: mqtt://hivemq:1883
+      JWT_SECRET: secret1234@
+      SERVICE_NAME: games-service
+      NODE_ENV: production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      hivemq:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  senior-care-network:
+    driver: bridge
+
+volumes:
+  hivemq-data:
+    driver: local
+  hivemq-log:
+    driver: local
+  mongodb-data:
+    driver: local
