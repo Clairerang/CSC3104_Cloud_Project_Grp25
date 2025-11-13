@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Notification Dashboard (Live)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    #events { max-width: 800px; }
+    .evt { padding: 8px; border-bottom: 1px solid #eee; }
+    .type { font-weight: bold; }
+    pre { background:#f8f8f8; padding:8px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <h2>Notification Dashboard (Live)</h2>
+  <p>Shows events published to <code>notification.events</code> in real time via SSE.</p>
+  <div id="events"></div>
+
+  <script>
+    const container = document.getElementById('events');
+    function addItem(obj) {
+      const d = document.createElement('div');
+      d.className = 'evt';
+      const ts = new Date().toLocaleTimeString();
+      d.innerHTML = `<div><span class="type">${obj.type || 'event'}</span> <small>${ts}</small></div><pre>${JSON.stringify(obj, null, 2)}</pre>`;
+      container.insertBefore(d, container.firstChild);
+    }
+
+    // connect to SSE
+    const s = new EventSource('/dashboard/stream');
+    s.onmessage = (m) => {
+      try {
+        const payload = JSON.parse(m.data);
+        if (payload.type === 'snapshot' && Array.isArray(payload.items)) {
+          payload.items.reverse().forEach(item => addItem(item));
+        } else if (payload.type === 'event') {
+          addItem(payload.event);
+        }
+      } catch (e) {
+        console.warn('invalid SSE payload', e);
+      }
+    };
+    s.onerror = (e) => {
+      console.warn('SSE error', e);
+    };
+  </script>
+</body>
+</html>

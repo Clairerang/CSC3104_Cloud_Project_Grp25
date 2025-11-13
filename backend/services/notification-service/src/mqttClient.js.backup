@@ -1,0 +1,170 @@
+const mqtt = require('mqtt');
+const { v4: uuidv4 } = require('uuid');
+const { connectMongo, models } = require('./models');
+// metrics
+const client = require('prom-client');
+const publishCounter = new client.Counter({ name: 'notification_events_published_total', help: 'Total number of events published to notification/events', labelNames: ['type'] });
+const publishErrors = new client.Counter({ name: 'notification_publish_errors_total', help: 'Total number of publish errors' });
+
+const MQTT_BROKER = process.env.MQTT_BROKER || 'hivemq';
+const MQTT_PORT = process.env.MQTT_PORT || 1883;
+
+const mqttClient = mqtt.connect(`mqtt://${MQTT_BROKER}:${MQTT_PORT}`, {
+  clientId: `notification-service-${uuidv4()}`,
+  clean: true,
+  reconnectPeriod: 1000
+});
+
+let outboxPublisherStarted = false;
+
+mqttClient.on('connect', () => {
+  console.log(`✅ MQTT connected to HiveMQ at ${MQTT_BROKER}:${MQTT_PORT}`);
+});
+
+mqttClient.on('error', (err) => {
+  console.error('❌ MQTT connection error:', err);
+});
+
+async function startMqttConsumer() {
+  // Ensure Mongo is connected
+  try {
+    await connectMongo();
+  } catch (e) {
+    console.warn('⚠️ models connectMongo warning:', e && e.message ? e.message : e);
+  }
+
+  // Start outbox publisher (will check if MQTT client exists)
+  startOutboxPublisher();
+
+  // Subscribe to gamification events
+  mqttClient.subscribe('gamification/events', { qos: 1 }, (err) => {
+    if (err) {
+      console.error('❌ Failed to subscribe to gamification/events:', err);
+    } else {
+      console.log('🎧 Notification Service listening to gamification/events...');
+    }
+  });
+
+  // Handle incoming messages
+  mqttClient.on('message', async (topic, message) => {
+    let event = null;
+    try {
+      event = JSON.parse(message.toString());
+    } catch (err) {
+      console.warn(`⚠️ Received non-JSON event in ${topic}`);
+      return;
+    }
+
+    console.log(`📨 Received event from ${topic}:`, event);
+
+    // Handle gamification events
+    if (topic === 'gamification/events') {
+      if (event.type === "badge_awarded") {
+        await publishEvent({
+          type: 'badge_notification',
+          userId: event.userId,
+          badge: event.badge,
+          source: 'gamification'
+        });
+      }
+    }
+  });
+}
+
+// Publish a generic event to notification/events using Outbox pattern
+const MAX_OUTBOX_ATTEMPTS = parseInt(process.env.OUTBOX_MAX_ATTEMPTS || '5', 10);
+
+async function publishEvent(payload) {
+  try {
+    // TEMPORARY FIX: Publish directly to MQTT (bypassing outbox pattern)
+    // TODO: Debug why setInterval callback never executes in outbox publisher
+    await new Promise((resolve, reject) => {
+      mqttClient.publish('notification/events', JSON.stringify(payload), { qos: 1 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    
+    console.log(`� Published event directly to MQTT: ${payload.type}`);
+    try { publishCounter.inc({ type: payload.type || 'unknown' }, 1); } catch (e) { /* ignore */ }
+    
+    // Also save to outbox for audit trail
+    const out = await models.Outbox.create({ 
+      eventType: payload.type || 'unknown', 
+      payload, 
+      published: true,
+      publishedAt: new Date(),
+      nextAttemptAt: new Date() 
+    });
+    
+    return out;
+  } catch (e) {
+    console.error('❌ publishEvent error:', e && e.message ? e.message : e);
+    try { publishErrors.inc(1); } catch (err) { /* ignore */ }
+    throw e;
+  }
+}
+
+// Outbox publisher: polls the Outbox collection and publishes pending messages to MQTT
+async function startOutboxPublisher(pollIntervalMs = 2000) {
+  if (!mqttClient) {
+    console.warn('Outbox publisher: MQTT client not initialized');
+    return;
+  }
+
+  if (!models || !models.Outbox) {
+    console.error('❌ Outbox publisher: models.Outbox not available!');
+    return;
+  }
+
+  console.log(`🚀 Outbox publisher started (poll interval: ${pollIntervalMs}ms)`);
+
+  const intervalId = setInterval(async () => {
+    console.log('[Outbox] Interval callback executing...');
+    try {
+      const now = new Date();
+      const pending = await models.Outbox.find({
+        published: false,
+        nextAttemptAt: { $lte: now },
+        attempts: { $lt: MAX_OUTBOX_ATTEMPTS }
+      }).limit(50);
+
+      console.log(`[Outbox] Found ${pending.length} messages to publish`);
+
+      for (const msg of pending) {
+        try {
+          // Publish to MQTT with QoS 1 (at least once delivery)
+          await new Promise((resolve, reject) => {
+            mqttClient.publish('notification/events', JSON.stringify(msg.payload), { qos: 1 }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+
+          // Mark as published
+          msg.published = true;
+          msg.publishedAt = new Date();
+          await msg.save();
+          console.log(`✅ Published outbox message ${msg.messageId} to MQTT`);
+        } catch (err) {
+          // Increment attempts and schedule retry with exponential backoff
+          msg.attempts += 1;
+          const backoffMs = Math.min(60000, Math.pow(2, msg.attempts) * 1000);
+          msg.nextAttemptAt = new Date(Date.now() + backoffMs);
+          msg.lastError = err && err.message ? err.message : String(err);
+          
+          if (msg.attempts >= MAX_OUTBOX_ATTEMPTS) {
+            console.error(`❌ Outbox message ${msg.messageId} failed after ${msg.attempts} attempts: ${msg.lastError}`);
+          } else {
+            console.warn(`⚠️ Outbox message ${msg.messageId} retry scheduled (attempt ${msg.attempts})`);
+          }
+          await msg.save();
+        }
+      }
+    } catch (err) {
+      console.error('❌ Outbox publisher error:', err && err.message ? err.message : err);
+    }
+  }, pollIntervalMs);
+}
+
+module.exports = { startMqttConsumer, publishEvent, mqttClient };

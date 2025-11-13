@@ -1,0 +1,138 @@
+<!--
+  ARCHIVED FEATURE: Phone Verification (OTP)
+  
+  This section was removed from the main testing UI on November 11, 2025.
+  Archived for potential future use.
+  
+  To re-enable:
+  1. Copy this HTML section back into index.html
+  2. Copy the JavaScript logic back into the script section
+  3. Ensure SMS service is running on port 4004
+-->
+
+<!-- Phone Verification Section -->
+<div class="card">
+  <h2>📱 Phone Verification (OTP)</h2>
+  <p>Test Twilio Verify service for OTP verification</p>
+
+  <label>Phone Number (E.164 format, e.g. +61412345678)</label>
+  <input id="verifyPhone" placeholder="+61412345678" />
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button id="sendOtp" style="background:#9c27b0;color:#fff">Send OTP</button>
+    <button id="checkOtp" style="background:#673ab7;color:#fff" disabled>Verify Code</button>
+  </div>
+
+  <div id="otpInputSection" style="display:none;margin-top:12px;">
+    <label>Enter Verification Code</label>
+    <input id="otpCode" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]*" />
+  </div>
+
+  <div class="log" id="verifyLog"></div>
+</div>
+
+<script>
+// ============================================
+// Phone Verification Logic (ARCHIVED)
+// ============================================
+let currentVerificationPhone = null;
+
+document.getElementById('sendOtp').addEventListener('click', async () => {
+  const phone = document.getElementById('verifyPhone').value.trim();
+  if (!phone) {
+    verifyLog('❌ Please enter a phone number');
+    return alert('Please enter a phone number in E.164 format (e.g. +61412345678)');
+  }
+  if (!phone.startsWith('+')) {
+    verifyLog('❌ Phone must be in E.164 format (start with +)');
+    return alert('Phone must be in E.164 format (start with +)');
+  }
+
+  try {
+    verifyLog(`📤 Sending verification code to ${phone}...`);
+    const res = await fetch('http://localhost:4004/verify/send', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ to: phone, channel: 'sms' })
+    });
+    const j = await res.json();
+    verifyLog(`✅ Response: ${JSON.stringify(j)}`);
+
+    if (j && j.ok && j.status === 'pending') {
+      currentVerificationPhone = phone;
+      document.getElementById('otpInputSection').style.display = 'block';
+      document.getElementById('checkOtp').disabled = false;
+      document.getElementById('otpCode').value = '';
+      document.getElementById('otpCode').focus();
+      showModal(`✅ Verification code sent to ${phone}!\n\nCheck your SMS and enter the 6-digit code below.`, false);
+      verifyLog(`✅ Code sent! Status: ${j.status}`);
+    } else {
+      verifyLog(`❌ Failed: ${JSON.stringify(j)}`);
+      showModal('Failed to send verification code: ' + (j && j.error ? j.error : JSON.stringify(j)), true);
+    }
+  } catch (err) {
+    verifyLog(`❌ Error: ${err.message}`);
+    showModal('Error sending verification code: ' + (err && err.message ? err.message : String(err)), true);
+  }
+});
+
+document.getElementById('checkOtp').addEventListener('click', async () => {
+  const code = document.getElementById('otpCode').value.trim();
+  if (!code) {
+    verifyLog('❌ Please enter the verification code');
+    return alert('Please enter the verification code from your SMS');
+  }
+  if (!currentVerificationPhone) {
+    verifyLog('❌ No active verification session');
+    return alert('Please send a verification code first');
+  }
+
+  try {
+    verifyLog(`🔍 Verifying code ${code} for ${currentVerificationPhone}...`);
+    const res = await fetch('http://localhost:4004/verify/check', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ to: currentVerificationPhone, code })
+    });
+    const j = await res.json();
+    verifyLog(`✅ Response: ${JSON.stringify(j)}`);
+
+    if (j && j.ok && j.verified) {
+      verifyLog(`✅✅✅ VERIFIED! Phone ${currentVerificationPhone} confirmed`);
+      showModal(`🎉 SUCCESS!\n\nPhone number ${currentVerificationPhone} has been verified!`, false);
+      // Optionally auto-fill family phone field
+      document.getElementById('familyPhone').value = currentVerificationPhone;
+      // Reset state
+      document.getElementById('otpInputSection').style.display = 'none';
+      document.getElementById('checkOtp').disabled = true;
+      currentVerificationPhone = null;
+    } else if (j && !j.verified) {
+      verifyLog(`❌ Verification failed - incorrect code or expired`);
+      showModal('❌ Verification failed!\n\nThe code is incorrect or has expired. Please try again.', true);
+    } else {
+      verifyLog(`❌ Failed: ${JSON.stringify(j)}`);
+      showModal('Verification failed: ' + (j && j.error ? j.error : JSON.stringify(j)), true);
+    }
+  } catch (err) {
+    verifyLog(`❌ Error: ${err.message}`);
+    showModal('Error verifying code: ' + (err && err.message ? err.message : String(err)), true);
+  }
+});
+
+// Allow Enter key to submit OTP code
+document.getElementById('otpCode').addEventListener('keypress', (ev) => {
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    document.getElementById('checkOtp').click();
+  }
+});
+
+// Helper function for verify log
+function verifyLog(message) {
+  const logElem = document.getElementById('verifyLog');
+  if (logElem) {
+    logElem.textContent += message + '\n';
+    logElem.scrollTop = logElem.scrollHeight;
+  }
+}
+</script>

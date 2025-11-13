@@ -23,13 +23,14 @@ services:
       retries: 3
       start_period: 10s
 
-  # HiveMQ MQTT Broker
+  # HiveMQ MQTT Broker (Updated with Control Center on port 9000)
   hivemq:
     image: hivemq/hivemq-ce:latest
     container_name: hivemq-broker
     ports:
       - "1883:1883"      # MQTT
       - "8000:8000"      # WebSocket
+      - "9000:8080"      # HiveMQ Control Center (mapped to 9000 to avoid conflict with API Gateway)
     volumes:
       - hivemq-data:/opt/hivemq/data
       - hivemq-log:/opt/hivemq/log
@@ -41,6 +42,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
 
   # MongoDB Database (Single Instance for All Services)
   mongodb:
@@ -77,6 +79,7 @@ services:
       MONGODB_URI: mongodb://mongodb:27017/senior_care
       MQTT_BROKER_URL: mqtt://hivemq:1883
       GAMES_SERVICE_URL: http://games-service:8081
+      NOTIFICATION_SERVICE_URL: http://notification-service:4002
       JWT_SECRET: secret1234@
       SERVICE_NAME: api-gateway
       NODE_ENV: production
@@ -123,6 +126,178 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # NOTIFICATION MICROSERVICES (from jerald branch)
+  # ========================================
+
+  # Notification Service - Event Dispatcher & gRPC Server
+  notification-service:
+    build:
+      context: ./backend
+      dockerfile: ./services/notification-service/Dockerfile
+    image: senior-care-notification-service:latest
+    container_name: notification-service
+    ports:
+      - "4002:4002"      # HTTP API
+      - "50051:50051"    # gRPC Server
+    environment:
+      - PORT=4002
+      - GRPC_PORT=50051
+      - MONGODB_URI=mongodb://mongodb:27017/senior_care
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
+      - SERVICE_NAME=notification-service
+      - NODE_ENV=development
+    env_file:
+      - ./backend/config/secrets/.env
+    volumes:
+      - ./backend/config/secrets:/app/config/secrets:ro
+      - ./backend/shared/testing-ui:/app/testing-notification:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      hivemq:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Push Notification Service - Firebase Cloud Messaging
+  push-notification-service:
+    build:
+      context: ./backend
+      dockerfile: ./services/push-notification-service/Dockerfile
+    image: senior-care-push-notification-service:latest
+    container_name: push-notification-service
+    ports:
+      - "4020:4020"
+    environment:
+      - PORT=4020
+      - MONGODB_URI=mongodb://mongodb:27017/senior_care
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
+      - SERVICE_NAME=push-notification-service
+      - NODE_ENV=development
+      - FIREBASE_SERVICE_ACCOUNT_PATH=/app/config/secrets/firebase-sa.json
+    env_file:
+      - ./backend/config/secrets/.env
+    volumes:
+      - ./backend/config/secrets:/app/config/secrets:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      hivemq:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4020/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # AI Companion Service - Google Gemini Chatbot
+  ai-companion-service:
+    build:
+      context: ./backend
+      dockerfile: ./services/ai-companion-service/Dockerfile
+    image: senior-care-ai-companion-service:latest
+    container_name: ai-companion-service
+    ports:
+      - "4015:4015"
+    environment:
+      - PORT=4015
+      - MONGODB_URI=mongodb://mongodb:27017/senior_care
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
+      - SERVICE_NAME=ai-companion-service
+      - NODE_ENV=development
+    env_file:
+      - ./backend/config/secrets/.env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      hivemq:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # SMS Service - Twilio SMS (Optional - for demo completeness)
+  sms-service:
+    build:
+      context: ./backend
+      dockerfile: ./services/sms-service/Dockerfile
+    image: senior-care-sms-service:latest
+    container_name: sms-service
+    ports:
+      - "4004:4004"
+    environment:
+      - PORT=4004
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
+      - SERVICE_NAME=sms-service
+      - NODE_ENV=development
+      - SMS_ADAPTER=mock
+    env_file:
+      - ./backend/config/secrets/.env
+    depends_on:
+      hivemq:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Email Service - Gmail SMTP (Optional - for demo completeness)
+  email-service:
+    build:
+      context: ./backend
+      dockerfile: ./services/email-service/Dockerfile
+    image: senior-care-email-service:latest
+    container_name: email-service
+    ports:
+      - "4003:4003"
+    environment:
+      - PORT=4003
+      - MQTT_BROKER=hivemq
+      - MQTT_PORT=1883
+      - SERVICE_NAME=email-service
+      - NODE_ENV=development
+    env_file:
+      - ./backend/config/secrets/.env
+    depends_on:
+      hivemq:
+        condition: service_healthy
+    networks:
+      - senior-care-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4003/health"]
       interval: 30s
       timeout: 10s
       retries: 3
