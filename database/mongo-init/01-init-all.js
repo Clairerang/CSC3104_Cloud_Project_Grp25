@@ -37,6 +37,9 @@ var memorySet3Id = UUID().toString();
 var invitation1Id = UUID().toString();
 var invitation2Id = UUID().toString();
 
+var medicine1Id = UUID().toString();
+var medicine2Id = UUID().toString();
+
 // Switch to / Create desired database
 db = db.getSiblingDB('senior_care');
 
@@ -50,6 +53,7 @@ db.createCollection('exercises');
 db.createCollection('triviaquestions');
 db.createCollection('memorysets');
 db.createCollection('invitations');
+db.createCollection('medications');
 
 // Cloud Seed Data
 // ---- Users ----
@@ -63,8 +67,8 @@ db.users.insertMany([
         profile: {
             name: "Mary Smith",
             age: 72,
-            email: "mary@example.com",
-            contact: "+65-9000-1000"
+            email: "cloudproject6769@gmail.com",
+            contact: "+6598765787"
         },
         createdAt: new Date("2025-01-15T10:30:00.000Z"),
         updatedAt: new Date("2025-01-15T10:30:00.000Z"),
@@ -91,8 +95,8 @@ db.users.insertMany([
         profile: {
             name: "Anna Smith",
             age: 40,
-            email: "anna@example.com",
-            contact: "+65-8000-2000"
+            email: "cloudproject6769@gmail.com",
+            contact: "+6598765787"
         },
         createdAt: new Date("2025-01-15T10:30:00.000Z"),
         updatedAt: new Date("2025-01-15T10:30:00.000Z"),
@@ -451,4 +455,24 @@ db.invitations.insertMany([
     status: "pending",
     createdAt: now
   }
+]);
+
+// Medications
+db.medications.insertMany([
+  {
+    medicineId: medicine1Id,
+    seniorId: seniorId1,
+    medicationName: "Panadol",
+    dosage: "2 tablets every 4 hour",
+    reminderEnabled: true,
+    lastTakenAt: now
+  },
+  {
+    medicineId: medicine2Id,
+    seniorId: seniorId1,
+    medicationName: "Amlodipine",
+    dosage: "5 mg once daily",
+    reminderEnabled: true,
+    lastTakenAt: now
+  },
 ]);
