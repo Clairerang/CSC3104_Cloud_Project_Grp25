@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: senior-care-frontend
+  namespace: senior-care-web
+  labels:
+    app: senior-care-frontend
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: senior-care-frontend
+
+  template:
+    metadata:
+      labels:
+        app: senior-care-frontend
+
+    spec:
+      containers:
+        - name: senior-care-frontend-container
+          image: ponyoo/senior-care-frontend:latest
+          ports:
+            - containerPort: 80

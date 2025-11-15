@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: games-service
+  namespace: senior-care-game
+  labels:
+    app: games-service
+
+specs:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: games-service
+
+  template:
+    metadata:
+      labels:
+        app: games-service
+
+  spec:
+    containers:
+      - name: games-service-container
+        image: ponyoo/senior-care-games-service:latest
+        ports:
+          - containerPort: 8081
