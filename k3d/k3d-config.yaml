@@ -1,11 +1,11 @@
 apiVersion: k3d.io/v1alpha3
 kind: Simple
-name: halo
+name: senior-care
 
 # Master Node
 servers: 1
 # Worker Node
-agents: 1   # edit if more resource is required
+agents: 2   # edit if more resource is required
 
 kubeAPI:
   host: "0.0.0.0"   # use default localhost ip
@@ -18,7 +18,7 @@ ports:
 # Create local registry for docker image
 registries:
   create: 
-    name: halo-registry.localhost
+    name: senior-care-registry.localhost
     host: "0.0.0.0"
     hostPort: "5000"
 
