@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -15,17 +15,50 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 interface ShareRecipeProps {
+  userId: string;
+  gameId: string;
   onComplete: () => void;
   onBack: () => void;
 }
 
-export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
+export function ShareRecipe({ userId, gameId, onComplete, onBack }: ShareRecipeProps) {
   const [recipeName, setRecipeName] = useState('');
   const [servings, setServings] = useState('');
   const [ingredients, setIngredients] = useState(['']);
   const [instructions, setInstructions] = useState('');
   const [story, setStory] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  // Award points directly - simplified approach
+  const awardGamePoints = async () => {
+    try {
+      const token = sessionStorage.getItem('token');
+      console.log(`[GAME-POINTS] Awarding 15 points for recipe sharing completion`);
+
+      const response = await fetch('/api/add-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'recipe',
+          points: 15,
+          session: 'afternoon'
+        })
+      });
+
+      if (response.ok) {
+        console.log(`[GAME-POINTS] Points awarded successfully`);
+      } else {
+        console.error('[GAME-POINTS] Failed to award points');
+      }
+    } catch (error) {
+      console.error('[GAME-POINTS] Error awarding points:', error);
+    } finally {
+      onComplete();
+    }
+  };
 
   const handleAddIngredient = () => {
     setIngredients([...ingredients, '']);
@@ -41,7 +74,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
     setIngredients(newIngredients);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (recipeName && ingredients[0] && instructions) {
       setSubmitted(true);
     }
@@ -73,7 +106,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
           <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
             <CardContent>
               <Typography variant="h3" sx={{ color: '#ff9800', mb: 1 }}>
-                +20 Points Earned!
+                +15 Points Earned!
               </Typography>
               <Typography variant="h5" color="text.secondary">
                 Your recipe will inspire others to cook and share!
@@ -85,7 +118,7 @@ export function ShareRecipe({ onComplete, onBack }: ShareRecipeProps) {
             <Button
               variant="contained"
               size="large"
-              onClick={onComplete}
+              onClick={awardGamePoints}
               sx={{ minHeight: 40, bgcolor: '#ff9800', fontSize: 20, '&:hover': { bgcolor: '#f57c00' } }}
             >
               Done

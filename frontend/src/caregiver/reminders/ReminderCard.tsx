@@ -1,21 +1,21 @@
-import React from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  IconButton,
-  Chip,
-} from '@mui/material';
-import {
-  Delete,
-  AccessTime,
+    AccessTime,
+    Delete,
 } from '@mui/icons-material';
-import { ReminderItem } from '../api/mockData';
+import {
+    Box,
+    Chip,
+    IconButton,
+    Paper,
+    Typography,
+} from '@mui/material';
+import React from 'react';
+import { ReminderItem } from '../api/client';
 
 interface ReminderCardProps {
   reminder: ReminderItem;
   isActive: boolean;
-  onDelete: (id: number) => void;
+  onDelete: (id: string | number) => void;
   formatTime: (time: string) => string;
   frequencyLabels: Record<string, string>;
 }

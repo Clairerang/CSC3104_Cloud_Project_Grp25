@@ -14,6 +14,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 interface MemoryQuizProps {
+  userId: string;
+  gameId: string;
   onComplete: () => void;
   onBack: () => void;
 }
@@ -26,7 +28,7 @@ interface MemorySet {
   difficulty: string;
 }
 
-export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
+export function MemoryQuiz({ userId, gameId, onComplete, onBack }: MemoryQuizProps) {
   const [cards, setCards] = useState<string[]>([]);
   const [memorySetName, setMemorySetName] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,37 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [showingPreview, setShowingPreview] = useState(false);
+
+  // Award points directly - simplified approach
+  const awardGamePoints = async () => {
+    try {
+      const token = sessionStorage.getItem('token');
+      console.log(`[GAME-POINTS] Awarding 15 points for memory match completion`);
+
+      const response = await fetch('/api/add-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'memory',
+          points: 15,
+          session: 'afternoon'
+        })
+      });
+
+      if (response.ok) {
+        console.log(`[GAME-POINTS] Points awarded successfully`);
+      } else {
+        console.error('[GAME-POINTS] Failed to award points');
+      }
+    } catch (error) {
+      console.error('[GAME-POINTS] Error awarding points:', error);
+    } finally {
+      onComplete();
+    }
+  };
 
   // Fetch memory card set from API
   useEffect(() => {
@@ -206,7 +239,7 @@ export function MemoryQuiz({ onComplete, onBack }: MemoryQuizProps) {
             <Button
               variant="contained"
               size="large"
-              onClick={onComplete}
+              onClick={awardGamePoints}
               sx={{ minHeight: 70, bgcolor: '#9c27b0', fontSize: 20, '&:hover': { bgcolor: '#7b1fa2' } }}
             >
               Done

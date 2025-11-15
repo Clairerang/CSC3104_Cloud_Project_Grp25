@@ -9,14 +9,14 @@ const MemorySet = require('./models/MemorySet');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/games';
 
-// Game definitions
+// Game definitions - Points assigned based on difficulty and engagement
 const games = [
   {
     gameId: 'trivia-001',
     name: 'Cultural Trivia',
     type: 'trivia',
     description: 'Test your knowledge of history and culture',
-    points: 15,
+    points: 10,
     difficulty: 'easy'
   },
   {
@@ -32,7 +32,7 @@ const games = [
     name: 'Morning Stretch',
     type: 'stretch',
     description: '5 gentle exercises to start your day',
-    points: 10,
+    points: 20,
     difficulty: 'easy'
   },
   {
@@ -40,7 +40,7 @@ const games = [
     name: 'Share a Recipe',
     type: 'recipe',
     description: 'Post your favorite family recipe',
-    points: 20,
+    points: 15,
     difficulty: 'easy'
   },
   {
@@ -48,7 +48,7 @@ const games = [
     name: 'Stack Tower',
     type: 'tower',
     description: 'Stack blocks perfectly to build a tall tower!',
-    points: 20,
+    points: 15,
     difficulty: 'easy'
   }
 ];

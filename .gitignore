@@ -7,6 +7,12 @@ package-lock.json
 .env.local
 .env.*.local
 
+# Firebase secrets (NEVER commit these!)
+backend/config/secrets/.env
+backend/config/secrets/firebase-sa.json
+backend/config/secrets/*.json
+backend/config/secrets/*.key
+
 # Logs
 *.log
 npm-debug.log*
@@ -40,3 +46,6 @@ coverage/
 # Temporary files
 *.tmp
 .cache/
+backend/config/secrets/ 
+backend/config/secrets/.env 
+backend/config/secrets/firebase-sa.json 

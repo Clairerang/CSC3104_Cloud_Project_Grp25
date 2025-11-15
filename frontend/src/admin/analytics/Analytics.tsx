@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../services/api';
 import {
   Box,
   Paper,
@@ -36,34 +37,50 @@ import {
 
 const Analytics: React.FC = () => {
   const [timeRange, setTimeRange] = useState('week');
+  const [stats, setStats] = useState<any>(null);
+  const [engagementData, setEngagementData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const userGrowthData = [
-    { month: 'Jan', seniors: 120, families: 240, total: 360 },
-    { month: 'Feb', seniors: 135, families: 270, total: 405 },
-    { month: 'Mar', seniors: 150, families: 300, total: 450 },
-    { month: 'Apr', seniors: 165, families: 330, total: 495 },
-    { month: 'May', seniors: 180, families: 360, total: 540 },
-    { month: 'Jun', seniors: 195, families: 390, total: 585 },
-  ];
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [timeRange]);
 
-  const engagementData = [
-    { date: 'Mon', checkIns: 145, tasks: 120, social: 89 },
-    { date: 'Tue', checkIns: 152, tasks: 130, social: 95 },
-    { date: 'Wed', checkIns: 148, tasks: 125, social: 92 },
-    { date: 'Thu', checkIns: 160, tasks: 135, social: 98 },
-    { date: 'Fri', checkIns: 155, tasks: 128, social: 94 },
-    { date: 'Sat', checkIns: 138, tasks: 115, social: 85 },
-    { date: 'Sun', checkIns: 142, tasks: 118, social: 87 },
-  ];
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      const [userStatsResponse, todayStatsResponse, weeklyEngagementResponse] = await Promise.all([
+        api.users.getStats(),
+        api.engagement.getStats(),
+        api.engagement.getTrends('week'),
+      ]);
 
-  const retentionData = [
-    { week: 'Week 1', rate: 95 },
-    { week: 'Week 2', rate: 88 },
-    { week: 'Week 3', rate: 82 },
-    { week: 'Week 4', rate: 78 },
-    { week: 'Week 5', rate: 75 },
-    { week: 'Week 6', rate: 72 },
-  ];
+      const userStats = userStatsResponse.data;
+      const todayStats = todayStatsResponse.data;
+      const weeklyData = weeklyEngagementResponse.data;
+
+      setStats({
+        totalUsers: userStats.total || 0,
+        totalSeniors: userStats.seniors || 0,
+        totalFamilies: userStats.family || 0,
+        checkInsToday: todayStats.checkIns || 0,
+        activeUsers: todayStats.activeUsers || 0,
+      });
+
+      // Transform weekly engagement data
+      const chartData = weeklyData.map((day: any) => ({
+        date: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
+        checkIns: day.checkIns || 0,
+        tasks: day.tasksCompleted || 0,
+        social: day.socialInteractions || 0,
+      }));
+
+      setEngagementData(chartData);
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExport = () => {
     // Export logic here
@@ -112,10 +129,7 @@ const Analytics: React.FC = () => {
                     Total Users
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    585
-                  </Typography>
-                  <Typography variant="caption" color="success.main">
-                    +12.5% from last month
+                    {stats?.totalUsers || 0}
                   </Typography>
                 </Box>
                 <People sx={{ fontSize: 40, color: 'primary.main', opacity: 0.3 }} />
@@ -129,13 +143,10 @@ const Analytics: React.FC = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography color="textSecondary" variant="body2" gutterBottom>
-                    Avg Engagement
+                    Total Seniors
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    85%
-                  </Typography>
-                  <Typography variant="caption" color="success.main">
-                    +3.2% from last week
+                    {stats?.totalSeniors || 0}
                   </Typography>
                 </Box>
                 <TrendingUp sx={{ fontSize: 40, color: 'success.main', opacity: 0.3 }} />
@@ -152,10 +163,7 @@ const Analytics: React.FC = () => {
                     Check-ins Today
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    152
-                  </Typography>
-                  <Typography variant="caption" color="success.main">
-                    +8.1% from yesterday
+                    {stats?.checkInsToday || 0}
                   </Typography>
                 </Box>
                 <CheckCircle sx={{ fontSize: 40, color: 'info.main', opacity: 0.3 }} />
@@ -169,78 +177,16 @@ const Analytics: React.FC = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography color="textSecondary" variant="body2" gutterBottom>
-                    Badges Earned
+                    Active Users
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    248
-                  </Typography>
-                  <Typography variant="caption" color="success.main">
-                    +15.3% this week
+                    {stats?.activeUsers || 0}
                   </Typography>
                 </Box>
                 <EmojiEvents sx={{ fontSize: 40, color: 'warning.main', opacity: 0.3 }} />
               </Box>
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
-
-      {/* User Growth Chart */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} lg={8}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight="600" gutterBottom>
-              User Growth Trend
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={userGrowthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="seniors"
-                  stackId="1"
-                  stroke="#1976d2"
-                  fill="#1976d2"
-                  name="Seniors"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="families"
-                  stackId="1"
-                  stroke="#dc004e"
-                  fill="#dc004e"
-                  name="Families"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} lg={4}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight="600" gutterBottom>
-              User Retention Rate
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={retentionData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="rate"
-                  stroke="#2e7d32"
-                  strokeWidth={3}
-                  name="Retention %"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Paper>
         </Grid>
       </Grid>
 

@@ -30,66 +30,48 @@ const RecentActivity: React.FC = () => {
 
   const fetchRecentActivity = async () => {
     try {
-      // Use mock data for demonstration
-      const mockActivities: ActivityLog[] = [
-        {
-          id: '1',
-          userId: 'user1',
-          user: 'Mary Johnson',
-          userName: 'Mary Johnson',
-          action: 'Completed daily check-in',
-          type: 'checkin',
-          description: 'Daily wellness check completed',
-          timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
-        },
-        {
-          id: '2',
-          userId: 'user2',
-          user: 'Robert Chen',
-          userName: 'Robert Chen',
-          action: 'Earned "7-Day Streak" badge',
-          type: 'badge',
-          description: 'Achievement unlocked',
-          timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
-        },
-        {
-          id: '3',
-          userId: 'user3',
-          user: 'Sarah Williams',
-          userName: 'Sarah Williams',
-          action: 'Completed memory quiz',
-          type: 'task',
-          description: 'Cognitive activity completed',
-          timestamp: new Date(Date.now() - 30 * 60000).toISOString(),
-        },
-        {
-          id: '4',
-          userId: 'user4',
-          user: 'John Davis',
-          userName: 'John Davis',
-          action: 'Made voice call to family',
-          type: 'social',
-          description: 'Social connection made',
-          timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
-        },
-        {
-          id: '5',
-          userId: 'user5',
-          user: 'Linda Martinez',
-          userName: 'Linda Martinez',
-          action: 'Completed daily check-in',
-          type: 'checkin',
-          description: 'Daily wellness check completed',
-          timestamp: new Date(Date.now() - 60 * 60000).toISOString(),
-        },
-      ];
+      // Fetch real notification data from backend
+      const response = await api.engagement.getRecentActivity(10);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 400));
-      setActivities(mockActivities);
+      // Transform notification data to activity log format
+      const transformedActivities: ActivityLog[] = response.data.map((item: any) => {
+        let activityType = 'checkin';
+        let activityAction = '';
+
+        if (item.type === 'game_completed') {
+          activityType = 'task';
+          activityAction = `Completed ${item.gameName || 'a game'}`;
+        } else if (item.type === 'checkin') {
+          activityType = 'checkin';
+          activityAction = 'Completed daily check-in';
+        } else if (item.type === 'login' || item.type === 'senior_login_notification') {
+          activityType = 'social';
+          activityAction = 'Logged in';
+        } else if (item.type === 'badge_earned') {
+          activityType = 'badge';
+          activityAction = `Earned "${item.badgeName || 'a badge'}"`;
+        } else {
+          activityType = 'checkin';
+          activityAction = item.action || 'Activity completed';
+        }
+
+        return {
+          id: item._id || item.id,
+          userId: item.userId,
+          user: item.userName || item.seniorName || 'Unknown User',
+          userName: item.userName || item.seniorName || 'Unknown User',
+          action: activityAction,
+          type: activityType,
+          description: item.description || '',
+          timestamp: item.timestamp || item.createdAt || new Date().toISOString(),
+        };
+      });
+
+      setActivities(transformedActivities);
       setLoading(false);
     } catch (error) {
       console.error('Error loading recent activity:', error);
+      setActivities([]);
       setLoading(false);
     }
   };

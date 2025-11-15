@@ -17,6 +17,8 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 
 interface MorningStretchProps {
+  userId: string;
+  gameId: string;
   onComplete: () => void;
   onBack: () => void;
 }
@@ -32,7 +34,7 @@ interface Exercise {
   difficulty: string;
 }
 
-export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
+export function MorningStretch({ userId, gameId, onComplete, onBack }: MorningStretchProps) {
   const [stretches, setStretches] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +44,37 @@ export function MorningStretch({ onComplete, onBack }: MorningStretchProps) {
   const [isPaused, setIsPaused] = useState(false);
   const [completed, setCompleted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Award points directly - simplified approach
+  const awardGamePoints = async () => {
+    try {
+      const token = sessionStorage.getItem('token');
+      console.log(`[GAME-POINTS] Awarding 20 points for morning stretch completion`);
+
+      const response = await fetch('/api/add-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'stretch',
+          points: 20,
+          session: 'morning'
+        })
+      });
+
+      if (response.ok) {
+        console.log(`[GAME-POINTS] Points awarded successfully`);
+      } else {
+        console.error('[GAME-POINTS] Failed to award points');
+      }
+    } catch (error) {
+      console.error('[GAME-POINTS] Error awarding points:', error);
+    } finally {
+      onComplete();
+    }
+  };
 
   // Fetch exercises from API
   useEffect(() => {
@@ -114,7 +147,7 @@ useEffect(() => {
   };
 
   const handleFinish = () => {
-    onComplete();
+    awardGamePoints();
   };
 
   // Loading state
@@ -194,7 +227,7 @@ useEffect(() => {
           <Card sx={{ mb: 3, bgcolor: '#e8f5e9' }}>
             <CardContent>
               <Typography variant="h3" sx={{ color: '#4caf50', mb: 1 }}>
-                +10 Points Earned!
+                +20 Points Earned!
               </Typography>
               <Typography variant="h5" color="text.secondary">
                 Keep up the great work with your daily exercises!

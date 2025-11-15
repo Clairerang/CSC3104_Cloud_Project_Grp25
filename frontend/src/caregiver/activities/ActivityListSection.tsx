@@ -1,19 +1,19 @@
-import React from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-} from '@mui/material';
 import { CalendarToday } from '@mui/icons-material';
-import { Activity } from '../api/mockData';
+import {
+    Box,
+    Card,
+    Typography,
+} from '@mui/material';
+import React from 'react';
+import { Activity } from '../api/client';
 import ActivityCard from './ActivityCard';
 
 interface ActivityListSectionProps {
   title: string;
   activities: Activity[];
   isCompleted?: boolean;
-  onDelete: (id: number) => void;
-  onMarkCompleted?: (id: number) => void;
+  onDelete: (id: string | number) => void;
+  onMarkCompleted?: (id: string | number) => void;
 }
 
 const ActivityListSection: React.FC<ActivityListSectionProps> = ({

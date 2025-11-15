@@ -1,23 +1,23 @@
-import React from 'react';
+import { Group, Notifications } from '@mui/icons-material';
 import {
-  Box,
-  Typography,
-  Card,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+    Box,
+    Button,
+    Card,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    Typography,
 } from '@mui/material';
-import { Notifications, Group } from '@mui/icons-material';
-import { ReminderItem } from '../api/mockData';
+import React from 'react';
+import { ReminderItem } from '../api/client';
 import ReminderCard from './ReminderCard';
 
 interface ReminderListSectionProps {
   title: string;
   reminders: ReminderItem[];
   isActive: boolean;
-  onDelete: (id: number) => void;
+  onDelete: (id: string | number) => void;
   formatTime: (time: string) => string;
   frequencyLabels: Record<string, string>;
   selectedElderlyFilter: string;

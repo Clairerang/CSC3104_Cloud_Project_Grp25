@@ -1,34 +1,69 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Button,
-} from '@mui/material';
 import {
-  Add,
+    Add,
 } from '@mui/icons-material';
-import { mockApi, ReminderItem, getSeniorsList } from '../api/mockData';
+import {
+    Box,
+    Button,
+    CircularProgress,
+    Alert as MuiAlert,
+    Snackbar,
+    Typography,
+} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import caregiverApi, { ReminderItem } from '../api/client';
 import ReminderFormDialog from './ReminderFormDialog';
 import ReminderListSection from './ReminderListSection';
+
+interface Senior {
+  id: string;
+  name: string;
+  initials: string;
+}
 
 const Reminders: React.FC = () => {
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<ReminderItem[]>([]);
+  const [seniors, setSeniors] = useState<Senior[]>([]);
   const [selectedElderlyFilter, setSelectedElderlyFilter] = useState<string>('all');
+  const [isAddingReminder, setIsAddingReminder] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   // Load data from API
   useEffect(() => {
-    const loadReminders = async () => {
+    const loadData = async () => {
       try {
-        const remindersData = await mockApi.getReminderItems();
-        setReminders(remindersData);
-        setFilteredReminders(remindersData);
-      } catch (error) {
-        console.error('Error loading reminders:', error);
+        setIsLoading(true);
+        const [remindersResponse, seniorsResponse] = await Promise.all([
+          caregiverApi.getReminders(),
+          caregiverApi.getSeniors(),
+        ]);
+        
+        setReminders(remindersResponse.reminders);
+        setFilteredReminders(remindersResponse.reminders);
+        
+        const seniorsList = seniorsResponse.seniors.map(item => ({
+          id: item.seniorId,
+          name: item.senior.profile?.name || item.senior.username,
+          initials: item.senior.profile?.name
+            ? item.senior.profile.name.split(' ').map(n => n[0]).join('').toUpperCase()
+            : 'UK',
+        }));
+        setSeniors(seniorsList);
+      } catch (err) {
+        console.error('Error loading reminders:', err);
+        setError('Failed to load reminders. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadReminders();
+    loadData();
   }, []);
 
   // Filter reminders by elderly
@@ -40,10 +75,6 @@ const Reminders: React.FC = () => {
     }
   }, [selectedElderlyFilter, reminders]);
 
-  const [isAddingReminder, setIsAddingReminder] = useState(false);
-
-  const seniors = getSeniorsList();
-
   const frequencyLabels = {
     'once': 'Once',
     'daily': 'Daily',
@@ -51,40 +82,40 @@ const Reminders: React.FC = () => {
     'monthly': 'Monthly',
   };
 
-  const handleAddReminder = async (reminderData: Omit<ReminderItem, 'id' | 'seniorInitials' | 'isActive'>) => {
+  const handleAddReminder = async (reminderData: { senior: string; title: string; time: string; type: string; description?: string; frequency: string }) => {
     const seniorData = seniors.find(s => s.name === reminderData.senior);
     if (!seniorData) {
       throw new Error('Selected elderly family member not found');
     }
     
-    const newReminder = {
-      ...reminderData,
-      seniorInitials: seniorData.initials,
-      isActive: true,
-    };
-    
-    const newReminderItem = await mockApi.addReminderItem(newReminder);
-    
-    // Use functional update to avoid race conditions and duplicates
-    setReminders(prev => {
-      // Check if reminder already exists (defensive check)
-      const exists = prev.some(r => r.id === newReminderItem.id);
-      if (exists) {
-        console.warn('Reminder already exists, skipping duplicate');
-        return prev;
-      }
-      return [...prev, newReminderItem];
-    });
-    
-    setIsAddingReminder(false);
+    try {
+      const response = await caregiverApi.createReminder({
+        seniorId: seniorData.id,
+        title: reminderData.title,
+        description: reminderData.description,
+        time: reminderData.time,
+        type: reminderData.type,
+        frequency: reminderData.frequency,
+      });
+      
+      setReminders(prev => [...prev, response.reminder]);
+      setSnackbar({ open: true, message: 'Reminder created successfully', severity: 'success' });
+      setIsAddingReminder(false);
+    } catch (err) {
+      console.error('Error creating reminder:', err);
+      setSnackbar({ open: true, message: 'Failed to create reminder', severity: 'error' });
+      throw err;
+    }
   };
 
-  const deleteReminder = async (id: number) => {
+  const deleteReminder = async (id: string | number) => {
     try {
-      await mockApi.deleteReminderItem(id);
-      setReminders(prev => prev.filter(r => r.id !== id));
-    } catch (error) {
-      console.error('Error deleting reminder:', error);
+      await caregiverApi.deleteReminder(String(id));
+      setReminders(prev => prev.filter(r => r.id !== id && r.reminderId !== id));
+      setSnackbar({ open: true, message: 'Reminder deleted successfully', severity: 'success' });
+    } catch (err) {
+      console.error('Error deleting reminder:', err);
+      setSnackbar({ open: true, message: 'Failed to delete reminder', severity: 'error' });
     }
   };
 
@@ -97,6 +128,22 @@ const Reminders: React.FC = () => {
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
   };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 6 }}>
+        <MuiAlert severity="error">{error}</MuiAlert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ height: '100%', overflowY: 'auto', bgcolor: '#f9fafb' }}>
@@ -167,6 +214,22 @@ const Reminders: React.FC = () => {
           showFilter={true}
         />
       </Box>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <MuiAlert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 };

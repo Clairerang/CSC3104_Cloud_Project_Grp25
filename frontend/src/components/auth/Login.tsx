@@ -49,7 +49,8 @@ const Login: React.FC = () => {
 
       if (userRole === 'admin') {
         navigate('/admin/dashboard');
-      } else if (userRole === 'caregiver') {
+      } else if (userRole === 'caregiver' || userRole === 'family') {
+        // Caregiver and Family share the same dashboard
         navigate('/caregiver');
       } else if (userRole === 'senior') {
         navigate('/senior');

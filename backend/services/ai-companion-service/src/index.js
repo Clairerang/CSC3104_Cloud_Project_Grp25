@@ -529,6 +529,55 @@ Your mission is to improve wellbeing and provide helpful assistance through:
     // Update metrics
     chatCounter.inc({ intent: intentName, status: 'success' });
 
+    // Integrate with engagement tracking - award points for chat interactions
+    let engagementTracked = false;
+    let pointsAwarded = 0;
+
+    try {
+      const axios = require('axios');
+      const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8080';
+
+      // Award 3 points per meaningful chat interaction (not for simple greetings)
+      const meaningfulIntents = ['CommunityEvents', 'VolunteerConnect', 'MedicationReminder', 'WeatherInfo', 'GameRequest', 'SMSFamily'];
+      if (meaningfulIntents.includes(intentName)) {
+        pointsAwarded = 3;
+      }
+
+      // Only track points if there are points to award
+      if (pointsAwarded > 0) {
+        // Determine session based on time of day
+        const hour = new Date().getHours();
+        let sessionTime = 'afternoon';
+        if (hour < 12) sessionTime = 'morning';
+        else if (hour >= 18) sessionTime = 'evening';
+
+        const trackingResponse = await axios.post(
+          `${API_GATEWAY_URL}/add-task`,
+          {
+            userId: userId,
+            type: 'ai_chat',
+            points: pointsAwarded,
+            session: sessionTime
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Service-Auth': process.env.SERVICE_AUTH_TOKEN || 'games-service-secret'
+            },
+            timeout: 5000
+          }
+        );
+
+        if (trackingResponse.data) {
+          engagementTracked = true;
+          logger.info(`✓ Awarded ${pointsAwarded} points for ${intentName} chat interaction`);
+        }
+      }
+    } catch (error) {
+      logger.error(`✗ Failed to track chat engagement: ${error.message}`);
+      // Don't fail the chat request if engagement tracking fails
+    }
+
     const responseTime = Date.now() - startTime;
     logger.info(`⚡ Response time: ${responseTime}ms`);
 
@@ -539,7 +588,11 @@ Your mission is to improve wellbeing and provide helpful assistance through:
       confidence,
       sessionId,
       mode: geminiModels.length > 0 ? 'gemini' : 'fallback',
-      aiProvider: geminiModels.length > 0 ? 'Google Gemini AI' : 'Keyword-based'
+      aiProvider: geminiModels.length > 0 ? 'Google Gemini AI' : 'Keyword-based',
+      engagement: {
+        tracked: engagementTracked,
+        pointsAwarded: pointsAwarded
+      }
     });
 
   } catch (error) {

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Card, 
-  Button, 
-  TextField, 
+import {
+  Box,
+  Typography,
+  Card,
+  Button,
+  TextField,
   Switch,
   FormControlLabel,
   Avatar,
   IconButton,
   Divider,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import {
   Person,
@@ -22,9 +23,20 @@ import {
   Delete,
   Save,
 } from '@mui/icons-material';
-import { mockApi, getSeniorsList, Profile, NotificationSettings } from '../api/mockData';
+import { Profile, NotificationSettings } from '../api/mockData';
+import { useAuth } from '../../components/auth/AuthContext';
+import { caregiverApi } from '../api/client';
+
+interface LinkedSenior {
+  id: string;
+  name: string;
+  initials: string;
+  relation: string;
+}
 
 const Settings: React.FC = () => {
+  const { user } = useAuth();
+
   const [profile, setProfile] = useState<Profile>({
     fullName: '',
     email: '',
@@ -42,28 +54,79 @@ const Settings: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-
-  const seniors = getSeniorsList();
+  const [seniors, setSeniors] = useState<LinkedSenior[]>([]);
 
   // Load data from API
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profileData, notificationData] = await Promise.all([
-          mockApi.getProfile(),
-          mockApi.getNotificationSettings(),
-        ]);
-        setProfile(profileData);
-        setNotifications(notificationData);
+        // Fetch current user's profile data from backend
+        const response = await fetch('/api/user/me', {
+          headers: {
+            'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('[Settings] Fetched user data:', userData);
+          setProfile({
+            fullName: userData.profile?.name || user?.name || '',
+            email: userData.profile?.email || user?.email || '',
+            phone: userData.profile?.contact || '',
+            username: userData.username || '',
+            address: '', // Address not currently stored in backend
+          });
+        } else {
+          console.error('[Settings] Failed to fetch user data, status:', response.status);
+          // Fallback to user from AuthContext
+          setProfile({
+            fullName: user?.name || '',
+            email: user?.email || '',
+            phone: '',
+            username: '',
+            address: '',
+          });
+        }
+
+        // Fetch linked seniors
+        const seniorsResponse = await caregiverApi.getSeniors();
+        console.log('[Settings] Fetched seniors:', seniorsResponse);
+        const linkedSeniors = seniorsResponse.seniors.map(item => {
+          const seniorName = item.senior.profile?.name || item.senior.username;
+          const getInitials = (name: string) => {
+            const matches = name.match(/\b\w/g);
+            return matches ? matches.join('').slice(0, 2).toUpperCase() : name.slice(0, 2).toUpperCase();
+          };
+
+          return {
+            id: item.seniorId,
+            name: seniorName,
+            initials: getInitials(seniorName),
+            relation: item.relation,
+          };
+        });
+        setSeniors(linkedSeniors);
+
       } catch (error) {
         console.error('Error loading settings data:', error);
+        // Set profile from AuthContext as fallback
+        if (user) {
+          setProfile({
+            fullName: user.name,
+            email: user.email,
+            phone: '',
+            username: '',
+            address: '',
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, []);
+  }, [user]);
 
   const handleProfileChange = (field: string, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }));
@@ -72,16 +135,13 @@ const Settings: React.FC = () => {
   const handleNotificationChange = async (field: string, value: boolean) => {
     const updated = { ...notifications, [field]: value };
     setNotifications(updated);
-    try {
-      await mockApi.updateNotificationSettings(updated);
-    } catch (error) {
-      console.error('Error updating notification settings:', error);
-    }
+    // TODO: Add API endpoint to update notification settings
+    console.log('Notification settings updated:', updated);
   };
 
   const handleSaveProfile = async () => {
     try {
-      await mockApi.updateProfile(profile);
+      // TODO: Add API endpoint to update user profile
       console.log('Profile saved:', profile);
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -208,30 +268,45 @@ const Settings: React.FC = () => {
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-            {seniors.map((senior, index) => (
-              <Paper
-                key={index}
-                sx={{
-                  p: 3,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ width: 40, height: 40, bgcolor: '#f3f4f6', color: '#6b7280' }}>
-                    {senior.initials}
-                  </Avatar>
-                  <Typography sx={{ fontWeight: 500, color: '#111827' }}>
-                    {senior.name}
-                  </Typography>
-                </Box>
-              </Paper>
-            ))}
-          </Box>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : seniors.length === 0 ? (
+            <Typography sx={{ color: '#6b7280', py: 2 }}>
+              No seniors are currently linked to your account.
+            </Typography>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+              {seniors.map((senior, index) => (
+                <Paper
+                  key={index}
+                  sx={{
+                    p: 3,
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ width: 40, height: 40, bgcolor: '#1976d2', color: 'white' }}>
+                      {senior.initials}
+                    </Avatar>
+                    <Box>
+                      <Typography sx={{ fontWeight: 500, color: '#111827' }}>
+                        {senior.name}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: '#6b7280' }}>
+                        Relation: {senior.relation}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
+          )}
         </Card>
       </Box>
     </Box>

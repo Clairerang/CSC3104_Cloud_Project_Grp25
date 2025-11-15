@@ -1,28 +1,28 @@
-import React from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  IconButton,
-  Chip,
-} from '@mui/material';
-import {
-  Delete,
-  CheckCircle,
-  CalendarToday,
-  AccessTime,
-  Event,
-  Check,
-  Close,
-  Schedule,
+    AccessTime,
+    CalendarToday,
+    Check,
+    CheckCircle,
+    Close,
+    Delete,
+    Event,
+    Schedule,
 } from '@mui/icons-material';
-import { Activity } from '../api/mockData';
+import {
+    Box,
+    Chip,
+    IconButton,
+    Paper,
+    Typography,
+} from '@mui/material';
+import React from 'react';
+import { Activity } from '../api/client';
 
 interface ActivityCardProps {
   activity: Activity;
   isCompleted?: boolean;
-  onDelete: (id: number) => void;
-  onMarkCompleted?: (id: number) => void;
+  onDelete: (id: string | number) => void;
+  onMarkCompleted?: (id: string | number) => void;
 }
 
 const ActivityCard: React.FC<ActivityCardProps> = ({

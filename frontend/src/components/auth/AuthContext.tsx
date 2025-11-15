@@ -4,7 +4,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'caregiver' | 'senior';
+  role: 'admin' | 'caregiver' | 'senior' | 'family';
 }
 
 interface AuthContextType {
@@ -62,12 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Extract user data and token from response
       const { token, user: userData } = data;
 
-      // Map backend role to frontend role type
-      let role: 'admin' | 'caregiver' | 'senior';
+      // Keep backend role as-is (no mapping)
+      let role: 'admin' | 'caregiver' | 'senior' | 'family';
       if (userData.role === 'admin') {
         role = 'admin';
       } else if (userData.role === 'family') {
-        role = 'caregiver'; // Map family to caregiver role in frontend
+        role = 'family';
+      } else if (userData.role === 'caregiver') {
+        role = 'caregiver';
       } else {
         role = 'senior';
       }
@@ -80,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       console.log('AuthContext: Login successful, user data:', user);
-      console.log('AuthContext: Backend role:', userData.role, '-> Frontend role:', role);
+      console.log('AuthContext: User role:', role);
       console.log('AuthContext: Stored token:', token.substring(0, 20) + '...');
 
     setUser(user);

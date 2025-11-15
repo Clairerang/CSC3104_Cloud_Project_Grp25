@@ -82,12 +82,12 @@ const UserList: React.FC = () => {
 
       // Transform backend data to frontend format
       const transformedUsers: User[] = response.data.map((user: any) => ({
-        id: user.userId || user._id,
-        name: user.profile?.name || user.username,
-        email: user.profile?.email || '',
-        role: user.role,
+        id: user.userId || user._id || 'unknown',
+        name: user.profile?.name || user.username || 'Unknown User',
+        email: user.profile?.email || user.email || '',
+        role: user.role || 'senior',
         status: 'active', // Default to active since backend doesn't have status field
-        createdAt: user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : '',
+        createdAt: user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         lastActive: user.lastActiveAt || user.updatedAt || user.createdAt,
         phoneNumber: user.profile?.contact || '',
       }));
@@ -112,8 +112,8 @@ const UserList: React.FC = () => {
     if (searchTerm) {
       filtered = filtered.filter(
         (user) =>
-          user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase())
+          (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -273,7 +273,7 @@ const UserList: React.FC = () => {
                       {user.name}
                     </Typography>
                   </TableCell>
-                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.email || '-'}</TableCell>
                   <TableCell>
                     <Chip
                       label={getRoleLabel(user.role)}
@@ -292,7 +292,7 @@ const UserList: React.FC = () => {
                   </TableCell>
                   <TableCell>{formatLastActive(user.lastActive)}</TableCell>
                   <TableCell>
-                    {new Date(user.createdAt).toLocaleDateString()}
+                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                   </TableCell>
                   <TableCell align="right">
                     <Tooltip title="View Details">

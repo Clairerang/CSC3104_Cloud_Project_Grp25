@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/notification';
+// Prefer consolidated env name, fallback to legacy
+const MONGO_URL = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://mongodb:27017/senior_care';
 
 let connected = false;
 
@@ -61,6 +62,16 @@ const deviceTokenSchema = new mongoose.Schema({
 
 const DeviceToken = mongoose.models.DeviceToken || mongoose.model('DeviceToken', deviceTokenSchema);
 
+// Relationships collection (senior -> family/caregiver links)
+const relationshipSchema = new mongoose.Schema({
+  seniorId: { type: String, index: true, required: true },
+  linkAccId: { type: String, index: true, required: true }, // caregiver/family userId
+  relation: { type: String, default: 'family' },
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true, collection: 'relationships' });
+
+const Relationship = mongoose.models.Relationship || mongoose.model('Relationship', relationshipSchema);
+
 // Verified phone numbers (after OTP verification)
 const verifiedPhoneSchema = new mongoose.Schema({
   userId: { 
@@ -114,6 +125,7 @@ module.exports = {
     RetryJob,
     NotificationEvent,
     DeviceToken,
+    Relationship,
     VerifiedPhone,
   }
 };

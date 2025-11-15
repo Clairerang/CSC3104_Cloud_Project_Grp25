@@ -13,6 +13,8 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 
 interface StackTowerProps {
+  userId: string;
+  gameId: string;
   onComplete: () => void;
   onBack: () => void;
 }
@@ -23,7 +25,7 @@ interface Block {
   color: string;
 }
 
-export function StackTower({ onComplete, onBack }: StackTowerProps) {
+export function StackTower({ userId, gameId, onComplete, onBack }: StackTowerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'completed' | 'failed'>('menu');
   const [score, setScore] = useState(0);
@@ -33,6 +35,37 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
   const [direction, setDirection] = useState(1);
   const [speed, setSpeed] = useState(2);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Award points directly - simplified approach
+  const awardGamePoints = async () => {
+    try {
+      const token = sessionStorage.getItem('token');
+      console.log(`[GAME-POINTS] Awarding 15 points for stack tower completion`);
+
+      const response = await fetch('/api/add-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'tower',
+          points: 15,
+          session: 'afternoon'
+        })
+      });
+
+      if (response.ok) {
+        console.log(`[GAME-POINTS] Points awarded successfully`);
+      } else {
+        console.error('[GAME-POINTS] Failed to award points');
+      }
+    } catch (error) {
+      console.error('[GAME-POINTS] Error awarding points:', error);
+    } finally {
+      onComplete();
+    }
+  };
 
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 550;
@@ -326,7 +359,7 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
                   <Card sx={{ mb: 3, bgcolor: '#d1e7ffff' }}>
                     <CardContent>
                       <Typography variant="h3" sx={{ color: '#3389ebff', mb: 1 }}>
-                        +20 Points Earned!
+                        +15 Points Earned!
                       </Typography>
                       <Typography variant="h5" color="text.secondary">
                         Some incredible skills you have!
@@ -338,7 +371,7 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
                     <Button
                         variant="contained"
                         size="large"
-                        onClick={onComplete}
+                        onClick={awardGamePoints}
                         sx={{ minHeight: 70, bgcolor: '#2088ffff', fontSize: 20, '&:hover': { bgcolor: '#0077ffff' } }}
                     >
                         Done
@@ -395,7 +428,7 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
                   <Card sx={{ mb: 3, bgcolor: '#d1e7ffff' }}>
                     <CardContent>
                       <Typography variant="h3" sx={{ color: '#3389ebff', mb: 1 }}>
-                        +20 Points Earned!
+                        +15 Points Earned!
                       </Typography>
                         <Typography variant="body1" color="text.secondary" sx={{ fontSize: 20 }}>
                         You reached {score} blocks!
@@ -407,7 +440,7 @@ export function StackTower({ onComplete, onBack }: StackTowerProps) {
                     <Button
                         variant="contained"
                         size="large"
-                        onClick={onComplete}
+                        onClick={awardGamePoints}
                         sx={{ minHeight: 70, bgcolor: '#2088ffff', fontSize: 20, '&:hover': { bgcolor: '#0077ffff' } }}
                     >
                         Done

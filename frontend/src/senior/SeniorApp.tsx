@@ -1,22 +1,26 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Paper, Box, Typography, Button, Modal } from "@mui/material";
-import HomeIcon from "@mui/icons-material/Home";
-import GroupIcon from "@mui/icons-material/Group";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import PhoneIcon from "@mui/icons-material/Phone";
-import LogoutIcon from "@mui/icons-material/Logout";
 import EndCallIcon from "@mui/icons-material/CallEnd";
 import CommentIcon from '@mui/icons-material/Comment';
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import GroupIcon from "@mui/icons-material/Group";
+import HomeIcon from "@mui/icons-material/Home";
+import LogoutIcon from "@mui/icons-material/Logout";
+import PhoneIcon from "@mui/icons-material/Phone";
+import { Box, Button, Modal, Paper, Typography } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/auth/AuthContext";
+import ChatModal from "./chat/ChatModal";
 
-import {  Contact, Activity } from "../types";
+import { registerPush } from "../push/registerPush";
+import { Activity, Contact } from "../types";
+import ActivitiesScreen from "./activities/ActivitiesScreen";
+import seniorApi, { CaregiverContact } from "./api/client";
 import CheckInScreen from "./checkin/CheckInScreen";
 import CircleScreen from "./circle/CircleScreen";
-import ActivitiesScreen from "./activities/ActivitiesScreen";
-import { MorningStretch } from "./games/MorningStretch";
-import { MemoryQuiz } from "./games/MemoryQuiz";
+import { NotificationItem, NotificationPanel } from "./components/NotificationPanel";
 import { CulturalTrivia } from "./games/CulturalTrivia";
+import { MemoryQuiz } from "./games/MemoryQuiz";
+import { MorningStretch } from "./games/MorningStretch";
 import { ShareRecipe } from "./games/ShareRecipe";
 import { StackTower } from "./games/StackTower";
 
@@ -34,30 +38,78 @@ const GAME_TYPE_TO_ID: { [key: string]: string } = {
 
 const SeniorApp: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("check-in");
   const [activeGame, setActiveGame] = useState<string | null>(null);
-  const [totalPoints, setTotalPoints] = useState<number>(850);
+  const [totalPoints, setTotalPoints] = useState<number>(0); // Start at 0, will fetch from backend
+  const [levelData, setLevelData] = useState<any>(null); // Store complete level data from backend
   const [activities, setActivities] = useState<Activity[]>([]);
 
   // New state for emergency modal
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+
+  // Chat modal state
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Notification panel state
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    const stored = localStorage.getItem('senior_notifications');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  // Fetch total points and level data from backend
+  const fetchTotalPoints = async () => {
+    try {
+      const token = sessionStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('/api/total-points', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTotalPoints(data.totalPoints || 0);
+        setLevelData({
+          level: data.level,
+          progress: data.progress,
+          latestStreak: data.latestStreak
+        });
+        console.log(`[POINTS] Fetched: ${data.totalPoints} points, Level ${data.level}, ${data.latestStreak}-day streak`);
+      }
+    } catch (error) {
+      console.error('Error fetching total points:', error);
+    }
+  };
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const [contacts, setContacts] = useState<Contact[]>([
-    { id: "1", name: "Sarah", initials: "SJ", relationship: "Daughter", lastCall: "1 week ago", isFavorite: true, phoneNumber: '+65 12345678' },
-    { id: "2", name: "Michael", initials: "MJ", relationship: "Son", lastCall: "1 week ago", isFavorite: true, phoneNumber: '+65 78945612' },
-    { id: "3", name: "Emma", initials: "EJ", relationship: "Granddaughter", lastCall: "2 weeks ago", isFavorite: true, phoneNumber: '+65 98765421' },
-    { id: "4", name: "Robert", initials: "RM", relationship: "Friend", lastCall: "1 week ago", phoneNumber: '+65 36925814' },
-    { id: "5", name: "Mary", initials: "MS", relationship: "Friend", lastCall: "1 week ago", phoneNumber: '+65 85274163' },
-    { id: "6", name: "David", initials: "DJ", relationship: "Brother", lastCall: "3 days ago", phoneNumber: '+65 65498721' },
-  ]);
+  // Helper function to convert API caregiver data to Contact format
+  const caregiverToContact = (caregiver: CaregiverContact): Contact => {
+    const getInitials = (name: string) => {
+      const matches = name.match(/\b\w/g);
+      return matches ? matches.join('').slice(0, 2).toUpperCase() : name.slice(0, 2).toUpperCase();
+    };
 
-  // Fetch activities from database
+    return {
+      id: caregiver.caregiverId,
+      name: caregiver.name,
+      initials: getInitials(caregiver.name),
+      relationship: caregiver.relation,
+      lastCall: "Not available", // This would need to be tracked separately
+      isFavorite: false, // Could be added as a user preference later
+      phoneNumber: caregiver.contact || 'Not provided',
+    };
+  };
+
+  const [contacts, setContacts] = useState<Contact[]>([]);
+
+  // Fetch activities and total points from database
   useEffect(() => {
     const fetchActivities = async () => {
       try {
@@ -102,7 +154,83 @@ const SeniorApp: React.FC = () => {
     };
 
     fetchActivities();
+    fetchTotalPoints(); // Fetch total points on component mount
   }, []);
+
+  // Fetch contacts (caregivers/family) from API
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const caregivers = await seniorApi.getCaregivers();
+        const mappedContacts = caregivers.map(caregiverToContact);
+        setContacts(mappedContacts);
+        console.log('[Senior App] Fetched contacts:', mappedContacts);
+      } catch (error) {
+        console.error('Error fetching contacts:', error);
+        // Keep contacts as empty array if fetch fails
+      }
+    };
+
+    fetchContacts();
+  }, []);
+
+  // Register for push notifications once user is known (senior app scope)
+  useEffect(() => {
+    if (user?.id) {
+      console.log('[Senior App] Registering push notifications for user:', user.id);
+      registerPush(user.id, (notification) => {
+        console.log('[Senior App] Notification received via callback:', notification);
+        // Add to in-app notification panel
+        const newNotif: NotificationItem = {
+          id: Date.now().toString(),
+          title: notification.title,
+          body: notification.body,
+          timestamp: Date.now(),
+          read: false
+        };
+        setNotifications(prev => {
+          const updated = [newNotif, ...prev].slice(0, 50); // Keep max 50
+          localStorage.setItem('senior_notifications', JSON.stringify(updated));
+          console.log('[Senior App] Notification added to panel. Total notifications:', updated.length);
+          return updated;
+        });
+      }).catch(err => {
+        console.warn('[Senior App] FCM registration failed, but UI will still work:', err);
+      });
+
+      // DEV: Add a test notification to verify UI works
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Senior App] Development mode: Adding test notification in 3 seconds');
+        setTimeout(() => {
+          const testNotif: NotificationItem = {
+            id: 'test-' + Date.now(),
+            title: 'Test Reminder',
+            body: 'This is a test reminder to verify the notification panel works!',
+            timestamp: Date.now(),
+            read: false
+          };
+          setNotifications(prev => {
+            const updated = [testNotif, ...prev];
+            localStorage.setItem('senior_notifications', JSON.stringify(updated));
+            return updated;
+          });
+        }, 3000);
+      }
+    }
+  }, [user?.id]);
+
+  const handleMarkAsRead = (id: string) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
+      localStorage.setItem('senior_notifications', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleClearAll = () => {
+    setNotifications([]);
+    localStorage.removeItem('senior_notifications');
+  };
 
   const handleEmergencyCall = () => {
     console.log("Emergency call initiated");
@@ -117,15 +245,29 @@ const SeniorApp: React.FC = () => {
     setActiveGame(null);
   };
 
-  const handleGameComplete = () => {
+  const handleGameComplete = async () => {
     const completedActivity = activities.find(a => a.id === activeGame);
     if (completedActivity) {
-      setTotalPoints(prevPoints => prevPoints + completedActivity.points);
-      console.log(`Game completed! Added ${completedActivity.points} points`);
+      console.log(`Game completed! Points will be updated from backend`);
     }
 
     setActiveGame(null);
     setActiveTab("activities");
+
+    // Fetch updated points from backend after game completion
+    // Wait 2 seconds for backend to process, then retry if needed
+    const refreshPoints = async (attempt = 1) => {
+      const oldPoints = totalPoints;
+      await fetchTotalPoints();
+
+      // If points haven't updated and we haven't tried 3 times, retry after 1 second
+      if (totalPoints === oldPoints && attempt < 3) {
+        console.log(`[POINTS] Retry ${attempt + 1}: Points not updated yet, retrying...`);
+        setTimeout(() => refreshPoints(attempt + 1), 1000);
+      }
+    };
+
+    setTimeout(() => refreshPoints(), 2000);
   };
 
   const handleAddContact = (newContact: Omit<Contact, "id">) => {
@@ -160,18 +302,30 @@ const closeEmergencyModal = () => {
 
   // If a game is active, show the game screen
   if (activeGame) {
+    // Map activity IDs to gameIds from the database
+    const gameIdMap: { [key: string]: string } = {
+      "1": "stretch-001",
+      "2": "memory-001",
+      "3": "trivia-001",
+      "4": "recipe-001",
+      "5": "tower-001"
+    };
+
+    const gameId = gameIdMap[activeGame];
+    const userId = user?.id || '';
+
     const getGameComponent = () => {
       switch (activeGame) {
         case "1":
-          return <MorningStretch onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+          return <MorningStretch userId={userId} gameId={gameId} onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         case "2":
-          return <MemoryQuiz onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+          return <MemoryQuiz userId={userId} gameId={gameId} onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         case "3":
-          return <CulturalTrivia onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+          return <CulturalTrivia userId={userId} gameId={gameId} onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         case "4":
-          return <ShareRecipe onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+          return <ShareRecipe userId={userId} gameId={gameId} onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         case "5":
-          return <StackTower onBack={handleBackToActivities} onComplete={handleGameComplete} />;
+          return <StackTower userId={userId} gameId={gameId} onBack={handleBackToActivities} onComplete={handleGameComplete} />;
         default:
           return null;
       }
@@ -215,6 +369,13 @@ const closeEmergencyModal = () => {
 
           {/* Emergency 911 button */}
           <Box sx={{ flex: 1 }} />
+
+          {/* Notification Bell */}
+          <NotificationPanel
+            notifications={notifications}
+            onMarkAsRead={handleMarkAsRead}
+            onClearAll={handleClearAll}
+          />
 
           <Button
             onClick={() => { openEmergencyModal(); handleEmergencyCall(); }}
@@ -371,6 +532,13 @@ const closeEmergencyModal = () => {
         {/* Emergency 911 button */}
         <Box sx={{ flex: 1 }} />
 
+        {/* Notification Bell */}
+        <NotificationPanel
+          notifications={notifications}
+          onMarkAsRead={handleMarkAsRead}
+          onClearAll={handleClearAll}
+        />
+
         <Button
           onClick={() => { openEmergencyModal(); handleEmergencyCall(); }}
           startIcon={<PhoneIcon sx={{ width: 20, height: 20 }} />}
@@ -406,6 +574,7 @@ const closeEmergencyModal = () => {
           activities={activities}
           onPlayGame={handlePlayGame}
           totalPoints={totalPoints}
+          levelData={levelData}
         />
       )}
 
@@ -443,7 +612,7 @@ const closeEmergencyModal = () => {
       {/* Chat bot */}
       <Button
         aria-label="open-messages"
-        onClick={() => console.log('Open messages')}
+        onClick={() => setChatOpen(true)}
         sx={{
           position: 'fixed',
           bottom: 110,
@@ -467,6 +636,13 @@ const closeEmergencyModal = () => {
       >
         <CommentIcon sx={{ width: 28, height: 28 }} />
       </Button>
+
+      {/* Chat Modal */}
+      <ChatModal
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        userId={user?.id || 'guest-user'}
+      />
 
       {/* Bottom Navigation */}
       <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, borderTop: '1px solid #e5e7eb' }} elevation={0}>

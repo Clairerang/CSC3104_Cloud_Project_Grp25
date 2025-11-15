@@ -17,6 +17,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 interface CulturalTriviaProps {
+  userId: string;
+  gameId: string;
   onComplete: () => void;
   onBack: () => void;
 }
@@ -31,7 +33,7 @@ interface TriviaQuestion {
   difficulty: string;
 }
 
-export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
+export function CulturalTrivia({ userId, gameId, onComplete, onBack }: CulturalTriviaProps) {
   const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,38 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [completed, setCompleted] = useState(false);
+
+  // Award points directly - simplified approach
+  const awardGamePoints = async () => {
+    try {
+      const token = sessionStorage.getItem('token');
+      console.log(`[GAME-POINTS] Awarding 10 points for trivia completion`);
+
+      const response = await fetch('/api/add-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'trivia',
+          points: 10,
+          session: 'afternoon'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[GAME-POINTS] Points awarded successfully`);
+      } else {
+        console.error('[GAME-POINTS] Failed to award points');
+      }
+    } catch (error) {
+      console.error('[GAME-POINTS] Error awarding points:', error);
+    } finally {
+      onComplete();
+    }
+  };
 
   // Fetch trivia questions from API
   useEffect(() => {
@@ -164,7 +198,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
           <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
             <CardContent>
               <Typography variant="h3" sx={{ color: '#ff9800', mb: 1 }}>
-                +15 Points Earned!
+                +10 Points Earned!
               </Typography>
               <Typography variant="h5" color="text.secondary">
                 {percentage >= 70
@@ -178,7 +212,7 @@ export function CulturalTrivia({ onComplete, onBack }: CulturalTriviaProps) {
             <Button
               variant="contained"
               size="large"
-              onClick={onComplete}
+              onClick={awardGamePoints}
               sx={{ minHeight: 50, bgcolor: '#ff9800', fontSize: 20, '&:hover': { bgcolor: '#f57c00' } }}
             >
               Done

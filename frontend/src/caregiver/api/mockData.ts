@@ -22,7 +22,7 @@ export interface Reminder {
 }
 
 export interface Activity {
-  id: number;
+  id: string | number;
   title: string;
   senior: string;
   seniorInitials: string;
@@ -34,7 +34,7 @@ export interface Activity {
 }
 
 export interface ReminderItem {
-  id: number;
+  id: string | number;
   title: string;
   senior: string;
   seniorInitials: string;
@@ -126,12 +126,12 @@ export interface OverallAnalyticsStats {
   tasksChange: string;
 }
 
-// Mock Data
+// Mock Data (Reflecting actual database users)
 export const mockSeniors: Senior[] = [
   {
     id: '1',
-    name: 'Grandma Rose',
-    initials: 'GR',
+    name: 'Mary Smith',
+    initials: 'MS',
     status: 'Active',
     lastCheckIn: '2 hours ago',
     isOnline: true,
@@ -139,76 +139,43 @@ export const mockSeniors: Senior[] = [
   },
   {
     id: '2',
-    name: 'Grandpa Joe',
-    initials: 'GJ',
-    status: 'Missed Check-In',
-    lastCheckIn: '1 day ago',
-    isOnline: false,
-    engagement: 45,
-  },
-  {
-    id: '3',
-    name: 'Aunt Margaret',
-    initials: 'AM',
+    name: 'Joe Tan',
+    initials: 'JT',
     status: 'Active',
-    lastCheckIn: '30 mins ago',
+    lastCheckIn: '1 hour ago',
     isOnline: true,
-    engagement: 88,
-  },
-  {
-    id: '4',
-    name: 'Uncle Frank',
-    initials: 'UF',
-    status: 'Inactive',
-    lastCheckIn: '3 days ago',
-    isOnline: false,
-    engagement: 20,
+    engagement: 85,
   },
 ];
 
 export const mockAlerts: Alert[] = [
   {
     id: '1',
-    message: '⚠ Grandpa Joe missed check-in today. Last seen online 1 day ago.',
-    severity: 'high',
+    message: '✅ Mary Smith checked in feeling great this morning.',
+    severity: 'low',
   },
   {
     id: '2',
-    message: '🚨 Uncle Frank has been inactive for 3 days - no online activity detected.',
-    severity: 'high',
+    message: '✅ Joe Tan logged in successfully at 9:45 AM.',
+    severity: 'low',
   },
   {
     id: '3',
-    message: '💊 Automated medication alert sent to Grandma Rose for 3 PM dose.',
+    message: '💊 Medication reminder scheduled for Mary Smith at 3 PM.',
     severity: 'medium',
-  },
-  {
-    id: '4',
-    message: "⏰ Grandpa Joe hasn't responded to medication reminder (2 PM).",
-    severity: 'high',
-  },
-  {
-    id: '5',
-    message: 'Weekly wellness check scheduled for tomorrow.',
-    severity: 'low',
   },
 ];
 
 export const mockReminders: Reminder[] = [
   {
     id: '1',
-    message: 'Call Grandma Rose – no social call in 3 days.',
+    message: 'Call Mary Smith – daily wellness check.',
     type: 'call',
   },
   {
     id: '2',
-    message: 'Check in with Uncle Frank – missed last appointment.',
+    message: 'Remind Joe Tan about afternoon medication.',
     type: 'task',
-  },
-  {
-    id: '3',
-    message: 'Schedule video call with Aunt Margaret this weekend.',
-    type: 'call',
   },
 ];
 
@@ -216,67 +183,45 @@ export const mockActivities: Activity[] = [
   {
     id: 1,
     title: 'Weekly Video Call',
-    senior: 'Grandma Rose',
-    seniorInitials: 'GR',
+    senior: 'Mary Smith',
+    seniorInitials: 'MS',
     date: '2025-01-24',
     time: '14:00',
     type: 'video-call',
-    description: 'Regular catch-up video call to discuss the week',
+    description: 'Regular catch-up video call with daughter',
     status: 'pending',
   },
   {
     id: 2,
-    title: 'Morning Walk',
-    senior: 'Aunt Margaret',
-    seniorInitials: 'AM',
+    title: 'Morning Exercise',
+    senior: 'Joe Tan',
+    seniorInitials: 'JT',
     date: '2025-01-23',
     time: '08:00',
     type: 'exercise',
-    description: 'Daily morning walk in the park',
+    description: 'Daily morning stretching routine',
     status: 'accepted',
   },
   {
     id: 3,
-    title: 'Gardening Session',
-    senior: 'Grandma Rose',
-    seniorInitials: 'GR',
-    date: '2025-01-25',
-    time: '10:00',
-    type: 'hobby',
-    description: 'Help with garden maintenance',
-    status: 'rejected',
-  },
-  {
-    id: 4,
     title: 'Check-in Call',
-    senior: 'Grandpa Joe',
-    seniorInitials: 'GJ',
+    senior: 'Mary Smith',
+    seniorInitials: 'MS',
     date: '2025-01-22',
     time: '16:00',
     type: 'phone-call',
-    description: 'Daily afternoon check-in',
+    description: 'Daily afternoon wellness check',
     status: 'completed',
   },
   {
-    id: 5,
-    title: 'Family Dinner',
-    senior: 'Uncle Frank',
-    seniorInitials: 'UF',
+    id: 4,
+    title: 'Family Visit',
+    senior: 'Joe Tan',
+    seniorInitials: 'JT',
     date: '2025-01-21',
     time: '18:00',
     type: 'visit',
-    description: 'Weekly family dinner at home',
-    status: 'completed',
-  },
-  {
-    id: 6,
-    title: 'Book Club Meeting',
-    senior: 'Aunt Margaret',
-    seniorInitials: 'AM',
-    date: '2025-01-20',
-    time: '15:00',
-    type: 'social',
-    description: 'Monthly book club discussion',
+    description: 'Weekly family visit with son',
     status: 'completed',
   },
 ];
@@ -284,20 +229,20 @@ export const mockActivities: Activity[] = [
 export const mockReminderItems: ReminderItem[] = [
   {
     id: 1,
-    title: 'Call Grandma Rose',
-    senior: 'Grandma Rose',
-    seniorInitials: 'GR',
+    title: 'Call Mary Smith',
+    senior: 'Mary Smith',
+    seniorInitials: 'MS',
     time: '15:00',
     type: 'call',
-    description: 'Daily check-in call',
+    description: 'Daily wellness check-in call',
     isActive: true,
     frequency: 'daily',
   },
   {
     id: 2,
-    title: 'Medication check for Grandpa Joe',
-    senior: 'Grandpa Joe',
-    seniorInitials: 'GJ',
+    title: 'Medication check for Joe Tan',
+    senior: 'Joe Tan',
+    seniorInitials: 'JT',
     time: '09:00',
     type: 'medication',
     description: 'Morning medication reminder',
@@ -306,25 +251,14 @@ export const mockReminderItems: ReminderItem[] = [
   },
   {
     id: 3,
-    title: 'Weekly video call with Aunt Margaret',
-    senior: 'Aunt Margaret',
-    seniorInitials: 'AM',
+    title: 'Weekly video call with Mary Smith',
+    senior: 'Mary Smith',
+    seniorInitials: 'MS',
     time: '18:00',
     type: 'call',
-    description: 'Weekly family video call',
+    description: 'Weekly family video call with daughter Anna',
     isActive: true,
     frequency: 'weekly',
-  },
-  {
-    id: 4,
-    title: 'Exercise reminder for Uncle Frank',
-    senior: 'Uncle Frank',
-    seniorInitials: 'UF',
-    time: '10:00',
-    type: 'task',
-    description: 'Daily walk reminder',
-    isActive: false,
-    frequency: 'daily',
   },
 ];
 
@@ -342,9 +276,9 @@ export const mockAnalyticsData: AnalyticsData = {
     { month: 'Apr', checkIns: 110, calls: 75, tasks: 142 },
   ],
   seniorDataMap: {
-    'grandma-rose': {
-      name: 'Grandma Rose',
-      initials: 'GR',
+    'mary-smith': {
+      name: 'Mary Smith',
+      initials: 'MS',
       weeklyData: [
         { week: 'Week 1', checkIns: 7, calls: 5, tasks: 10 },
         { week: 'Week 2', checkIns: 7, calls: 6, tasks: 11 },

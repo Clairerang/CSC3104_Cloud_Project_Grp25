@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  IconButton,
-  Chip,
-  LinearProgress,
-  Alert as MuiAlert,
-  CircularProgress,
-} from '@mui/material';
 import { Close, Timeline } from '@mui/icons-material';
-import { mockApi, Alert } from '../api/mockData';
-import { caregiverApi, CaregiverSeniorItem, SeniorSummaryResponse } from '../api/client';
+import {
+    Box,
+    Card,
+    Chip,
+    CircularProgress,
+    IconButton,
+    LinearProgress,
+    Alert as MuiAlert,
+    Snackbar,
+    Typography,
+} from '@mui/material';
+import React, { useCallback, useEffect, useState } from 'react';
+import { caregiverApi, CaregiverSeniorItem, SeniorSummaryResponse, NotificationEvent } from '../api/client';
+import { Alert } from '../api/mockData';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 import { CaregiverSeniorCard, SeniorStatus } from '../types/caregiver';
 import SeniorDetailsDialog from './SeniorDetailsDialog';
 
@@ -91,6 +93,53 @@ const enrichSenior = (
   };
 };
 
+const mapNotificationToAlert = (notification: NotificationEvent): Alert => {
+  let message = '';
+  let severity: 'high' | 'medium' | 'low' = 'low';
+
+  const payload = notification.payload;
+  const type = payload.type;
+
+  // Map different notification types to user-friendly messages
+  switch (type) {
+    case 'urgent_wellbeing_alert':
+      message = `${payload.userName || payload.seniorName || 'A senior'} is not feeling well and needs attention`;
+      severity = 'high';
+      break;
+    case 'missed_checkin':
+    case 'missed_checkin_alert':
+      message = `${payload.seniorName || payload.userName || 'Senior'} has missed their check-in`;
+      severity = 'high';
+      break;
+    case 'checkin':
+      const mood = payload.mood === 'not-well' ? 'not feeling well' : payload.mood || 'checked in';
+      message = `${payload.userName || payload.seniorName || 'Senior'} ${mood === 'checked in' ? mood : `is ${mood}`}`;
+      severity = payload.mood === 'not-well' ? 'high' : 'low';
+      break;
+    case 'daily_login':
+    case 'login':
+    case 'senior_login_notification':
+      message = `${payload.seniorName || payload.name || payload.userName || 'Senior'} logged in`;
+      severity = 'low';
+      break;
+    case 'game_completed':
+      const gameName = payload.gameName || 'a game';
+      const points = payload.points ? ` and earned ${payload.points} points` : '';
+      message = `${payload.userName || payload.seniorName || 'Senior'} completed ${gameName}${points}`;
+      severity = 'low';
+      break;
+    default:
+      message = payload.message || payload.body || `${type} event occurred`;
+      severity = payload.severity as any || 'medium';
+  }
+
+  return {
+    id: notification._id,
+    message,
+    severity,
+  };
+};
+
 const Dashboard: React.FC = () => {
   const [seniors, setSeniors] = useState<CaregiverSeniorCard[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -98,49 +147,92 @@ const Dashboard: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loadingSeniors, setLoadingSeniors] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadAlerts = async () => {
-      try {
-        const alertsData = await mockApi.getAlerts();
-        setAlerts(alertsData);
-      } catch (err) {
-        console.error('Error loading alerts:', err);
-      }
-    };
-
-    const loadSeniors = async () => {
-      setLoadingSeniors(true);
-      setError(null);
-      try {
-        const response = await caregiverApi.getSeniors();
-        const enriched = await Promise.all(
-          response.seniors.map(async (item) => {
-            const summary = await caregiverApi.getSeniorSummary(item.seniorId);
-            return enrichSenior(item, summary);
-          })
-        );
-        setSeniors(enriched);
-      } catch (err) {
-        console.error('Error loading caregiver seniors:', err);
-        setError('Unable to load linked seniors. Please try again later.');
-        setSeniors([]);
-      } finally {
-        setLoadingSeniors(false);
-      }
-    };
-
-    loadAlerts();
-    loadSeniors();
+  const loadSeniors = useCallback(async () => {
+    setLoadingSeniors(true);
+    setError(null);
+    try {
+      const response = await caregiverApi.getSeniors();
+      const enriched = await Promise.all(
+        response.seniors.map(async (item) => {
+          const summary = await caregiverApi.getSeniorSummary(item.seniorId);
+          return enrichSenior(item, summary);
+        })
+      );
+      setSeniors(enriched);
+    } catch (err) {
+      console.error('Error loading caregiver seniors:', err);
+      setError('Unable to load linked seniors. Please try again later.');
+      setSeniors([]);
+    } finally {
+      setLoadingSeniors(false);
+    }
   }, []);
 
-  const dismissAlert = async (id: string) => {
+  // Real-time updates via MQTT
+  useRealtimeUpdates({
+    enabled: true,
+    onEvent: (event) => {
+      console.log('📬 Dashboard received event:', event.type);
+
+      // Show notification
+      if (event.type === 'checkin') {
+        setNotification(`Check-in: ${event.session} session completed`);
+      } else if (event.type === 'game_completed') {
+        setNotification(`${event.gameName}: +${event.points} points`);
+      } else if (event.type === 'login') {
+        setNotification(`${event.name || event.username} has logged in`);
+      }
+
+      // Refresh senior data
+      loadSeniors();
+    },
+  });
+
+  const loadAlerts = useCallback(async () => {
     try {
-      await mockApi.dismissAlert(id);
-      setAlerts(alerts.filter(alert => alert.id !== id));
-    } catch (error) {
-      console.error('Error dismissing alert:', error);
+      const response = await caregiverApi.getNotifications(50, 1);
+      console.log('[Dashboard] Raw notifications:', response);
+
+      const mappedAlerts = response.items
+        .filter(notification => {
+          const type = notification.payload?.type;
+          if (!type) return false;
+
+          // Show high-priority alerts and important notifications
+          const isAlert = [
+            'urgent_wellbeing_alert',
+            'missed_checkin',
+            'missed_checkin_alert'  // Backend actually publishes this
+          ].includes(type);
+
+          const isBadMood = type === 'checkin' && notification.payload.mood === 'not-well';
+
+          // Show game completions and check-ins as notifications (not just bad moods)
+          const isEngagement = ['game_completed', 'checkin', 'senior_login_notification', 'login'].includes(type);
+
+          return isAlert || isBadMood || isEngagement;
+        })
+        .map(mapNotificationToAlert)
+        .slice(0, 15); // Show more items
+
+      console.log('[Dashboard] Filtered alerts:', mappedAlerts);
+      setAlerts(mappedAlerts);
+    } catch (err) {
+      console.error('Error loading alerts:', err);
     }
+  }, []);
+
+  useEffect(() => {
+    loadAlerts();
+    loadSeniors();
+  }, [loadSeniors, loadAlerts]);
+
+  const dismissAlert = async (id: string) => {
+    // For now, just remove from local state
+    // TODO: Add API endpoint to mark notification as read/dismissed
+    setAlerts(alerts.filter(alert => alert.id !== id));
   };
 
   const handleSeniorClick = (senior: CaregiverSeniorCard) => {
@@ -381,6 +473,15 @@ const Dashboard: React.FC = () => {
           onClose={handleCloseDialog}
         />
       </Box>
+
+      {/* Real-time notification snackbar */}
+      <Snackbar
+        open={!!notification}
+        autoHideDuration={4000}
+        onClose={() => setNotification(null)}
+        message={notification}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      />
     </Box>
   );
 };

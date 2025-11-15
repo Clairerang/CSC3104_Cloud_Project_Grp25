@@ -21,7 +21,13 @@ const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.path}`);
+  next();
+});
 
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI)
@@ -174,31 +180,38 @@ app.get('/exercises', async (req, res) => {
 // Start a new game session
 app.post('/session/start', async (req, res) => {
   try {
+    console.log('[SESSION-START] Request received:', req.body);
     const { userId, gameId, gameType } = req.body;
 
     if (!userId || !gameId || !gameType) {
+      console.log('[SESSION-START] Missing required fields');
       return res.status(400).json({
         success: false,
         error: 'userId, gameId, and gameType are required'
       });
     }
 
+    const sessionId = require('uuid').v4();
+    console.log('[SESSION-START] Creating session:', sessionId);
+
     const session = new GameSession({
-      sessionId: require('uuid').v4(),
+      sessionId,
       userId,
       gameId,
       gameType,
       startedAt: new Date()
     });
 
+    console.log('[SESSION-START] Saving to database...');
     await session.save();
+    console.log('[SESSION-START] Session saved successfully:', sessionId);
 
     res.json({
       success: true,
-      session
+      sessionId: session.sessionId
     });
   } catch (error) {
-    console.error('Error starting game session:', error);
+    console.error('[SESSION-START] Error:', error.message);
     res.status(500).json({
       success: false,
       error: error.message
@@ -232,14 +245,8 @@ app.post('/session/complete', async (req, res) => {
     const game = await Game.findOne({ gameId: session.gameId });
 
     if (game) {
+      // Award exact points from game definition
       pointsEarned = game.points;
-
-      // Bonus points for excellent performance
-      if (session.gameType === 'trivia' && correctAnswers === totalQuestions) {
-        pointsEarned += 5; // Perfect score bonus
-      } else if (session.gameType === 'memory' && moves <= 15) {
-        pointsEarned += 5; // Efficient completion bonus
-      }
     }
 
     // Update session
@@ -254,11 +261,74 @@ app.post('/session/complete', async (req, res) => {
 
     await session.save();
 
-    res.json({
+    // Integrate with engagement tracking - call API Gateway with retry logic
+    let engagementTracked = false;
+    let engagementError = null;
+
+    try {
+      console.log(`[GAME-COMPLETE] Attempting to track ${pointsEarned} points for user ${session.userId}`);
+
+      const axios = require('axios');
+      const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8080';
+
+      // Determine session based on time of day
+      const hour = new Date().getHours();
+      let sessionTime = 'afternoon';
+      if (hour < 12) sessionTime = 'morning';
+      else if (hour >= 18) sessionTime = 'evening';
+
+      const trackingResponse = await axios.post(
+        `${API_GATEWAY_URL}/add-task`,
+        {
+          userId: session.userId, // Required for service auth
+          type: session.gameType,
+          points: pointsEarned,
+          session: sessionTime
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Service-Auth': process.env.SERVICE_AUTH_TOKEN || 'games-service-secret'
+          },
+          timeout: 5000 // 5 second timeout
+        }
+      );
+
+      if (trackingResponse.data) {
+        engagementTracked = true;
+        console.log(`[GAME-COMPLETE] ✓ Successfully tracked points for user ${session.userId}`);
+        console.log(`[GAME-COMPLETE] Daily progress: ${trackingResponse.data.dailyProgress?.todayTotal}/${trackingResponse.data.dailyProgress?.dailyCap}`);
+      }
+    } catch (error) {
+      engagementError = error.message;
+      console.error(`[GAME-COMPLETE] ✗ Failed to track engagement:`, error.message);
+
+      // Log but don't fail the request - game completion should still succeed
+      if (error.response) {
+        console.error(`[GAME-COMPLETE] API Response Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+      } else if (error.request) {
+        console.error(`[GAME-COMPLETE] No response from API Gateway - service may be down`);
+      }
+
+      // TODO: Implement retry queue or dead letter queue for failed point tracking
+      console.warn(`[GAME-COMPLETE] Points will need to be manually reconciled for session ${sessionId}`);
+    }
+
+    const response = {
       success: true,
       session,
-      pointsEarned
-    });
+      pointsEarned,
+      engagement: {
+        tracked: engagementTracked,
+        error: engagementError
+      }
+    };
+
+    if (!engagementTracked) {
+      response.warning = 'Game completed successfully but points tracking failed. Points may be reconciled later.';
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error completing game session:', error);
     res.status(500).json({

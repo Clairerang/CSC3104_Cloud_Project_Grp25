@@ -269,34 +269,81 @@ app.post('/save-device-token', async (req, res) => {
   }
 });
 
-// Scheduler: check for missed checkins and send reminders
-const CHECK_PERIOD_MS = parseInt(process.env.CHECK_PERIOD_MS || '60000', 10); // default 60s for testing
-const CHECKIN_THRESHOLD_MS = parseInt(process.env.CHECKIN_THRESHOLD_MS || String(24 * 60 * 60 * 1000), 10); // default 24h
+// Scheduler: missed check-ins within first 3h of today's session
+// Tuning:
+//  - CHECK_PERIOD_MS: how often to check (default 60s)
+//  - MISSED_CHECKIN_WINDOW_MS: window from start-of-day to allow check-in (default 3h)
+const CHECK_PERIOD_MS = parseInt(process.env.CHECK_PERIOD_MS || '60000', 10);
+const MISSED_CHECKIN_WINDOW_MS = parseInt(process.env.MISSED_CHECKIN_WINDOW_MS || String(3 * 60 * 60 * 1000), 10);
+
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+async function hasTodayCheckin(userId, todayStart) {
+  const docs = await models.CheckIn.find({
+    userId,
+    timestamp: { $gte: todayStart }
+  }).limit(1).lean().exec();
+  return docs && docs.length > 0;
+}
 
 async function checkForMissedCheckins() {
   try {
     const users = await models.User.find().lean().exec();
     const now = Date.now();
+    const todayStart = startOfToday();
+    const windowEnd = new Date(todayStart.getTime() + MISSED_CHECKIN_WINDOW_MS);
+
+    // Only evaluate after the window has passed
+    if (Date.now() < windowEnd.getTime()) return;
+
     for (const u of users) {
-      const last = u.lastCheckInAt ? new Date(u.lastCheckInAt).getTime() : 0;
-      const lastReminder = u.lastReminderAt ? new Date(u.lastReminderAt).getTime() : 0;
-      const age = now - last;
-      if (age > CHECKIN_THRESHOLD_MS) {
-        // don't spam: only remind once per threshold window
-        if (now - lastReminder > CHECKIN_THRESHOLD_MS) {
+      // Seniors only (if roles exist elsewhere, rely on downstream consumers)
+      const checkedIn = await hasTodayCheckin(u.userId, todayStart);
+      if (checkedIn) continue;
+
+      // Prevent repeated alerts: reuse lastReminderAt as a per-day throttle
+      const lastReminderAt = u.lastReminderAt ? new Date(u.lastReminderAt) : null;
+      if (lastReminderAt && lastReminderAt >= todayStart) {
+        // Already alerted today
+        continue;
+      }
+
+      // Find caregivers/family linked to this senior and notify them
+      const relations = await models.Relationship.find({ seniorId: u.userId }).lean().exec();
+      const caregiverIds = (relations || []).map(r => r.linkAccId).filter(Boolean);
+
+      if (caregiverIds.length === 0) {
+        // Fallback: still publish an alert tagged to the senior (dashboard visibility)
+        const alert = {
+          type: 'missed_checkin_alert',
+          userId: u.userId,
+          name: u.name || u.userId,
+          windowMs: MISSED_CHECKIN_WINDOW_MS,
+          targets: ['dashboard']
+        };
+        await publishEvent(alert);
+      } else {
+        // Publish to each caregiver so their devices receive push
+        for (const caregiverId of caregiverIds) {
           const alert = {
             type: 'missed_checkin_alert',
-            userId: u.userId,
-            name: u.name,
-            ageMs: age,
-            targets: ['dashboard','mobile','tablet']
+            userId: caregiverId,
+            seniorId: u.userId,
+            seniorName: u.name || u.userId,
+            message: `No check-in from ${u.name || u.userId} within the first 3 hours`,
+            targets: ['dashboard','mobile']
           };
           await publishEvent(alert);
-          // update lastReminderAt
-          await models.User.updateOne({ userId: u.userId }, { $set: { lastReminderAt: new Date() } });
-          console.log(`🔔 Published missed-checkin alert for ${u.userId}`);
         }
       }
+
+      // Update lastReminderAt to avoid re-sending today
+      await models.User.updateOne({ userId: u.userId }, { $set: { lastReminderAt: new Date() } });
+      console.log(`🔔 Published missed-checkin alert (caregivers) for ${u.userId}`);
     }
   } catch (e) {
     console.error('⚠️ checkForMissedCheckins error:', e && e.message ? e.message : e);

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
-// Fixed: Using same database as event-dispatcher
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/notification';
+// Use consolidated senior_care database (prefer MONGODB_URI)
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://mongodb:27017/senior_care';
 
 let _connected = false;
 

@@ -4,14 +4,15 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const { User, Relationship, Engagement, Invitation } = require('./models');
+const mqtt = require('mqtt');
+const { User, Relationship, Engagement, Invitation, Activity, Reminder } = require('./models');
 
 const app = express();
 const port = 8080;
 
-app.use(express.json());
 const JWT_SECRET = 'secret1234@';
 
+// IMPORTANT: Proxy middleware MUST come BEFORE express.json() to avoid body parsing conflicts
 // Proxy /games requests to games-service
 const GAMES_SERVICE_URL = process.env.GAMES_SERVICE_URL || 'http://games-service:8081';
 app.use('/games', createProxyMiddleware({
@@ -29,6 +30,26 @@ app.use('/games', createProxyMiddleware({
   }
 }));
 
+// Proxy /notification requests to notification-service (FCM config, token save, dashboard)
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:4002';
+app.use('/notification', createProxyMiddleware({
+  target: NOTIFICATION_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/notification': '', // Remove /notification prefix when forwarding
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Proxy] ${req.method} ${req.path} -> ${NOTIFICATION_SERVICE_URL}${req.path}`);
+  },
+  onError: (err, req, res) => {
+    console.error('[Proxy Error]', err);
+    res.status(500).json({ error: 'Notification service unavailable' });
+  }
+}));
+
+// Apply express.json() AFTER proxy middleware so body isn't consumed before proxying
+app.use(express.json());
+
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/senior_care';
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
@@ -37,12 +58,91 @@ mongoose.connect(MONGODB_URI, {
 .then(() => console.log('Connected to MongoDB!'))
 .catch(err => console.error('MongoDB connection error:', err));
 
+// Connect to MQTT Broker
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://hivemq:1883';
+const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
+  clientId: `api-gateway-${uuidv4()}`,
+  clean: true,
+  reconnectPeriod: 1000,
+});
+
+mqttClient.on('connect', () => {
+  console.log('✅ API Gateway connected to MQTT Broker');
+});
+
+mqttClient.on('error', (error) => {
+  console.error('❌ MQTT connection error:', error);
+});
+
+// Helper function to publish events to MQTT
+function publishEvent(eventType, eventData) {
+  const event = {
+    type: eventType,
+    ...eventData,
+    timestamp: new Date().toISOString()
+  };
+
+  // Set default target if not provided
+  if (!event.target && !event.targets) {
+    event.target = ['dashboard', 'mobile'];
+  }
+
+  mqttClient.publish('notification/events', JSON.stringify(event), { qos: 1 }, (err) => {
+    if (err) {
+      console.error(`❌ Failed to publish ${eventType} event:`, err);
+    } else {
+      console.log(`📤 Published ${eventType} event to MQTT:`, { type: eventType, userId: event.userId, targets: event.target || event.targets });
+    }
+  });
+}
+
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid or expired token.' });
+  }
+}
+
+// Hybrid authentication: supports both JWT tokens and service-to-service auth
+function authenticateHybrid(req, res, next) {
+  // Check for service-to-service authentication first
+  const serviceAuth = req.headers['x-service-auth'];
+  const SERVICE_AUTH_TOKEN = process.env.SERVICE_AUTH_TOKEN || 'games-service-secret';
+
+  if (serviceAuth === SERVICE_AUTH_TOKEN) {
+    // Service-to-service call - extract userId from request body or query
+    const userId = req.body.userId || req.query.userId;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId required for service calls' });
+    }
+
+    // Create a mock user object for service calls
+    req.user = {
+      userId: userId,
+      role: 'senior', // Services can only perform actions on behalf of seniors
+      serviceAuth: true
+    };
+
+    console.log(`[SERVICE-AUTH] Authenticated service call for user ${userId}`);
+    return next();
+  }
+
+  // Fall back to regular JWT authentication
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied. No token or service auth provided.' });
   }
 
   try {
@@ -87,9 +187,9 @@ app.post('/register', authenticateToken, async (req, res) => {
       });
     }
 
-    const validRoles = ['senior', 'family', 'admin'];
+    const validRoles = ['senior', 'family', 'caregiver', 'admin'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: "Invalid role. Must be 'senior', 'family', or 'admin'" });
+      return res.status(400).json({ error: "Invalid role. Must be 'senior', 'family', 'caregiver', or 'admin'" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -176,6 +276,42 @@ app.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Publish login event for real-time updates (especially for seniors)
+    if (user.role === 'senior') {
+      // Publish event to senior's dashboard
+      publishEvent('login', {
+        userId: user.userId,
+        username: user.username,
+        name: user.profile?.name || user.username,
+        role: user.role,
+        title: 'Senior Login',
+        body: `${user.profile?.name || user.username} has logged in`
+      });
+
+      // Notify caregivers that senior has logged in
+      try {
+        const relationships = await Relationship.find({ seniorId: user.userId }).lean();
+        const caregiverIds = relationships.map(r => r.linkAccId).filter(Boolean);
+
+        if (caregiverIds.length > 0) {
+          for (const caregiverId of caregiverIds) {
+            publishEvent('senior_login_notification', {
+              userId: caregiverId,
+              seniorId: user.userId,
+              seniorName: user.profile?.name || user.username,
+              timestamp: new Date().toISOString(),
+              title: `${user.profile?.name || user.username} Logged In`,
+              body: `${user.profile?.name || user.username} has successfully logged in at ${new Date().toLocaleTimeString()}`,
+              target: ['mobile', 'dashboard']
+            });
+          }
+          console.log(`[LOGIN] Notified ${caregiverIds.length} caregiver(s) about ${user.profile?.name || user.username}'s login`);
+        }
+      } catch (err) {
+        console.error('[LOGIN] Error notifying caregivers:', err);
+      }
+    }
+
     res.status(200).json({
       message: "Login successful",
       token,
@@ -189,6 +325,30 @@ app.post('/login', async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get current user's profile
+app.get('/user/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findOne({ userId }, '-passwordHash').lean();
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      userId: user.userId,
+      username: user.username,
+      role: user.role,
+      profile: user.profile,
+      createdAt: user.createdAt,
+      lastActiveAt: user.lastActiveAt
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -210,10 +370,10 @@ app.post('/signup', async (req, res) => {
       });
     }
 
-    // Public signup only allows senior and family roles
-    const validRoles = ['senior', 'family'];
+    // Public signup only allows senior, family, and caregiver roles
+    const validRoles = ['senior', 'family', 'caregiver'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: "Invalid role. Public signup only allows 'senior' or 'family' accounts. Admin accounts must be created by administrators." });
+      return res.status(400).json({ error: "Invalid role. Public signup only allows 'senior', 'family', or 'caregiver' accounts. Admin accounts must be created by administrators." });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -339,19 +499,70 @@ app.post('/checkin', authenticateToken, async (req, res) => {
 
     const streak = await calculateStreak(userId);
 
+    // Award points for check-in
+    const checkInPoints = 5;
+    const tasksCompleted = [{ type: 'checkin', points: checkInPoints }];
+    let totalScore = checkInPoints;
+
     const newEngagement = new Engagement({
       userId,
       date: today,
       session,
       mood,
       checkIn: true,
-      tasksCompleted: [],
-      totalScore: 0,
+      tasksCompleted,
+      totalScore,
       lastActiveAt: new Date(),
       streak
     });
 
     await newEngagement.save();
+
+    console.log(`[CHECK-IN] User ${userId} checked in (${session}). Points: ${checkInPoints}, Streak: ${streak}`);
+
+    // Publish MQTT event for real-time dashboard updates
+    publishEvent('checkin', {
+      userId,
+      session,
+      mood,
+      points: checkInPoints,
+      streak,
+      title: 'Check-in Completed',
+      body: `${session.charAt(0).toUpperCase() + session.slice(1)} check-in recorded (${mood})`
+    });
+
+    // Send urgent alert to caregivers if senior is not feeling well
+    if (mood === 'not-well') {
+      try {
+        const seniorUser = await User.findOne({ userId }).select('profile username').lean();
+        const seniorName = seniorUser?.profile?.name || seniorUser?.username || userId;
+
+        const relationships = await Relationship.find({ seniorId: userId }).lean();
+        const caregiverIds = relationships.map(r => r.linkAccId).filter(Boolean);
+
+        if (caregiverIds.length > 0) {
+          for (const caregiverId of caregiverIds) {
+            publishEvent('urgent_wellbeing_alert', {
+              userId: caregiverId,
+              seniorId: userId,
+              seniorName,
+              mood,
+              session,
+              timestamp: new Date().toISOString(),
+              title: `⚠️ ${seniorName} Needs Attention`,
+              body: `${seniorName} checked in feeling "not well" during ${session} session. Please check on them immediately.`,
+              target: ['mobile', 'dashboard'],
+              priority: 'urgent'
+            });
+          }
+          console.log(`[URGENT] Alerted ${caregiverIds.length} caregiver(s) - ${seniorName} is not feeling well`);
+        } else {
+          console.warn(`[URGENT] No caregivers found for senior ${userId} who is not feeling well`);
+        }
+      } catch (err) {
+        console.error('[CHECK-IN] Error sending urgent wellbeing alert:', err);
+      }
+    }
 
     res.status(201).json({
       message: `Check-in recorded successfully for ${session} session`,
@@ -369,9 +580,20 @@ app.get('/total-points', authenticateToken, async (req, res) => {
   try {
     const { userId, role } = req.user;
 
+    // Validation: Check role
     if (role !== 'senior') {
+      console.log(`[VALIDATION] Access denied for user ${userId} with role ${role}`);
       return res.status(403).json({ error: 'Access denied. Only senior users can view total points.' });
     }
+
+    // Validation: Check user exists
+    const userExists = await User.findOne({ userId });
+    if (!userExists) {
+      console.log(`[VALIDATION] User ${userId} not found in database`);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    console.log(`[TOTAL-POINTS] Calculating points for user ${userId}`);
 
     const result = await Engagement.aggregate([
       { $match: { userId } },
@@ -381,8 +603,8 @@ app.get('/total-points', authenticateToken, async (req, res) => {
     const totalPoints = result.length > 0 ? result[0].totalPoints : 0;
 
     const xpForLevel = (L) => {
-      if (L <= 0) return 0; 
-      return (50 * Math.pow(L, 2) + 100 * Math.pow(1.1, L)) / 4; //xp formula
+      if (L <= 0) return 0;
+      return Math.floor((50 * Math.pow(L, 2) + 100 * Math.pow(1.1, L)) / 4);
     };
 
     let level = 0;
@@ -403,6 +625,8 @@ app.get('/total-points', authenticateToken, async (req, res) => {
 
     const latestStreak = latestCheckin ? latestCheckin.streak || 0 : 0;
 
+    console.log(`[TOTAL-POINTS] User ${userId}: ${totalPoints} points, Level ${level}, ${latestStreak}-day streak`);
+
     res.status(200).json({
       message: 'Total points, level, and latest streak retrieved successfully',
       userId,
@@ -416,7 +640,7 @@ app.get('/total-points', authenticateToken, async (req, res) => {
       latestStreak
     });
   } catch (error) {
-    console.error('Error calculating total points and streak:', error);
+    console.error('[ERROR] Error calculating total points and streak:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -454,15 +678,17 @@ app.post('/add-relation', authenticateToken, async (req, res, next) => {
 
     let seniorId, linkAccId;
 
-    if (requester.role === "senior" && targetUser.role === "family") {
+    const isCaregiver = (role) => role === "family" || role === "caregiver";
+
+    if (requester.role === "senior" && isCaregiver(targetUser.role)) {
       seniorId = requesterId;
       linkAccId = targetUser.userId;
-    } else if (requester.role === "family" && targetUser.role === "senior") {
+    } else if (isCaregiver(requester.role) && targetUser.role === "senior") {
       seniorId = targetUser.userId;
       linkAccId = requesterId;
     } else {
-      return res.status(400).json({ 
-        error: "Invalid relationship. Family can only link with seniors and vice versa." 
+      return res.status(400).json({
+        error: "Invalid relationship. Family/Caregivers can only link with seniors and vice versa."
       });
     }
 
@@ -595,10 +821,10 @@ app.get('/relations/:userId', authenticateToken, async (req, res, next) => {
 app.get('/caregiver/seniors', authenticateToken, async (req, res, next) => {
   try {
     const caregiverId = req.user.userId;
-    const allowedRoles = ['family'];
+    const allowedRoles = ['family', 'caregiver'];
 
     if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Only caregivers can access linked seniors.' });
+      return res.status(403).json({ error: 'Only caregivers and family members can access linked seniors.' });
     }
 
     const relationships = await Relationship.find({ linkAccId: caregiverId }).lean();
@@ -642,7 +868,7 @@ app.get('/caregiver/seniors', authenticateToken, async (req, res, next) => {
 app.get('/caregiver/seniors/:seniorId/summary', authenticateToken, async (req, res, next) => {
   try {
     const caregiverId = req.user.userId;
-    const allowedRoles = ['family'];
+    const allowedRoles = ['family', 'caregiver'];
     const { seniorId } = req.params;
 
     if (!allowedRoles.includes(req.user.role)) {
@@ -692,7 +918,7 @@ app.get('/caregiver/seniors/:seniorId/summary', authenticateToken, async (req, r
   }
 });
 
-app.post('/add-task', authenticateToken, async (req, res) => {
+app.post('/add-task', authenticateHybrid, async (req, res) => {
   try {
     const userId = req.user.userId;
     const user = await User.findOne({ userId });
@@ -719,6 +945,36 @@ app.post('/add-task', authenticateToken, async (req, res) => {
 
     const engagementDate = date || new Date().toISOString().split('T')[0];
 
+    // Calculate today's total points across all sessions (daily point cap check)
+    const DAILY_POINT_CAP = 100;
+    const todayEngagements = await Engagement.find({ userId, date: engagementDate });
+    const todayTotalPoints = todayEngagements.reduce((sum, eng) => sum + eng.totalScore, 0);
+
+    console.log(`[ADD-TASK] User ${userId}: Current daily total: ${todayTotalPoints}/${DAILY_POINT_CAP} points`);
+
+    // Calculate how many points can still be added today
+    const remainingDailyPoints = Math.max(0, DAILY_POINT_CAP - todayTotalPoints);
+
+    if (remainingDailyPoints === 0) {
+      console.log(`[DAILY-CAP] User ${userId} has reached daily point cap (${DAILY_POINT_CAP} points)`);
+      return res.status(400).json({
+        error: 'Daily point cap reached',
+        message: `You've earned the maximum ${DAILY_POINT_CAP} points for today. Great job! Come back tomorrow for more.`,
+        dailyTotal: todayTotalPoints,
+        dailyCap: DAILY_POINT_CAP
+      });
+    }
+
+    // Cap the points to the remaining daily allowance
+    let cappedPoints = points;
+    let pointsCapped = false;
+
+    if (points > remainingDailyPoints) {
+      cappedPoints = remainingDailyPoints;
+      pointsCapped = true;
+      console.log(`[DAILY-CAP] Points capped: ${points} → ${cappedPoints} (remaining: ${remainingDailyPoints})`);
+    }
+
     let engagement = await Engagement.findOne({ userId, date: engagementDate, session });
 
     if (!engagement) {
@@ -733,16 +989,51 @@ app.post('/add-task', authenticateToken, async (req, res) => {
       });
     }
 
-    engagement.tasksCompleted.push({ type, points });
+    engagement.tasksCompleted.push({ type, points: cappedPoints });
     engagement.totalScore = engagement.tasksCompleted.reduce((acc, task) => acc + task.points, 0);
     engagement.lastActiveAt = new Date();
 
     await engagement.save();
 
-    res.status(200).json({
-      message: `Task added successfully for ${session} session on ${engagementDate}`,
-      engagement
+    const newDailyTotal = todayTotalPoints + cappedPoints;
+    console.log(`[ADD-TASK] Task "${type}" added: ${cappedPoints} points. Daily total: ${newDailyTotal}/${DAILY_POINT_CAP}`);
+
+    // Publish MQTT event for real-time dashboard updates
+    const gameNames = {
+      'trivia': 'Brain Boost Trivia',
+      'memory': 'Memory Match',
+      'stretch': 'Morning Stretch',
+      'recipe': 'Share a Recipe',
+      'tower': 'Stack Tower',
+      'ai_chat': 'AI Companion Chat'
+    };
+
+    publishEvent('game_completed', {
+      userId,
+      gameType: type,
+      gameName: gameNames[type] || type,
+      points: cappedPoints,
+      session,
+      dailyTotal: newDailyTotal,
+      title: 'Activity Completed!',
+      body: `Earned ${cappedPoints} points from ${gameNames[type] || type}`
     });
+
+    const response = {
+      message: `Task added successfully for ${session} session on ${engagementDate}`,
+      engagement,
+      dailyProgress: {
+        todayTotal: newDailyTotal,
+        dailyCap: DAILY_POINT_CAP,
+        remaining: DAILY_POINT_CAP - newDailyTotal
+      }
+    };
+
+    if (pointsCapped) {
+      response.warning = `Points awarded were capped to ${cappedPoints} (original: ${points}) to stay within daily limit.`;
+    }
+
+    res.status(200).json(response);
 
   } catch (error) {
     console.error('Error adding task:', error);
@@ -935,6 +1226,670 @@ app.post('/invitations', authenticateToken, async (req, res) => {
   }
 });
 
+// ACTIVITIES ENDPOINTS
+// Get activities for a caregiver
+app.get('/caregiver/activities', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can access activities' });
+    }
+
+    const activities = await Activity.find({ familyId }).sort({ date: 1, time: 1 }).lean();
+    
+    // Enrich with senior details
+    const enrichedActivities = await Promise.all(
+      activities.map(async (activity) => {
+        const senior = await User.findOne({ userId: activity.seniorId }, '-passwordHash').lean();
+        return {
+          id: activity.activityId,
+          activityId: activity.activityId,
+          title: activity.title,
+          senior: senior?.profile?.name || senior?.username || 'Unknown',
+          seniorId: activity.seniorId,
+          seniorInitials: senior?.profile?.name ? senior.profile.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'UK',
+          date: activity.date,
+          time: activity.time,
+          type: activity.type,
+          description: activity.description,
+          status: activity.status,
+          createdAt: activity.createdAt,
+          updatedAt: activity.updatedAt
+        };
+      })
+    );
+
+    res.status(200).json({
+      activities: enrichedActivities
+    });
+  } catch (error) {
+    console.error('Error fetching activities:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create activity
+app.post('/caregiver/activities', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can create activities' });
+    }
+
+    const { seniorId, title, description, date, time, type } = req.body;
+
+    if (!seniorId || !title || !date || !time) {
+      return res.status(400).json({ error: 'seniorId, title, date, and time are required' });
+    }
+
+    // Verify the senior is linked to this caregiver
+    const relationship = await Relationship.findOne({ seniorId, linkAccId: familyId });
+    if (!relationship) {
+      return res.status(403).json({ error: 'Senior is not linked to this caregiver' });
+    }
+
+    const activityId = uuidv4();
+    const newActivity = new Activity({
+      activityId,
+      seniorId,
+      familyId,
+      title,
+      description: description || '',
+      date,
+      time,
+      type: type || 'visit',
+      status: 'pending'
+    });
+
+    await newActivity.save();
+
+    // Get senior details for response
+    const senior = await User.findOne({ userId: seniorId }, '-passwordHash').lean();
+
+    res.status(201).json({
+      message: 'Activity created successfully',
+      activity: {
+        id: activityId,
+        activityId,
+        title,
+        senior: senior?.profile?.name || senior?.username || 'Unknown',
+        seniorId,
+        seniorInitials: senior?.profile?.name ? senior.profile.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'UK',
+        date,
+        time,
+        type: newActivity.type,
+        description: newActivity.description,
+        status: newActivity.status
+      }
+    });
+  } catch (error) {
+    console.error('Error creating activity:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update activity
+app.put('/caregiver/activities/:activityId', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    const { activityId } = req.params;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can update activities' });
+    }
+
+    const activity = await Activity.findOne({ activityId, familyId });
+    if (!activity) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+
+    const { title, description, date, time, type, status } = req.body;
+    
+    if (title) activity.title = title;
+    if (description !== undefined) activity.description = description;
+    if (date) activity.date = date;
+    if (time) activity.time = time;
+    if (type) activity.type = type;
+    if (status) activity.status = status;
+
+    await activity.save();
+
+    res.status(200).json({
+      message: 'Activity updated successfully',
+      activity
+    });
+  } catch (error) {
+    console.error('Error updating activity:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete activity
+app.delete('/caregiver/activities/:activityId', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    const { activityId } = req.params;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can delete activities' });
+    }
+
+    const activity = await Activity.findOneAndDelete({ activityId, familyId });
+    if (!activity) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+
+    res.status(200).json({
+      message: 'Activity deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting activity:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// SENIOR ACTIVITIES ENDPOINTS
+// Get activities for a senior
+app.get('/senior/activities', authenticateToken, async (req, res) => {
+  try {
+    const seniorId = req.user.userId;
+    
+    if (req.user.role !== 'senior') {
+      return res.status(403).json({ error: 'Only seniors can access their activities' });
+    }
+
+    const activities = await Activity.find({ seniorId }).sort({ date: 1, time: 1 }).lean();
+    
+    // Enrich with caregiver details
+    const enrichedActivities = await Promise.all(
+      activities.map(async (activity) => {
+        const caregiver = await User.findOne({ userId: activity.familyId }, '-passwordHash').lean();
+        return {
+          id: activity.activityId,
+          activityId: activity.activityId,
+          title: activity.title,
+          caregiver: caregiver?.profile?.name || caregiver?.username || 'Caregiver',
+          caregiverId: activity.familyId,
+          date: activity.date,
+          time: activity.time,
+          type: activity.type,
+          description: activity.description,
+          status: activity.status,
+          createdAt: activity.createdAt,
+          updatedAt: activity.updatedAt
+        };
+      })
+    );
+
+    res.status(200).json({
+      activities: enrichedActivities
+    });
+  } catch (error) {
+    console.error('Error fetching senior activities:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update activity status (for senior to accept/reject)
+app.patch('/senior/activities/:activityId/status', authenticateToken, async (req, res) => {
+  try {
+    const seniorId = req.user.userId;
+    const { activityId } = req.params;
+    const { status } = req.body;
+    
+    if (req.user.role !== 'senior') {
+      return res.status(403).json({ error: 'Only seniors can update activity status' });
+    }
+
+    if (!['accepted', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be "accepted" or "rejected"' });
+    }
+
+    const activity = await Activity.findOne({ activityId, seniorId });
+    if (!activity) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+
+    activity.status = status;
+    await activity.save();
+
+    res.status(200).json({
+      message: 'Activity status updated successfully',
+      activity: {
+        id: activity.activityId,
+        status: activity.status
+      }
+    });
+  } catch (error) {
+    console.error('Error updating activity status:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get caregivers/family linked to a senior
+app.get('/senior/caregivers', authenticateToken, async (req, res) => {
+  try {
+    const seniorId = req.user.userId;
+
+    if (req.user.role !== 'senior') {
+      return res.status(403).json({ error: 'Only seniors can access this endpoint' });
+    }
+
+    const relationships = await Relationship.find({ seniorId }).lean();
+
+    if (!relationships.length) {
+      return res.status(200).json({ seniorId, caregivers: [] });
+    }
+
+    const caregiverIds = relationships.map(rel => rel.linkAccId);
+    const caregivers = await User.find(
+      { userId: { $in: caregiverIds } },
+      '-passwordHash'
+    ).lean();
+
+    const caregiversById = caregivers.reduce((acc, caregiver) => {
+      acc[caregiver.userId] = caregiver;
+      return acc;
+    }, {});
+
+    const result = relationships
+      .filter(rel => caregiversById[rel.linkAccId])
+      .map(rel => ({
+        caregiverId: rel.linkAccId,
+        relation: rel.relation,
+        role: caregiversById[rel.linkAccId].role,
+        name: caregiversById[rel.linkAccId].profile?.name || caregiversById[rel.linkAccId].username,
+        email: caregiversById[rel.linkAccId].profile?.email,
+        contact: caregiversById[rel.linkAccId].profile?.contact
+      }));
+
+    res.status(200).json({ seniorId, caregivers: result });
+  } catch (error) {
+    console.error('Error fetching senior caregivers:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// REMINDERS ENDPOINTS
+// Get reminders for a caregiver
+app.get('/caregiver/reminders', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can access reminders' });
+    }
+
+    const reminders = await Reminder.find({ familyId }).sort({ time: 1 }).lean();
+    
+    // Enrich with senior details
+    const enrichedReminders = await Promise.all(
+      reminders.map(async (reminder) => {
+        const senior = await User.findOne({ userId: reminder.seniorId }, '-passwordHash').lean();
+        return {
+          id: reminder.reminderId,
+          reminderId: reminder.reminderId,
+          title: reminder.title,
+          senior: senior?.profile?.name || senior?.username || 'Unknown',
+          seniorId: reminder.seniorId,
+          seniorInitials: senior?.profile?.name ? senior.profile.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'UK',
+          time: reminder.time,
+          type: reminder.type,
+          description: reminder.description,
+          frequency: reminder.frequency,
+          isActive: reminder.isActive,
+          createdAt: reminder.createdAt,
+          updatedAt: reminder.updatedAt
+        };
+      })
+    );
+
+    res.status(200).json({
+      reminders: enrichedReminders
+    });
+  } catch (error) {
+    console.error('Error fetching reminders:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Test endpoint to send a test notification to a senior user
+app.post('/test-notification', authenticateToken, async (req, res) => {
+  try {
+    const { seniorId } = req.body;
+
+    if (!seniorId) {
+      return res.status(400).json({ error: 'seniorId is required' });
+    }
+
+    // Publish a test notification event
+    publishEvent('test_notification', {
+      userId: seniorId,
+      title: 'Test Notification',
+      body: 'This is a test notification to verify push notifications are working!',
+      target: ['mobile', 'dashboard']
+    });
+
+    res.status(200).json({
+      message: 'Test notification sent',
+      seniorId,
+      note: 'Check the senior app and browser console for the notification'
+    });
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Manual check for missed check-ins (for demo purposes)
+app.post('/check-missed-checkins', authenticateToken, async (req, res) => {
+  try {
+    const caregiverId = req.user.userId;
+    const caregiver = await User.findOne({ userId: caregiverId });
+
+    if (!caregiver || (caregiver.role !== 'caregiver' && caregiver.role !== 'family')) {
+      return res.status(403).json({ error: 'Only caregivers and family members can trigger this check' });
+    }
+
+    // Find all seniors linked to this caregiver
+    const relationships = await Relationship.find({ linkAccId: caregiverId }).lean();
+    const seniorIds = relationships.map(r => r.seniorId).filter(Boolean);
+
+    if (seniorIds.length === 0) {
+      return res.status(404).json({ error: 'No linked seniors found' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const alerts = [];
+
+    for (const seniorId of seniorIds) {
+      // Check if senior has checked in today
+      const todayEngagement = await Engagement.findOne({
+        userId: seniorId,
+        date: today,
+        checkIn: true
+      }).lean();
+
+      if (!todayEngagement) {
+        // Senior hasn't checked in today - send alert
+        const seniorUser = await User.findOne({ userId: seniorId }).select('profile username').lean();
+        const seniorName = seniorUser?.profile?.name || seniorUser?.username || seniorId;
+
+        publishEvent('missed_checkin_alert', {
+          userId: caregiverId,
+          seniorId,
+          seniorName,
+          message: `${seniorName} has not checked in today`,
+          title: `⚠️ Missed Check-in: ${seniorName}`,
+          body: `${seniorName} has not checked in today. Please verify their wellbeing.`,
+          target: ['mobile', 'dashboard'],
+          priority: 'alert'
+        });
+
+        alerts.push({
+          seniorId,
+          seniorName,
+          status: 'No check-in today'
+        });
+
+        console.log(`[MANUAL-CHECK] Alert sent for ${seniorName} - no check-in today`);
+      }
+    }
+
+    res.status(200).json({
+      message: 'Missed check-in check completed',
+      seniorsChecked: seniorIds.length,
+      alertsSent: alerts.length,
+      alerts: alerts.length > 0 ? alerts : 'All seniors have checked in today!'
+    });
+  } catch (error) {
+    console.error('Error checking missed check-ins:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create reminder
+app.post('/caregiver/reminders', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    
+    if (req.user.role !== 'family' && req.user.role !== 'caregiver') {
+      return res.status(403).json({ error: 'Only caregivers and family members can create reminders' });
+    }
+
+    const { seniorId, title, description, time, type, frequency } = req.body;
+
+    if (!seniorId || !title || !time || !type) {
+      return res.status(400).json({ error: 'seniorId, title, time, and type are required' });
+    }
+
+    // Verify the senior is linked to this caregiver
+    const relationship = await Relationship.findOne({ seniorId, linkAccId: familyId });
+    if (!relationship) {
+      return res.status(403).json({ error: 'Senior is not linked to this caregiver' });
+    }
+
+    const reminderId = uuidv4();
+    const newReminder = new Reminder({
+      reminderId,
+      seniorId,
+      familyId,
+      title,
+      description: description || '',
+      time,
+      type,
+      frequency: frequency || 'once',
+      isActive: true
+    });
+
+    await newReminder.save();
+
+    // Get senior details for response
+    const senior = await User.findOne({ userId: seniorId }, '-passwordHash').lean();
+
+    // Publish a push/mobile event so the senior gets notified
+    try {
+      publishEvent('reminder_created', {
+        userId: seniorId,
+        title: 'New Reminder',
+        body: `${(req.user && req.user.username) || 'Your caregiver'} scheduled: ${title}`,
+        reminder: {
+          reminderId,
+          title,
+          description: newReminder.description || '',
+          time,
+          type,
+          frequency: newReminder.frequency
+        },
+        target: ['mobile','dashboard']
+      });
+    } catch (e) {
+      console.warn('Failed to publish reminder_created event', e && e.message ? e.message : e);
+    }
+
+    res.status(201).json({
+      message: 'Reminder created successfully',
+      reminder: {
+        id: reminderId,
+        reminderId,
+        title,
+        senior: senior?.profile?.name || senior?.username || 'Unknown',
+        seniorId,
+        seniorInitials: senior?.profile?.name ? senior.profile.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'UK',
+        time,
+        type,
+        description: newReminder.description,
+        frequency: newReminder.frequency,
+        isActive: newReminder.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Error creating reminder:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update reminder
+app.put('/caregiver/reminders/:reminderId', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    const { reminderId } = req.params;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can update reminders' });
+    }
+
+    const reminder = await Reminder.findOne({ reminderId, familyId });
+    if (!reminder) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    const { title, description, time, type, frequency, isActive } = req.body;
+    
+    if (title) reminder.title = title;
+    if (description !== undefined) reminder.description = description;
+    if (time) reminder.time = time;
+    if (type) reminder.type = type;
+    if (frequency) reminder.frequency = frequency;
+    if (isActive !== undefined) reminder.isActive = isActive;
+
+    await reminder.save();
+
+    res.status(200).json({
+      message: 'Reminder updated successfully',
+      reminder
+    });
+  } catch (error) {
+    console.error('Error updating reminder:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete reminder
+app.delete('/caregiver/reminders/:reminderId', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    const { reminderId } = req.params;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can delete reminders' });
+    }
+
+    const reminder = await Reminder.findOneAndDelete({ reminderId, familyId });
+    if (!reminder) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    res.status(200).json({
+      message: 'Reminder deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting reminder:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ANALYTICS ENDPOINTS
+// Get engagement analytics for caregivers
+app.get('/caregiver/analytics', authenticateToken, async (req, res) => {
+  try {
+    const familyId = req.user.userId;
+    
+    if (req.user.role !== 'family') {
+      return res.status(403).json({ error: 'Only caregivers can access analytics' });
+    }
+
+    // Get all linked seniors
+    const relationships = await Relationship.find({ linkAccId: familyId }).lean();
+    const seniorIds = relationships.map(rel => rel.seniorId);
+
+    if (seniorIds.length === 0) {
+      return res.status(200).json({
+        seniors: [],
+        weeklyData: [],
+        monthlyData: []
+      });
+    }
+
+    // Calculate date ranges
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    // Get senior details
+    const seniors = await User.find({ userId: { $in: seniorIds } }, '-passwordHash').lean();
+
+    // Get engagements for all seniors
+    const engagements = await Engagement.find({
+      userId: { $in: seniorIds },
+      date: { $gte: thirtyDaysAgo.toISOString().split('T')[0] }
+    }).lean();
+
+    // Calculate weekly and monthly data
+    const weeklyData = [];
+    const monthlyData = [];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayEngagements = engagements.filter(e => e.date === dateStr);
+      weeklyData.push({
+        week: dateStr,
+        checkIns: dayEngagements.filter(e => e.checkIn).length,
+        calls: 0, // Would need call tracking
+        tasks: dayEngagements.reduce((sum, e) => sum + (e.tasksCompleted?.length || 0), 0)
+      });
+    }
+
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayEngagements = engagements.filter(e => e.date === dateStr);
+      monthlyData.push({
+        month: dateStr,
+        checkIns: dayEngagements.filter(e => e.checkIn).length,
+        calls: 0,
+        tasks: dayEngagements.reduce((sum, e) => sum + (e.tasksCompleted?.length || 0), 0)
+      });
+    }
+
+    // Calculate per-senior stats
+    const seniorsWithStats = await Promise.all(
+      seniors.map(async (senior) => {
+        const seniorEngagements = engagements.filter(e => e.userId === senior.userId);
+        const totalPoints = seniorEngagements.reduce((sum, e) => sum + (e.totalScore || 0), 0);
+        
+        return {
+          seniorId: senior.userId,
+          name: senior.profile?.name || senior.username,
+          initials: senior.profile?.name ? senior.profile.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'UK',
+          engagement: Math.min(100, totalPoints),
+          totalPoints,
+          checkInsCount: seniorEngagements.filter(e => e.checkIn).length,
+          tasksCount: seniorEngagements.reduce((sum, e) => sum + (e.tasksCompleted?.length || 0), 0)
+        };
+      })
+    );
+
+    res.status(200).json({
+      seniors: seniorsWithStats,
+      weeklyData,
+      monthlyData
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 //ADMIN
 app.get('/admin/users', authenticateToken, async (req, res) => {
@@ -1109,9 +2064,9 @@ app.post('/admin/add-user', authenticateToken, async (req, res) => {
       });
     }
 
-    const validRoles = ['senior', 'family', 'admin'];
+    const validRoles = ['senior', 'family', 'caregiver', 'admin'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: "Invalid role. Must be 'senior', 'family', or 'admin'" });
+      return res.status(400).json({ error: "Invalid role. Must be 'senior', 'family', 'caregiver', or 'admin'" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1273,6 +2228,27 @@ async function checkGamesServiceHealth() {
   }
 }
 
+// Helper function to check service health (generic)
+async function checkServiceHealth(serviceUrl, serviceName) {
+  try {
+    const axios = require('axios');
+    const startTime = Date.now();
+    const response = await axios.get(`${serviceUrl}/health`, { timeout: 3000 });
+    const responseTime = Date.now() - startTime;
+    return {
+      status: 'online',
+      responseTime: `${responseTime}ms`,
+      details: response.data
+    };
+  } catch (error) {
+    return {
+      status: 'offline',
+      responseTime: 'N/A',
+      error: error.message
+    };
+  }
+}
+
 // Helper function to calculate uptime percentage
 function calculateUptimePercentage() {
   // For now, assume 99.9% uptime - in production, this would track actual downtime
@@ -1330,8 +2306,13 @@ app.get('/health/services', async (req, res) => {
       }
     }
 
-    // Check Games Service
+    // Check all microservices
     const gamesServiceHealth = await checkGamesServiceHealth();
+    const notificationServiceHealth = await checkServiceHealth('http://notification-service:4002', 'notification-service');
+    const pushNotificationServiceHealth = await checkServiceHealth('http://push-notification-service:4020', 'push-notification-service');
+    const aiCompanionServiceHealth = await checkServiceHealth('http://ai-companion-service:4015', 'ai-companion-service');
+    const smsServiceHealth = await checkServiceHealth('http://sms-service:4004', 'sms-service');
+    const emailServiceHealth = await checkServiceHealth('http://email-service:4003', 'email-service');
 
     const services = [
       {
@@ -1373,16 +2354,54 @@ app.get('/health/services', async (req, res) => {
         details: gamesServiceHealth.details || { error: gamesServiceHealth.error }
       },
       {
-        id: 'hivemq',
-        name: 'HiveMQ (MQTT Broker)',
-        status: 'unknown',
-        uptime: 99.5,
-        responseTime: 'N/A',
-        endpoint: 'mqtt://hivemq:1883',
+        id: 'notification-service',
+        name: 'Notification Service',
+        status: notificationServiceHealth.status,
+        uptime: notificationServiceHealth.status === 'online' ? uptimePercentage : 0,
+        responseTime: notificationServiceHealth.responseTime,
+        endpoint: 'http://notification-service:4002',
         lastChecked: new Date().toISOString(),
-        details: {
-          note: 'MQTT connection status not directly queryable from API Gateway'
-        }
+        details: notificationServiceHealth.details || { error: notificationServiceHealth.error }
+      },
+      {
+        id: 'push-notification-service',
+        name: 'Push Notification Service',
+        status: pushNotificationServiceHealth.status,
+        uptime: pushNotificationServiceHealth.status === 'online' ? uptimePercentage : 0,
+        responseTime: pushNotificationServiceHealth.responseTime,
+        endpoint: 'http://push-notification-service:4020',
+        lastChecked: new Date().toISOString(),
+        details: pushNotificationServiceHealth.details || { error: pushNotificationServiceHealth.error }
+      },
+      {
+        id: 'ai-companion-service',
+        name: 'AI Companion Service',
+        status: aiCompanionServiceHealth.status,
+        uptime: aiCompanionServiceHealth.status === 'online' ? uptimePercentage : 0,
+        responseTime: aiCompanionServiceHealth.responseTime,
+        endpoint: 'http://ai-companion-service:4015',
+        lastChecked: new Date().toISOString(),
+        details: aiCompanionServiceHealth.details || { error: aiCompanionServiceHealth.error }
+      },
+      {
+        id: 'sms-service',
+        name: 'SMS Service',
+        status: smsServiceHealth.status,
+        uptime: smsServiceHealth.status === 'online' ? uptimePercentage : 0,
+        responseTime: smsServiceHealth.responseTime,
+        endpoint: 'http://sms-service:4004',
+        lastChecked: new Date().toISOString(),
+        details: smsServiceHealth.details || { error: smsServiceHealth.error }
+      },
+      {
+        id: 'email-service',
+        name: 'Email Service',
+        status: emailServiceHealth.status,
+        uptime: emailServiceHealth.status === 'online' ? uptimePercentage : 0,
+        responseTime: emailServiceHealth.responseTime,
+        endpoint: 'http://email-service:4003',
+        lastChecked: new Date().toISOString(),
+        details: emailServiceHealth.details || { error: emailServiceHealth.error }
       }
     ];
 

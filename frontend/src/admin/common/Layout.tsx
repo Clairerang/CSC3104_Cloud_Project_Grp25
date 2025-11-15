@@ -17,7 +17,6 @@ import {
   Avatar,
   Menu,
   MenuItem,
-  Badge,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -27,8 +26,8 @@ import {
   ExitToApp,
   MonitorHeart,
   Assessment,
-  Notifications,
 } from '@mui/icons-material';
+import NotificationDropdown from '../components/NotificationDropdown';
 
 const drawerWidth = 260;
 
@@ -191,11 +190,7 @@ const Layout: React.FC = () => {
               'Admin Portal'}
           </Typography>
 
-          <IconButton color="inherit" sx={{ mr: 2 }}>
-            <Badge badgeContent={3} color="error">
-              <Notifications />
-            </Badge>
-          </IconButton>
+          <NotificationDropdown />
 
           <IconButton onClick={handleProfileMenuOpen} sx={{ p: 0 }}>
             <Avatar sx={{ bgcolor: 'primary.main' }}>

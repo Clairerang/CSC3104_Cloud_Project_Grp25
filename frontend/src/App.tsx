@@ -44,7 +44,7 @@ function App() {
             </Route>
 
             {/* Caregiver Dashboard Routes - Protected */}
-            <Route element={<ProtectedRoute allowedRoles={['caregiver']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['caregiver', 'family']} />}>
               <Route path="/caregiver/*" element={<CaregiverApp />} />
             </Route>
 

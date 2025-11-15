@@ -1,25 +1,25 @@
-import React from 'react';
 import {
-  Box,
-  Button,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
-  CircularProgress,
+    Alert,
+    Box,
+    Button,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    TextField,
 } from '@mui/material';
-import { ReminderItem } from '../api/mockData';
+import React from 'react';
+import { ReminderItem } from '../api/client';
 
 interface ReminderFormDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (reminder: Omit<ReminderItem, 'id' | 'seniorInitials' | 'isActive'>) => Promise<void>;
+  onSubmit: (reminder: { senior: string; title: string; time: string; type: string; description?: string; frequency: string }) => Promise<void>;
   seniors: Array<{ name: string; initials: string }>;
   frequencyLabels: Record<string, string>;
 }

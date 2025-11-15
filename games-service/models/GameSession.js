@@ -18,7 +18,7 @@ const gameSessionSchema = new mongoose.Schema({
   gameType: {
     type: String,
     required: true,
-    enum: ['trivia', 'memory', 'stretch']
+    enum: ['trivia', 'memory', 'stretch', 'recipe', 'tower']
   },
   startedAt: {
     type: Date,

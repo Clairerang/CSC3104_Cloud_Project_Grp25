@@ -1,10 +1,10 @@
+import { Box, CircularProgress } from '@mui/material';
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Box, CircularProgress } from '@mui/material';
 
 interface ProtectedRouteProps {
-  allowedRoles?: ('admin' | 'caregiver' | 'senior')[];
+  allowedRoles?: ('admin' | 'caregiver' | 'senior' | 'family')[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
@@ -36,13 +36,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
     console.log('ProtectedRoute: User role not allowed', {
       userRole: user.role,
       allowedRoles,
-      redirectingTo: user.role === 'admin' ? '/admin/dashboard' : user.role === 'caregiver' ? '/caregiver' : '/senior'
+      redirectingTo: user.role === 'admin' ? '/admin/dashboard' : user.role === 'caregiver' ? '/caregiver' : user.role === 'family' ? '/caregiver' : '/senior'
     });
     // Redirect to appropriate dashboard based on user role
     switch (user.role) {
       case 'admin':
         return <Navigate to="/admin/dashboard" replace />;
       case 'caregiver':
+      case 'family':
         return <Navigate to="/caregiver" replace />;
       case 'senior':
         return <Navigate to="/senior" replace />;

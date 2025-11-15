@@ -27,6 +27,7 @@ import RecentActivity from './RecentActivity';
 
 const DashboardHome: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [engagementData, setEngagementData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -37,13 +38,15 @@ const DashboardHome: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       // Fetch real data from backend APIs
-      const [userCountResponse, todayStatsResponse] = await Promise.all([
+      const [userCountResponse, todayStatsResponse, weeklyEngagementResponse] = await Promise.all([
         api.users.getStats(),
         api.engagement.getStats(),
+        api.engagement.getTrends('week'),
       ]);
 
       const userCount = userCountResponse.data;
       const todayStats = todayStatsResponse.data;
+      const weeklyData = weeklyEngagementResponse.data;
 
       const dashboardStats: DashboardStats = {
         totalUsers: userCount.total || 0,
@@ -64,7 +67,15 @@ const DashboardHome: React.FC = () => {
         },
       };
 
+      // Transform weekly engagement data for chart
+      const chartData = weeklyData.map((day: any) => ({
+        name: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
+        checkIns: day.checkIns || 0,
+        active: day.activeUsers || 0,
+      }));
+
       setStats(dashboardStats);
+      setEngagementData(chartData);
     } catch (err: any) {
       console.error('Failed to load dashboard data:', err);
       // Fallback to default data if API fails
@@ -86,27 +97,17 @@ const DashboardHome: React.FC = () => {
           unresolved: 0,
         },
       });
+      setEngagementData([]);
       setError('Failed to load dashboard data. Showing empty state.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock data for charts (replace with real data from API)
-  const engagementData = [
-    { name: 'Mon', checkIns: 65, active: 80 },
-    { name: 'Tue', checkIns: 72, active: 85 },
-    { name: 'Wed', checkIns: 68, active: 82 },
-    { name: 'Thu', checkIns: 75, active: 88 },
-    { name: 'Fri', checkIns: 80, active: 92 },
-    { name: 'Sat', checkIns: 58, active: 75 },
-    { name: 'Sun', checkIns: 55, active: 70 },
-  ];
-
   const userDistributionData = [
-    { name: 'Seniors', value: stats?.users.totalSeniors || 150, color: '#1976d2' },
-    { name: 'Families', value: stats?.users.totalFamilies || 300, color: '#dc004e' },
-    { name: 'Admins', value: stats?.users.totalAdmins || 10, color: '#2e7d32' },
+    { name: 'Seniors', value: stats?.users.totalSeniors || 0, color: '#1976d2' },
+    { name: 'Families', value: stats?.users.totalFamilies || 0, color: '#dc004e' },
+    { name: 'Admins', value: stats?.users.totalAdmins || 0, color: '#2e7d32' },
   ];
 
   if (loading) {
@@ -127,28 +128,24 @@ const DashboardHome: React.FC = () => {
       value: stats?.users.totalSeniors || 0,
       icon: <Elderly fontSize="large" />,
       color: '#1976d2',
-      trend: '+12%',
     },
     {
       title: 'Active Today',
       value: stats?.users.activeToday || 0,
       icon: <CheckCircle fontSize="large" />,
       color: '#2e7d32',
-      trend: '+8%',
     },
     {
       title: 'Check-ins Today',
       value: stats?.engagement.checkInsToday || 0,
       icon: <Celebration fontSize="large" />,
       color: '#9c27b0',
-      trend: '+15%',
     },
     {
       title: 'Active Alerts',
       value: stats?.alerts.unresolved || 0,
       icon: <Warning fontSize="large" />,
       color: '#ed6c02',
-      trend: stats?.alerts.unresolved ? '-5%' : '0%',
     },
   ];
 
@@ -174,11 +171,8 @@ const DashboardHome: React.FC = () => {
                     <Typography variant="body2" color="textSecondary" gutterBottom>
                       {card.title}
                     </Typography>
-                    <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                    <Typography variant="h4" fontWeight="bold">
                       {card.value}
-                    </Typography>
-                    <Typography variant="caption" color={card.trend.startsWith('+') ? 'success.main' : 'error.main'}>
-                      {card.trend} from last week
                     </Typography>
                   </Box>
                   <Box

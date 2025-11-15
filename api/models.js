@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
   username: { type: String, required: true },
   passwordHash: { type: String, required: true },
-  role: { type: String, enum: ['senior', 'family', 'admin'], required: true },
+  role: { type: String, enum: ['senior', 'family', 'caregiver', 'admin'], required: true },
   profile: {
     name: String,
     age: Number,
@@ -95,10 +95,102 @@ const invitationSchema = new mongoose.Schema({
 
 const Invitation = mongoose.model('Invitation', invitationSchema);
 
+// Activity Schema
+const activitySchema = new mongoose.Schema({
+  activityId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  seniorId: {
+    type: String,
+    required: true
+  },
+  familyId: {
+    type: String,
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  date: {
+    type: String,
+    required: true
+  },
+  time: {
+    type: String,
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ['video-call', 'phone-call', 'visit', 'exercise', 'hobby', 'social'],
+    default: 'visit'
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'accepted', 'rejected', 'completed', 'cancelled'],
+    default: 'pending'
+  }
+}, { timestamps: true });
+
+const Activity = mongoose.model('Activity', activitySchema);
+
+// Reminder Schema
+const reminderSchema = new mongoose.Schema({
+  reminderId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  seniorId: {
+    type: String,
+    required: true
+  },
+  familyId: {
+    type: String,
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  time: {
+    type: String,
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ['call', 'task', 'medication'],
+    required: true
+  },
+  frequency: {
+    type: String,
+    enum: ['once', 'daily', 'weekly', 'monthly'],
+    default: 'once'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+}, { timestamps: true });
+
+const Reminder = mongoose.model('Reminder', reminderSchema);
+
 
 module.exports = {
   User,
   Relationship,
   Engagement,
-  Invitation
+  Invitation,
+  Activity,
+  Reminder
 };

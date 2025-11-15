@@ -48,20 +48,25 @@ const ServiceMonitor: React.FC = () => {
         api.system.getMetrics(),
       ]);
 
-      // Transform services data
-      const transformedServices: ServiceHealth[] = servicesRes.data.services.map((service: any) => ({
-        id: service.id,
-        name: service.id,
-        displayName: service.name,
-        status: service.status,
-        uptime: service.uptime,
-        responseTime: typeof service.responseTime === 'string'
-          ? parseInt(service.responseTime.replace('ms', '').replace('< ', '')) || 0
-          : service.responseTime,
-        lastChecked: service.lastChecked,
-        endpoint: service.endpoint,
-        version: service.details?.version || 'N/A',
-      }));
+      // Transform services data and filter out HiveMQ
+      const transformedServices: ServiceHealth[] = servicesRes.data.services
+        .filter((service: any) =>
+          !service.id?.toLowerCase().includes('hivemq') &&
+          !service.name?.toLowerCase().includes('hivemq')
+        )
+        .map((service: any) => ({
+          id: service.id,
+          name: service.id,
+          displayName: service.name,
+          status: service.status,
+          uptime: service.uptime,
+          responseTime: typeof service.responseTime === 'string'
+            ? parseInt(service.responseTime.replace('ms', '').replace('< ', '')) || 0
+            : service.responseTime,
+          lastChecked: service.lastChecked,
+          endpoint: service.endpoint,
+          version: service.details?.version || 'N/A',
+        }));
 
       setServices(transformedServices);
 

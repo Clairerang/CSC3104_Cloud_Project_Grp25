@@ -174,30 +174,42 @@ async function startPushService() {
   // Handle incoming MQTT messages
   mqttClient.on('message', async (topic, mqttMessage) => {
     if (topic !== 'notification/events') return;
-    
+
     let event = null;
-    try { 
-      event = JSON.parse(mqttMessage.toString()); 
-    } catch (e) { 
-      logger.warn('Invalid JSON in MQTT message'); 
-      return; 
+    try {
+      event = JSON.parse(mqttMessage.toString());
+    } catch (e) {
+      logger.warn('Invalid JSON in MQTT message');
+      return;
     }
+
+    logger.info(`📨 Received MQTT event:`, {
+      type: event.type,
+      userId: event.userId,
+      targets: event.target || event.targets,
+      title: event.title
+    });
 
     // Only deliver to mobile targets
     const targets = event.target || event.targets || [];
-    if (!targets.includes('mobile')) return;
+    if (!targets.includes('mobile')) {
+      logger.info(`⏭️  Skipping event - no 'mobile' target (targets: ${JSON.stringify(targets)})`);
+      return;
+    }
 
     // Find device tokens for user
     try {
-      const tokens = await models.DeviceToken.find({ 
-        userId: event.userId, 
-        revoked: { $ne: true } 
+      const tokens = await models.DeviceToken.find({
+        userId: event.userId,
+        revoked: { $ne: true }
       }).lean().exec();
 
       if (!tokens || tokens.length === 0) {
-        logger.info(`No device tokens for user ${event.userId}`);
+        logger.warn(`⚠️  No device tokens found for user ${event.userId}`);
         return;
       }
+
+      logger.info(`📱 Found ${tokens.length} device token(s) for user ${event.userId}`);
 
       const message = {
         notification: {

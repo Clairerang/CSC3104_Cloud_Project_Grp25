@@ -1,26 +1,19 @@
-import React, { useState } from "react";
-import { Box, Typography, Card, Button, Stack } from "@mui/material";
-import StarIcon from "@mui/icons-material/Star";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import PeopleIcon from "@mui/icons-material/People";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import TriviaIcon from "@mui/icons-material/Quiz";
-import PeopleIcon from "@mui/icons-material/People";
+import StarIcon from "@mui/icons-material/Star";
 import TowerIcon from "@mui/icons-material/TableRows";
+import { Alert, Box, Button, Card, CircularProgress, Stack, Typography } from "@mui/material";
+import React, { useEffect, useState } from "react";
 import type { Activity } from "../../types";
+import { ScheduledActivity, seniorApi } from "../api/client";
 
 interface Props {
   activities: Activity[];
   onPlayGame: (activityId: string) => void;
-  totalPoints: number; // Add this prop
-}
-
-interface Invitation {
-  id: string;
-  from: string;
-  title: string;
-  dateTime: string;
-  message: string;
-  status: 'pending' | 'accepted' | 'declined' ;
+  totalPoints: number;
+  levelData: any; // Level data from backend
 }
 
 // compute the starting points required for a given level (level start)
@@ -57,38 +50,59 @@ const getLevelInfo = (totalPoints: number) => {
   return { level, min, next, gap, progress, progressValue, toNextLevel };
 };
 
-const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints }) => {
-  const [invitations, setInvitations] = useState<Invitation[]>([
-    {
-      id: "1",
-      from: "Sarah",
-      title: "Family Dinner",
-      dateTime: "2025-10-26T18:00:00",
-      message: "Hi Mom! Would love to have dinner together this Saturday. Miss you! ❤️",
-      status: 'accepted',
-    },
-    {
-      id: "2",
-      from: "Michael",
-      title: "Doctor Appointment",
-      dateTime: "2025-10-28T10:00:00",
-      message: "Scheduled your checkup with Dr. Lee. I will pick you up at 9:30 AM.",
-      status: 'pending',
-    },
-  ]);
+const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints, levelData }) => {
+  const [scheduledActivities, setScheduledActivities] = useState<ScheduledActivity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
-  const handleAccept = (invitationId: string) => {
-    setInvitations(invitations.map(inv => 
-      inv.id === invitationId ? { ...inv, status: 'accepted' } : inv
-    ));
+  // Fetch scheduled activities from caregivers
+  useEffect(() => {
+    const fetchScheduledActivities = async () => {
+      try {
+        setLoadingActivities(true);
+        const data = await seniorApi.getActivities();
+        setScheduledActivities(data);
+        setActivitiesError(null);
+      } catch (error) {
+        console.error('Error fetching scheduled activities:', error);
+        setActivitiesError('Failed to load scheduled activities');
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    fetchScheduledActivities();
+  }, []);
+
+  const handleAcceptActivity = async (activityId: string) => {
+    try {
+      await seniorApi.updateActivityStatus(activityId, 'accepted');
+      setScheduledActivities(scheduledActivities.map(activity =>
+        activity.activityId === activityId ? { ...activity, status: 'accepted' } : activity
+      ));
+    } catch (error) {
+      console.error('Error accepting activity:', error);
+    }
   };
 
-  const handleDecline = (invitationId: string) => {
-    setInvitations(invitations.filter(inv => inv.id !== invitationId));
+  const handleRejectActivity = async (activityId: string) => {
+    try {
+      await seniorApi.updateActivityStatus(activityId, 'rejected');
+      setScheduledActivities(scheduledActivities.map(activity =>
+        activity.activityId === activityId ? { ...activity, status: 'rejected' } : activity
+      ));
+    } catch (error) {
+      console.error('Error rejecting activity:', error);
+    }
   };
 
-  // compute level info once for rendering
-  const levelInfo = getLevelInfo(totalPoints);
+  // Use backend level data if available, otherwise calculate locally as fallback
+  const levelInfo = levelData ? {
+    level: levelData.level,
+    progress: levelData.progress.percent,
+    toNextLevel: levelData.progress.xpToNextLevel,
+    progressValue: levelData.progress.currentXP,
+  } : getLevelInfo(totalPoints);
   
   return (
     <Box sx={{ flex: 1, overflowY: 'auto', pb: 20 }}>
@@ -113,63 +127,96 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
           </Box>
         </Box>
 
-        {/* Family Invitations Card */}
+        {/* Scheduled Activities from Caregivers */}
         <Card sx={{ bgcolor: 'white', borderRadius: 1, p: 4, mb: 6 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
             <Box sx={{
               width: 40,
               height: 40,
-              bgcolor: '#fef3c7',
+              bgcolor: '#dbeafe',
               borderRadius: 2,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <Typography sx={{ fontSize: 24 }}>📨</Typography>
+              <Typography sx={{ fontSize: 24 }}>📅</Typography>
             </Box>
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Family Invitations
+              Scheduled Activities
             </Typography>
           </Box>
 
-          {invitations.length === 0 ? (
+          {loadingActivities ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+              <CircularProgress />
+            </Box>
+          ) : activitiesError ? (
+            <Alert severity="error" sx={{ my: 2 }}>
+              {activitiesError}
+            </Alert>
+          ) : scheduledActivities.length === 0 ? (
             <Box sx={{ 
               textAlign: 'center', 
               py: 6,
               color: '#9ca3af',
             }}>
               <Typography sx={{ fontSize: 16 }}>
-                No pending invitations
+                No scheduled activities
               </Typography>
             </Box>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {invitations.map((invitation) => (
-                <Card key={invitation.id} sx={{ bgcolor: '#fef3f2', borderRadius: 1, p: 3, border: '1px solid #fecaca' }}>
+              {scheduledActivities.map((activity) => (
+                <Card key={activity.id} sx={{
+                  bgcolor: activity.status === 'accepted' ? '#f0fdf4' :
+                          activity.status === 'completed' ? '#eff6ff' :
+                          activity.status === 'rejected' ? '#fef2f2' : '#fef3f2',
+                  borderRadius: 1,
+                  p: 3,
+                  border: activity.status === 'accepted' ? '1px solid #86efac' :
+                          activity.status === 'completed' ? '1px solid #93c5fd' :
+                          activity.status === 'rejected' ? '1px solid #fecaca' : '1px solid #fecaca'
+                }}>
                   <Box sx={{ display: 'flex', gap: 3}}>
                     <Box sx={{
                       width: 48,
                       height: 48,
-                      bgcolor: '#ddd6fe',
+                      bgcolor: '#dbeafe',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}>
-                      <Typography sx={{ fontSize: 24 }}>👤</Typography>
+                      <Typography sx={{ fontSize: 24 }}>
+                        {activity.type === 'video-call' ? '📹' :
+                         activity.type === 'phone-call' ? '📞' :
+                         activity.type === 'visit' ? '🏠' :
+                         activity.type === 'exercise' ? '🏃' :
+                         activity.type === 'hobby' ? '🎨' : '🤝'}
+                      </Typography>
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontSize: 18, color: '#a855f7', fontWeight: 600, mb: 1 }}>
-                        From {invitation.from}
+                      <Typography sx={{ fontSize: 18, color: '#3b82f6', fontWeight: 600, mb: 1 }}>
+                        From {activity.caregiver}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Typography sx={{ fontWeight: 700, fontSize: 20 }}>
-                          {invitation.title}
+                          {activity.title}
                         </Typography>
-                        {invitation.status === 'accepted' && (
-                          <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#1edc63ff', fontStyle: 'italic' }}>
+                        {activity.status === 'accepted' && (
+                          <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#16a34a', fontStyle: 'italic' }}>
                             - Accepted
+                          </Typography>
+                        )}
+                        {activity.status === 'completed' && (
+                          <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#2563eb', fontStyle: 'italic' }}>
+                            - Completed
+                          </Typography>
+                        )}
+                        {activity.status === 'rejected' && (
+                          <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#dc2626', fontStyle: 'italic' }}>
+                            - Declined
                           </Typography>
                         )}
                       </Box>
@@ -177,33 +224,35 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: 16 }}>📅</Typography>
                           <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
-                            {invitation.dateTime ? new Date(invitation.dateTime).toLocaleDateString() : 'N/A'}
+                            {new Date(activity.date).toLocaleDateString()}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: 16 }}>🕐</Typography>
                           <Typography sx={{ fontSize: 16, color: '#6b7280' }}>
-                            {invitation.dateTime ? new Date(invitation.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                            {activity.time}
                           </Typography>
                         </Box>
                       </Box>
-                      <Box sx={{
-                        bgcolor: 'white',
-                        borderRadius: 1,
-                        p: 1.5,
-                        mb: 3,
-                      }}>
-                        <Typography sx={{ fontSize: 16, color: '#6b7280', fontStyle: 'italic' }}>
-                          "{invitation.message}"
-                        </Typography>
-                      </Box>
+                      {activity.description && (
+                        <Box sx={{
+                          bgcolor: 'white',
+                          borderRadius: 1,
+                          p: 1.5,
+                          mb: 3,
+                        }}>
+                          <Typography sx={{ fontSize: 16, color: '#6b7280', fontStyle: 'italic' }}>
+                            "{activity.description}"
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
                   </Box>
                   
-                  {invitation.status === 'pending' ? (
+                  {activity.status === 'pending' ? (
                     <Box sx={{ display: 'flex', gap: 3 }}>
-                      <Box 
-                        onClick={() => handleAccept(invitation.id)}
+                      <Box
+                        onClick={() => handleAcceptActivity(activity.activityId)}
                         sx={{
                           flex: 1,
                           py: 1,
@@ -221,8 +270,8 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                         <Typography sx={{ fontSize: 20, color: 'white' }}>✓</Typography>
                         <Typography sx={{ fontWeight: 600, color: 'white', fontSize: 16 }}>Accept</Typography>
                       </Box>
-                      <Box 
-                        onClick={() => handleDecline(invitation.id)}
+                      <Box
+                        onClick={() => handleRejectActivity(activity.activityId)}
                         sx={{
                           flex: 1,
                           py: 1,
@@ -241,16 +290,52 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                         <Typography sx={{ fontWeight: 600, color: 'white', fontSize: 16 }}>Decline</Typography>
                       </Box>
                     </Box>
-                  ) : (
+                  ) : activity.status === 'accepted' ? (
                     <Box sx={{
-                      bgcolor: '#faf5ff',
+                      bgcolor: '#dcfce7',
                       borderRadius: 1,
                       py: 1,
                       textAlign: 'center',
                       border: '2px solid #16a34a',
                     }}>
                       <Typography sx={{ fontWeight: 600, color: '#16a34a', fontSize: 16 }}>
-                        ✓ You've accepted this invitation
+                        ✓ You've accepted this activity
+                      </Typography>
+                    </Box>
+                  ) : activity.status === 'completed' ? (
+                    <Box sx={{
+                      bgcolor: '#dbeafe',
+                      borderRadius: 1,
+                      py: 1,
+                      textAlign: 'center',
+                      border: '2px solid #2563eb',
+                    }}>
+                      <Typography sx={{ fontWeight: 600, color: '#2563eb', fontSize: 16 }}>
+                        ✓ This activity has been completed
+                      </Typography>
+                    </Box>
+                  ) : activity.status === 'rejected' ? (
+                    <Box sx={{
+                      bgcolor: '#fee2e2',
+                      borderRadius: 1,
+                      py: 1,
+                      textAlign: 'center',
+                      border: '2px solid #dc2626',
+                    }}>
+                      <Typography sx={{ fontWeight: 600, color: '#dc2626', fontSize: 16 }}>
+                        ✕ You've declined this activity
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{
+                      bgcolor: '#fef3c7',
+                      borderRadius: 1,
+                      py: 1,
+                      textAlign: 'center',
+                      border: '2px solid #f59e0b',
+                    }}>
+                      <Typography sx={{ fontWeight: 600, color: '#f59e0b', fontSize: 16 }}>
+                        Status: {activity.status}
                       </Typography>
                     </Box>
                   )}
@@ -295,7 +380,7 @@ const ActivitiesScreen: React.FC<Props> = ({ activities, onPlayGame, totalPoints
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ea580c' }}>
                   <Typography sx={{ fontSize: 24 }}>🔥</Typography>
                   <Typography sx={{ fontWeight: 600 }}>
-                    7 Days
+                    {levelData?.latestStreak || 0} Day{levelData?.latestStreak !== 1 ? 's' : ''}
                   </Typography>
                 </Box>
             </Box>
