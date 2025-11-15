@@ -30,47 +30,56 @@ const RecentActivity: React.FC = () => {
 
   const fetchRecentActivity = async () => {
     try {
-      // Fetch real notification data from backend
+      // Try to fetch real notification data from backend
       const response = await api.engagement.getRecentActivity(10);
 
-      // Transform notification data to activity log format
-      const transformedActivities: ActivityLog[] = response.data.map((item: any) => {
-        let activityType = 'checkin';
-        let activityAction = '';
+      // Check if we got valid data
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        // Transform notification data to activity log format
+        const transformedActivities: ActivityLog[] = response.data.map((item: any) => {
+          let activityType = 'checkin';
+          let activityAction = '';
 
-        if (item.type === 'game_completed') {
-          activityType = 'task';
-          activityAction = `Completed ${item.gameName || 'a game'}`;
-        } else if (item.type === 'checkin') {
-          activityType = 'checkin';
-          activityAction = 'Completed daily check-in';
-        } else if (item.type === 'login' || item.type === 'senior_login_notification') {
-          activityType = 'social';
-          activityAction = 'Logged in';
-        } else if (item.type === 'badge_earned') {
-          activityType = 'badge';
-          activityAction = `Earned "${item.badgeName || 'a badge'}"`;
-        } else {
-          activityType = 'checkin';
-          activityAction = item.action || 'Activity completed';
-        }
+          const payload = item.payload || item;
 
-        return {
-          id: item._id || item.id,
-          userId: item.userId,
-          user: item.userName || item.seniorName || 'Unknown User',
-          userName: item.userName || item.seniorName || 'Unknown User',
-          action: activityAction,
-          type: activityType,
-          description: item.description || '',
-          timestamp: item.timestamp || item.createdAt || new Date().toISOString(),
-        };
-      });
+          if (payload.type === 'game_completed') {
+            activityType = 'task';
+            activityAction = `Completed ${payload.gameName || 'a game'}`;
+          } else if (payload.type === 'checkin') {
+            activityType = 'checkin';
+            activityAction = 'Completed daily check-in';
+          } else if (payload.type === 'login' || payload.type === 'senior_login_notification') {
+            activityType = 'social';
+            activityAction = 'Logged in';
+          } else if (payload.type === 'badge_earned') {
+            activityType = 'badge';
+            activityAction = `Earned "${payload.badgeName || 'a badge'}"`;
+          } else {
+            activityType = 'checkin';
+            activityAction = item.action || 'Activity completed';
+          }
 
-      setActivities(transformedActivities);
+          return {
+            id: item._id || item.id,
+            userId: payload.userId || item.userId,
+            user: payload.userName || payload.seniorName || item.userName || 'Unknown User',
+            userName: payload.userName || payload.seniorName || item.userName || 'Unknown User',
+            action: activityAction,
+            type: activityType,
+            description: item.description || '',
+            timestamp: item.receivedAt || item.timestamp || item.createdAt || new Date().toISOString(),
+          };
+        });
+
+        setActivities(transformedActivities);
+      } else {
+        // No data available - show empty state
+        setActivities([]);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error loading recent activity:', error);
+      // Gracefully show empty state on error
       setActivities([]);
       setLoading(false);
     }
@@ -132,6 +141,11 @@ const RecentActivity: React.FC = () => {
       <Typography variant="h6" fontWeight="600" gutterBottom>
         Recent Activity
       </Typography>
+      {activities.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
+          <Typography variant="body2">No recent activity to display</Typography>
+        </Box>
+      ) : (
       <List sx={{ maxHeight: 400, overflow: 'auto' }}>
         {activities.map((activity) => (
           <ListItem
@@ -169,6 +183,7 @@ const RecentActivity: React.FC = () => {
           </ListItem>
         ))}
       </List>
+      )}
     </Paper>
   );
 };

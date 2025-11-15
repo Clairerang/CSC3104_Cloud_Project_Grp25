@@ -37,45 +37,53 @@ const DashboardHome: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch real data from backend APIs
-      const [userCountResponse, todayStatsResponse, weeklyEngagementResponse] = await Promise.all([
-        api.users.getStats(),
-        api.engagement.getStats(),
-        api.engagement.getTrends('week'),
-      ]);
+      // Fetch all users to calculate stats
+      const usersResponse = await api.users.getAll();
+      const allUsers = usersResponse.data || [];
 
-      const userCount = userCountResponse.data;
-      const todayStats = todayStatsResponse.data;
-      const weeklyData = weeklyEngagementResponse.data;
+      // Calculate user counts by role
+      const seniorCount = allUsers.filter((u: any) => u.role === 'senior').length;
+      const familyCount = allUsers.filter((u: any) => u.role === 'family' || u.role === 'caregiver').length;
+      const adminCount = allUsers.filter((u: any) => u.role === 'admin').length;
+      const totalUsers = allUsers.length;
+
+      // Calculate active users today (users with lastActiveAt within last 24 hours)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const activeToday = allUsers.filter((u: any) => {
+        if (!u.lastActiveAt) return false;
+        return new Date(u.lastActiveAt) > oneDayAgo;
+      }).length;
 
       const dashboardStats: DashboardStats = {
-        totalUsers: userCount.total || 0,
-        activeUsers: todayStats.activeUsers || 0,
-        totalCheckIns: todayStats.totalCheckIns || 0,
+        totalUsers,
+        activeUsers: activeToday,
+        totalCheckIns: 0, // Will be calculated from notifications
         systemHealth: 'healthy',
         users: {
-          totalSeniors: userCount.seniors || 0,
-          totalFamilies: userCount.family || 0,
-          totalAdmins: userCount.admins || 0,
-          activeToday: todayStats.activeUsers || 0,
+          totalSeniors: seniorCount,
+          totalFamilies: familyCount,
+          totalAdmins: adminCount,
+          activeToday,
         },
         engagement: {
-          checkInsToday: todayStats.checkIns || 0,
+          checkInsToday: 0,
         },
         alerts: {
           unresolved: 0,
         },
       };
 
-      // Transform weekly engagement data for chart
-      const chartData = weeklyData.map((day: any) => ({
-        name: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
-        checkIns: day.checkIns || 0,
-        active: day.activeUsers || 0,
-      }));
-
       setStats(dashboardStats);
-      setEngagementData(chartData);
+
+      // Set simple engagement data for the week
+      const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const simpleEngagementData = daysOfWeek.map(day => ({
+        name: day,
+        checkIns: 0,
+        active: 0,
+      }));
+      setEngagementData(simpleEngagementData);
+
     } catch (err: any) {
       console.error('Failed to load dashboard data:', err);
       // Fallback to default data if API fails

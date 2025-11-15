@@ -174,6 +174,49 @@ const SeniorApp: React.FC = () => {
     fetchContacts();
   }, []);
 
+  // Fetch notifications from backend notification service
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user?.id) return;
+
+      try {
+        const response = await seniorApi.getNotifications(20);
+        console.log('[Senior App] Fetched notifications:', response);
+
+        // Transform backend notifications to NotificationItem format
+        const backendNotifs: NotificationItem[] = response.items.map((item: any) => {
+          const payload = item.payload || {};
+          return {
+            id: item._id || item.id || Date.now().toString(),
+            title: payload.title || 'New Notification',
+            body: payload.body || payload.message || '',
+            timestamp: new Date(item.receivedAt || item.timestamp || Date.now()).getTime(),
+            read: false,
+          };
+        });
+
+        // Merge with localStorage notifications and remove duplicates
+        const stored = localStorage.getItem('senior_notifications');
+        const localNotifs: NotificationItem[] = stored ? JSON.parse(stored) : [];
+
+        const allNotifs = [...backendNotifs, ...localNotifs];
+        const uniqueNotifs = allNotifs.filter((notif, index, self) =>
+          index === self.findIndex((n) => n.id === notif.id)
+        );
+
+        setNotifications(uniqueNotifs.slice(0, 50)); // Keep max 50 notifications
+        localStorage.setItem('senior_notifications', JSON.stringify(uniqueNotifs.slice(0, 50)));
+      } catch (error) {
+        console.error('[Senior App] Error fetching notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+    // Poll every 30 seconds for new notifications
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   // Register for push notifications once user is known (senior app scope)
   useEffect(() => {
     if (user?.id) {

@@ -13,6 +13,18 @@ app.use(express.json());
 
 app.get("/", (req, res) => res.send("Notification Service Running ✅"));
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "online",
+    service: "notification-service",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    mqtt: mqttClient && mqttClient.connected ? 'connected' : 'disconnected',
+    version: '1.0.0'
+  });
+});
+
 // Register a user (simple for testing)
 app.post('/register-user', async (req, res) => {
   const { userId, name, contact } = req.body;

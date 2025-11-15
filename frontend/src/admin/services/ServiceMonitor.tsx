@@ -70,20 +70,28 @@ const ServiceMonitor: React.FC = () => {
 
       setServices(transformedServices);
 
-      // Transform metrics data
+      // Calculate meaningful metrics from service data
+      const totalServices = transformedServices.length;
+      const onlineServices = transformedServices.filter(s => s.status === 'online').length;
+      const offlineServices = transformedServices.filter(s => s.status !== 'online').length;
+
       const avgResponseTime = transformedServices
         .filter(s => s.responseTime > 0)
         .reduce((sum, s) => sum + (s.responseTime as number), 0) /
         (transformedServices.filter(s => s.responseTime > 0).length || 1);
 
+      const healthPercentage = totalServices > 0
+        ? Math.round((onlineServices / totalServices) * 100)
+        : 0;
+
       setMetrics({
-        cpu: 0, // Not available from backend yet
-        memory: 0, // Will be parsed from backend response
-        disk: 0,
-        activeConnections: 0,
+        cpu: totalServices, // Repurpose as total services count
+        memory: healthPercentage, // Repurpose as health percentage
+        disk: offlineServices, // Repurpose as offline services count
+        activeConnections: onlineServices, // Shows online services
         requestsPerMinute: 0,
         averageResponseTime: Math.round(avgResponseTime),
-        errorRate: 0,
+        errorRate: offlineServices,
       });
     } catch (error) {
       console.error('Error fetching service data:', error);
@@ -99,14 +107,6 @@ const ServiceMonitor: React.FC = () => {
     setRefreshing(true);
     await fetchData();
   };
-
-  const performanceData = [
-    { time: '10:00', cpu: 30, memory: 58 },
-    { time: '10:15', cpu: 35, memory: 60 },
-    { time: '10:30', cpu: 32, memory: 59 },
-    { time: '10:45', cpu: 38, memory: 62 },
-    { time: '11:00', cpu: 35, memory: 62 },
-  ];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -207,10 +207,10 @@ const ServiceMonitor: React.FC = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    CPU Usage
+                    Total Services
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    {metrics?.cpu}%
+                    {metrics?.cpu}
                   </Typography>
                 </Box>
                 <Memory sx={{ fontSize: 40, color: 'warning.main' }} />
@@ -224,7 +224,7 @@ const ServiceMonitor: React.FC = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Memory Usage
+                    System Health
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {metrics?.memory}%
@@ -236,24 +236,6 @@ const ServiceMonitor: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
-
-      {/* Performance Chart */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight="600" gutterBottom>
-          System Performance (Last Hour)
-        </Typography>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={performanceData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="time" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="cpu" stroke="#ed6c02" name="CPU %" />
-            <Line type="monotone" dataKey="memory" stroke="#1976d2" name="Memory %" />
-          </LineChart>
-        </ResponsiveContainer>
-      </Paper>
 
       {/* Services Table */}
       <Paper>

@@ -1923,7 +1923,7 @@ app.get('/users/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/admin/stats/today', authenticateToken, async (req, res) => {
+app.get('/api/admin/stats/today', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view stats' });
@@ -1973,7 +1973,7 @@ app.get('/admin/stats/today', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/admin/stats/weekly-engagement', authenticateToken, async (req, res) => {
+app.get('/api/admin/stats/weekly-engagement', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view engagement trends' });
@@ -2011,7 +2011,7 @@ app.get('/admin/stats/weekly-engagement', authenticateToken, async (req, res) =>
 });
 
 
-app.get('/admin/stats/usercount', authenticateToken, async (req, res) => {
+app.get('/api/admin/stats/usercount', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view user statistics' });
@@ -2038,6 +2038,33 @@ app.get('/admin/stats/usercount', authenticateToken, async (req, res) => {
     res.status(200).json(stats);
   } catch (error) {
     console.error('Error fetching user counts by role:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/engagements/recent - Get recent activity/notifications
+app.get('/api/engagements/recent', authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Fetch recent notifications from notification service via internal API call
+    try {
+      const axios = require('axios');
+      const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:4002';
+      const response = await axios.get(`${notificationServiceUrl}/dashboard/history`, {
+        params: { limit, page: 1 },
+        timeout: 3000
+      });
+
+      const notifications = response.data.items || [];
+      res.status(200).json(notifications);
+    } catch (notificationError) {
+      console.error('Error fetching from notification service:', notificationError.message);
+      // Return empty array if notification service is unavailable
+      res.status(200).json([]);
+    }
+  } catch (error) {
+    console.error('Error fetching recent engagements:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

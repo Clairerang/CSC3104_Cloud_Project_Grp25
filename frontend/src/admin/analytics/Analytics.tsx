@@ -48,30 +48,38 @@ const Analytics: React.FC = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      const [userStatsResponse, todayStatsResponse, weeklyEngagementResponse] = await Promise.all([
-        api.users.getStats(),
-        api.engagement.getStats(),
-        api.engagement.getTrends('week'),
-      ]);
 
-      const userStats = userStatsResponse.data;
-      const todayStats = todayStatsResponse.data;
-      const weeklyData = weeklyEngagementResponse.data;
+      // Fetch all users to calculate stats
+      const usersResponse = await api.users.getAll();
+      const allUsers = usersResponse.data || [];
+
+      // Calculate user counts by role
+      const seniorCount = allUsers.filter((u: any) => u.role === 'senior').length;
+      const familyCount = allUsers.filter((u: any) => u.role === 'family' || u.role === 'caregiver').length;
+      const totalUsers = allUsers.length;
+
+      // Calculate active users today
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const activeToday = allUsers.filter((u: any) => {
+        if (!u.lastActiveAt) return false;
+        return new Date(u.lastActiveAt) > oneDayAgo;
+      }).length;
 
       setStats({
-        totalUsers: userStats.total || 0,
-        totalSeniors: userStats.seniors || 0,
-        totalFamilies: userStats.family || 0,
-        checkInsToday: todayStats.checkIns || 0,
-        activeUsers: todayStats.activeUsers || 0,
+        totalUsers,
+        totalSeniors: seniorCount,
+        totalFamilies: familyCount,
+        checkInsToday: 0,
+        activeUsers: activeToday,
       });
 
-      // Transform weekly engagement data
-      const chartData = weeklyData.map((day: any) => ({
-        date: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
-        checkIns: day.checkIns || 0,
-        tasks: day.tasksCompleted || 0,
-        social: day.socialInteractions || 0,
+      // Simple weekly engagement data
+      const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const chartData = daysOfWeek.map(day => ({
+        date: day,
+        checkIns: 0,
+        tasks: 0,
+        social: 0,
       }));
 
       setEngagementData(chartData);

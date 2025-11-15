@@ -76,6 +76,19 @@ export const seniorApi = {
     const response = await apiClient.get<CaregiversResponse>('/senior/caregivers');
     return response.data.caregivers;
   },
+
+  // Get notifications for the senior user
+  async getNotifications(limit: number = 20): Promise<{ items: any[] }> {
+    try {
+      const response = await apiClient.get(`/engagements/recent`, {
+        params: { limit }
+      });
+      return { items: response.data };
+    } catch (error) {
+      console.error('[Senior API] Error fetching notifications:', error);
+      return { items: [] };
+    }
+  },
 };
 
 export default seniorApi;
