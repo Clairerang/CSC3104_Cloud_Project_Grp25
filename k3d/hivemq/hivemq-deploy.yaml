@@ -6,7 +6,6 @@ metadata:
   labels:
     app: hivemq
 spec:
-  replicas: 1   # CE has no clustering
   selector:
     matchLabels:
       app: hivemq
@@ -23,8 +22,6 @@ spec:
               containerPort: 1883      # MQTT
             - name: websocket
               containerPort: 8000      # WebSocket
-            - name: control-center
-              containerPort: 8080      # Control Center
           # Health checks
           livenessProbe:
             exec:

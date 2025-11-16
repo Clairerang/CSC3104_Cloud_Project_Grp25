@@ -2,6 +2,7 @@ CLUSTER_NAME := senior-care
 CONFIG_FILE := ./k3d-config.yaml
 
 MONGODB_INIT_PATH := ../database/mongo-init/01-init-all.js
+BACKEND_ENV_PATH := ../backend/config/secrets/.env
 
 .PHONY: create delete restart status
 
@@ -55,3 +56,15 @@ hivemq-deploy:
 
 hivemq-deploy-delete:
 	kubectl delete namespace senior-care-hivemq
+
+notification-deploy:
+	kubectl create namespace senior-care-notification
+
+	kubectl create secret generic backend-env \
+	--from-env-file=${BACKEND_ENV_PATH} \
+  	-n senior-care-notification
+
+	kubectl apply -f ./notifications/notification-service
+
+notification-deploy-delete:
+	kubectl delete namespace senior-care-notification

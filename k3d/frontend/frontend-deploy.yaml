@@ -22,6 +22,6 @@ spec:
     spec:
       containers:
         - name: senior-care-frontend-container
-          image: ponyoo/senior-care-frontend:latest
+          image: minmin20/senior-care:frontend-latest
           ports:
             - containerPort: 80

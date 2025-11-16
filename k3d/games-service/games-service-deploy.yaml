@@ -3,11 +3,11 @@ kind: Deployment
 
 metadata:
   name: games-service
-  namespace: senior-care-game
+  namespace: senior-care-web
   labels:
     app: games-service
 
-specs:
+spec:
   replicas: 2
 
   selector:
@@ -19,9 +19,9 @@ specs:
       labels:
         app: games-service
 
-  spec:
-    containers:
-      - name: games-service-container
-        image: ponyoo/senior-care-games-service:latest
-        ports:
-          - containerPort: 8081
+    spec:
+      containers:
+        - name: games-service-container
+          image: minmin20/senior-care:games-service-latest
+          ports:
+            - containerPort: 8081
