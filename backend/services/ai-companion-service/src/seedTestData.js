@@ -3,12 +3,12 @@ const mongoose = require('mongoose');
 const User = require('./models/User');
 const Relationship = require('./models/Relationship');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/ai-companion';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://mongo:27017/senior_care';
 
 async function seedTestData() {
   try {
     console.log('🌱 Connecting to MongoDB...');
-    await mongoose.connect(MONGO_URI, {
+    await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });

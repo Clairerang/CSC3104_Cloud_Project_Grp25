@@ -123,7 +123,7 @@ mqttClient.on('error', (err) => {
 });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://mongo:27017/ai-companion', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/senior_care', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => {
