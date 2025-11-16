@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: ai-companion-service
+  namespace: senior-care-ai-companion
+  labels:
+    app: ai-companion-service
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: ai-companion-service
+
+  template:
+    metadata:
+      labels:
+        app: ai-companion-service
+
+    spec:
+      containers:
+        - name: ai-companion-service-container
+          image: minmin20/senior-care:ai-companion-service-latest
+          imagePullPolicy: Always 
+          ports:
+          - containerPort: 4015
+          env:
+            - name: MONGODB_URI
+              value: "mongodb://mongodb.senior-care-db.svc.cluster.local:27017/senior_care"
+            - name: MQTT_BROKER 
+              value: "hivemq.senior-care-hivemq.svc.cluster.local"
+            - name: API_GATEWAY_URL
+              value: "http://api-gateway.senior-care-api.svc.cluster.local:8080"
+            - name: MQTT_PORT
+              value: "1883"
+            - name: SERVICE_AUTH_TOKEN
+              value: "games-service-secret"
+          envFrom:
+            - secretRef:
+                name: backend-env
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4015
+            initialDelaySeconds: 40   # start_period
+            periodSeconds: 30         # interval
+            timeoutSeconds: 10        # timeout
+            failureThreshold: 3       # retries
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4015
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
