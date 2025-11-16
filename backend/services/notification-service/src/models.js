@@ -37,6 +37,7 @@ const notificationEventSchema = new mongoose.Schema({
   payload: { type: mongoose.Schema.Types.Mixed },
   sourceTopic: String,
   receivedAt: { type: Date, default: Date.now },
+  readBy: { type: [String], default: [] }, // Array of userIds who have read this notification
 }, { timestamps: true });
 
 // MongoDB Models for Notification Service

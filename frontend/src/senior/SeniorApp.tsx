@@ -186,10 +186,24 @@ const SeniorApp: React.FC = () => {
         // Transform backend notifications to NotificationItem format
         const backendNotifs: NotificationItem[] = response.items.map((item: any) => {
           const payload = item.payload || {};
+
+          // If this is a reminder notification, include reminder details in the body
+          let body = payload.body || payload.message || '';
+          if (payload.reminder) {
+            const r = payload.reminder;
+            const details = [];
+            if (r.time) details.push(`⏰ ${r.time}`);
+            if (r.frequency) details.push(`🔁 ${r.frequency}`);
+            if (r.description) details.push(`📝 ${r.description}`);
+            if (details.length > 0) {
+              body = `${body}\n\n${details.join('\n')}`;
+            }
+          }
+
           return {
             id: item._id || item.id || Date.now().toString(),
             title: payload.title || 'New Notification',
-            body: payload.body || payload.message || '',
+            body: body,
             timestamp: new Date(item.receivedAt || item.timestamp || Date.now()).getTime(),
             read: false,
           };
@@ -262,7 +276,11 @@ const SeniorApp: React.FC = () => {
     }
   }, [user?.id]);
 
-  const handleMarkAsRead = (id: string) => {
+  const handleMarkAsRead = async (id: string) => {
+    // Mark as read in backend
+    await seniorApi.markNotificationsAsRead([id]);
+
+    // Update local state - mark as read but keep visible
     setNotifications(prev => {
       const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
       localStorage.setItem('senior_notifications', JSON.stringify(updated));
@@ -270,7 +288,14 @@ const SeniorApp: React.FC = () => {
     });
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
+    // Mark all notifications as read in backend
+    const notificationIds = notifications.map(n => n.id);
+    if (notificationIds.length > 0) {
+      await seniorApi.markNotificationsAsRead(notificationIds);
+    }
+
+    // Clear local state
     setNotifications([]);
     localStorage.removeItem('senior_notifications');
   };

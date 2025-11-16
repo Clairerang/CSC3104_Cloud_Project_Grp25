@@ -412,8 +412,48 @@ async function start() {
       const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 200);
       const page = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);
       const skip = (page - 1) * limit;
-      const docs = await models.NotificationEvent.find().sort({ receivedAt: -1 }).skip(skip).limit(limit).lean().exec();
+      const userId = req.query.userId;
+      const unreadOnly = req.query.unreadOnly === 'true';
+
+      // Build query filter
+      let filter = userId ? { 'payload.userId': userId } : {};
+
+      // If unreadOnly is true, filter out notifications already read by this user
+      if (unreadOnly && userId) {
+        filter.readBy = { $ne: userId };
+      }
+
+      const docs = await models.NotificationEvent.find(filter).sort({ receivedAt: -1 }).skip(skip).limit(limit).lean().exec();
       res.json({ ok: true, items: docs });
+    } catch (e) {
+      res.status(500).json({ error: e && e.message ? e.message : String(e) });
+    }
+  });
+
+  // Mark notifications as read
+  app.post('/dashboard/mark-read', async (req, res) => {
+    try {
+      const { userId, notificationIds } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+      }
+
+      if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+        return res.status(400).json({ error: 'notificationIds array is required' });
+      }
+
+      // Update all specified notifications to add userId to readBy array
+      const result = await models.NotificationEvent.updateMany(
+        { _id: { $in: notificationIds } },
+        { $addToSet: { readBy: userId } }
+      ).exec();
+
+      res.json({
+        ok: true,
+        modified: result.modifiedCount,
+        message: `Marked ${result.modifiedCount} notification(s) as read`
+      });
     } catch (e) {
       res.status(500).json({ error: e && e.message ? e.message : String(e) });
     }

@@ -1923,7 +1923,7 @@ app.get('/users/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/admin/stats/today', authenticateToken, async (req, res) => {
+app.get('/admin/stats/today', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view stats' });
@@ -1973,7 +1973,7 @@ app.get('/api/admin/stats/today', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/admin/stats/weekly-engagement', authenticateToken, async (req, res) => {
+app.get('/admin/stats/weekly-engagement', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view engagement trends' });
@@ -2011,7 +2011,7 @@ app.get('/api/admin/stats/weekly-engagement', authenticateToken, async (req, res
 });
 
 
-app.get('/api/admin/stats/usercount', authenticateToken, async (req, res) => {
+app.get('/admin/stats/usercount', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view user statistics' });
@@ -2042,17 +2042,28 @@ app.get('/api/admin/stats/usercount', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/engagements/recent - Get recent activity/notifications
-app.get('/api/engagements/recent', authenticateToken, async (req, res) => {
+// GET /engagements/recent - Get recent activity/notifications (nginx strips /api prefix)
+app.get('/engagements/recent', authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
+    const userId = req.user?.userId; // Get userId from authenticated user
+
+    if (!userId) {
+      console.error('[Engagements] No userId found in authenticated request');
+      return res.status(200).json([]); // Return empty array if no userId
+    }
 
     // Fetch recent notifications from notification service via internal API call
     try {
       const axios = require('axios');
       const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:4002';
       const response = await axios.get(`${notificationServiceUrl}/dashboard/history`, {
-        params: { limit, page: 1 },
+        params: {
+          limit,
+          page: 1,
+          userId: userId,
+          unreadOnly: 'true' // Only fetch unread notifications
+        },
         timeout: 3000
       });
 
@@ -2065,6 +2076,42 @@ app.get('/api/engagements/recent', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('Error fetching recent engagements:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /engagements/mark-read - Mark notifications as read
+app.post('/engagements/mark-read', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { notificationIds } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!notificationIds || !Array.isArray(notificationIds)) {
+      return res.status(400).json({ error: 'notificationIds array is required' });
+    }
+
+    // Forward to notification service
+    try {
+      const axios = require('axios');
+      const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:4002';
+      const response = await axios.post(`${notificationServiceUrl}/dashboard/mark-read`, {
+        userId,
+        notificationIds
+      }, {
+        timeout: 3000
+      });
+
+      res.status(200).json(response.data);
+    } catch (notificationError) {
+      console.error('Error marking notifications as read:', notificationError.message);
+      res.status(500).json({ error: 'Failed to mark notifications as read' });
+    }
+  } catch (error) {
+    console.error('Error in mark-read endpoint:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

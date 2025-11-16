@@ -54,35 +54,89 @@ const DashboardHome: React.FC = () => {
         return new Date(u.lastActiveAt) > oneDayAgo;
       }).length;
 
+      // Fetch today's stats from backend (includes check-ins and active seniors)
+      let checkInsToday = 0;
+      let activeTodayFromDB = activeToday; // fallback to calculated value
+      try {
+        const todayStatsResponse = await api.engagement.getStats();
+        checkInsToday = todayStatsResponse.data.totalCheckinsToday || 0;
+        activeTodayFromDB = todayStatsResponse.data.totalActiveSeniors || activeToday;
+      } catch (statsError) {
+        console.error('Failed to fetch today stats:', statsError);
+      }
+
+      // Calculate system health based on services
+      let systemHealth: 'healthy' | 'warning' | 'error' = 'healthy';
+      try {
+        const healthResponse = await api.health.getAllServices();
+        const services = healthResponse.data.services || [];
+        const onlineCount = services.filter((s: any) => s.status === 'online').length;
+        const totalCount = services.length;
+
+        if (onlineCount === totalCount) {
+          systemHealth = 'healthy';
+        } else if (onlineCount > totalCount / 2) {
+          systemHealth = 'warning';
+        } else {
+          systemHealth = 'error';
+        }
+      } catch (healthError) {
+        console.error('Failed to fetch system health:', healthError);
+      }
+
+      // TODO: Implement alerts endpoint to get real unresolved alerts count
+      // For now, calculate based on seniors who haven't checked in today
+      const unresolvedAlerts = Math.max(0, seniorCount - checkInsToday);
+
       const dashboardStats: DashboardStats = {
         totalUsers,
-        activeUsers: activeToday,
-        totalCheckIns: 0, // Will be calculated from notifications
-        systemHealth: 'healthy',
+        activeUsers: activeTodayFromDB,
+        totalCheckIns: checkInsToday,
+        systemHealth,
         users: {
           totalSeniors: seniorCount,
           totalFamilies: familyCount,
           totalAdmins: adminCount,
-          activeToday,
+          activeToday: activeTodayFromDB,
         },
         engagement: {
-          checkInsToday: 0,
+          checkInsToday: checkInsToday,
         },
         alerts: {
-          unresolved: 0,
+          unresolved: unresolvedAlerts,
         },
       };
 
       setStats(dashboardStats);
 
-      // Set simple engagement data for the week
-      const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const simpleEngagementData = daysOfWeek.map(day => ({
-        name: day,
-        checkIns: 0,
-        active: 0,
-      }));
-      setEngagementData(simpleEngagementData);
+      // Fetch real weekly engagement data from API
+      try {
+        const engagementResponse = await api.engagement.getTrends('week');
+        const weeklyData = engagementResponse.data.trendData || [];
+
+        // Transform API data to chart format
+        const chartData = weeklyData.map((item: any) => {
+          const date = new Date(item.date);
+          const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+          return {
+            name: dayName,
+            checkIns: item.checkins || 0,
+            active: item.activeUsers || 0,
+          };
+        });
+
+        setEngagementData(chartData);
+      } catch (engagementError) {
+        console.error('Failed to load engagement data:', engagementError);
+        // Fallback to empty data
+        const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const fallbackData = daysOfWeek.map(day => ({
+          name: day,
+          checkIns: 0,
+          active: 0,
+        }));
+        setEngagementData(fallbackData);
+      }
 
     } catch (err: any) {
       console.error('Failed to load dashboard data:', err);

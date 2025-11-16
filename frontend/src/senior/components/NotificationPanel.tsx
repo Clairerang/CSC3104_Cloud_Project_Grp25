@@ -26,8 +26,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-    // Mark all as read when opening panel
-    notifications.filter(n => !n.read).forEach(n => onMarkAsRead(n.id));
+    // Don't auto-mark as read - let user read and dismiss manually
   };
 
   const handleClose = () => {
@@ -104,7 +103,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: 14, mb: 0.5 }}>
                     {notif.title}
                   </Typography>
-                  <Typography variant="body2" sx={{ fontSize: 13, color: '#6b7280', mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ fontSize: 13, color: '#6b7280', mb: 0.5, whiteSpace: 'pre-line' }}>
                     {notif.body}
                   </Typography>
                   <Typography variant="caption" sx={{ fontSize: 11, color: '#9ca3af' }}>

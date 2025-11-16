@@ -89,6 +89,15 @@ export const seniorApi = {
       return { items: [] };
     }
   },
+
+  // Mark notifications as read
+  async markNotificationsAsRead(notificationIds: string[]): Promise<void> {
+    try {
+      await apiClient.post(`/engagements/mark-read`, { notificationIds });
+    } catch (error) {
+      console.error('[Senior API] Error marking notifications as read:', error);
+    }
+  },
 };
 
 export default seniorApi;
