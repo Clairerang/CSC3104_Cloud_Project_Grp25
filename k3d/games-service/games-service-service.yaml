@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: games-service
-  namespace: senior-care-web
+  namespace: senior-care-games
 spec:
   type: ClusterIP
   selector:

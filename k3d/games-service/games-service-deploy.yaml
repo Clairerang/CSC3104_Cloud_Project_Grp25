@@ -3,7 +3,7 @@ kind: Deployment
 
 metadata:
   name: games-service
-  namespace: senior-care-web
+  namespace: senior-care-games
   labels:
     app: games-service
 
@@ -23,5 +23,34 @@ spec:
       containers:
         - name: games-service-container
           image: minmin20/senior-care:games-service-latest
+          imagePullPolicy: Always 
           ports:
-            - containerPort: 8081
+          - containerPort: 8081
+          env:
+            - name: MONGODB_URI
+              value: "mongodb://mongodb.senior-care-db.svc.cluster.local:27017/senior_care"
+            - name: MQTT_BROKER_URL
+              value: "mqtt://hivemq.senior-care-hivemq.svc.cluster.local:1883"
+            - name: API_GATEWAY_URL
+              value: "http://api-gateway.senior-care-api.svc.cluster.local:8080"
+            - name: SERVICE_AUTH_TOKEN
+              value: "games-service-secret"
+            - name: JWT_SECRET
+              value: "secret1234@"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 40   # start_period
+            periodSeconds: 30         # interval
+            timeoutSeconds: 10        # timeout
+            failureThreshold: 3       # retries
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
