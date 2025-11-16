@@ -29,12 +29,18 @@ deploy-all-delete: ui-deploy-delete mongo-deploy-delete hivemq-deploy-delete
 ui-deploy:
 	kubectl create namespace senior-care-web
 
-	kubectl apply -f ./api-gateway/
-	sleep 60
 	kubectl apply -f ./frontend/
 
 ui-deploy-delete:
 	kubectl delete namespace senior-care-web
+
+api-deploy:
+	kubectl create namespace senior-care-api
+
+	kubectl apply -f ./api-gateway/
+
+api-deploy-delete:
+	kubectl delete namespace senior-care-api
 
 mongo-deploy:
 	kubectl create namespace senior-care-db
@@ -68,3 +74,33 @@ notification-deploy:
 
 notification-deploy-delete:
 	kubectl delete namespace senior-care-notification
+
+push-notification-deploy:
+
+	kubectl apply -f ./notifications/push-notification
+
+push-notification-deploy-delete:
+
+	kubectl delete service push-notification-service -n senior-care-notification
+
+	kubectl delete deployment push-notification-service -n senior-care-notification
+
+ai-companion-deploy:
+	kubectl create namespace senior-care-ai-companion
+
+	kubectl create secret generic backend-env \
+	--from-env-file=${BACKEND_ENV_PATH} \
+  	-n senior-care-ai-companion
+
+	kubectl apply -f ./ai-companion
+
+ai-companion-deploy-delete:
+	kubectl delete namespace senior-care-ai-companion
+
+games-service-deploy:
+	kubectl create namespace senior-care-games
+
+	kubectl apply -f ./games-service
+
+games-service-deploy-delete:
+	kubectl delete namespace senior-care-games
