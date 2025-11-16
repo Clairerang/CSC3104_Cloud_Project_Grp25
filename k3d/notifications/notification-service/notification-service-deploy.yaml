@@ -23,6 +23,7 @@ spec:
       containers:
         - name: notification-service-container
           image: minmin20/senior-care:notification-service-latest
+          imagePullPolicy: Always 
           ports:
             - name: http
               containerPort: 4002

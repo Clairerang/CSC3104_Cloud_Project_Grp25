@@ -2,7 +2,7 @@ const path = require('path');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 
-const PROTO_PATH = path.join(process.cwd(), 'backend/config/protos/notification.proto');
+const PROTO_PATH = path.join(process.cwd(), 'protos/notification.proto');
 
 function startGrpcServer({ publishEvent, models, port = process.env.GRPC_PORT || 50051 } = {}) {
   if (!publishEvent || typeof publishEvent !== 'function') {
