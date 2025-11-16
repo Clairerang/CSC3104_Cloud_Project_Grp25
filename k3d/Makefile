@@ -21,9 +21,9 @@ status:
 	@echo "\nkubectl nodes:"
 	-kubectl get nodes -o wide || echo "Cluster not running"
 
-deploy-all: ui-deploy mongo-deploy
+deploy-all: ui-deploy mongo-deploy hivemq-deploy
 
-deploy-all-delete: ui-deploy-delete mongo-deploy-delete
+deploy-all-delete: ui-deploy-delete mongo-deploy-delete hivemq-deploy-delete
 
 ui-deploy:
 	kubectl create namespace senior-care-web
