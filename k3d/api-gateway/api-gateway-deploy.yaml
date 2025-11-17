@@ -23,6 +23,7 @@ spec:
       containers:
         - name: api-gateway-container
           image: minmin20/senior-care:api-gateway-latest
+          imagePullPolicy: Always
           ports:
           - containerPort: 8080
           env:

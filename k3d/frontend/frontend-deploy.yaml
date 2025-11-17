@@ -23,6 +23,7 @@ spec:
       containers:
         - name: senior-care-frontend-container
           image: minmin20/senior-care:frontend-latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           env:
