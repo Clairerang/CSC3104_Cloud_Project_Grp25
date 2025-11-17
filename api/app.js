@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const mqtt = require('mqtt');
 const { User, Relationship, Engagement, Invitation, Activity, Reminder } = require('./models');
+const axios = require('axios');
 
 const app = express();
 const port = 8080;
@@ -2435,8 +2436,16 @@ app.get('/health/services', async (req, res) => {
 
     // Check all microservices
     const gamesServiceHealth = await checkGamesServiceHealth();
-    const notificationServiceHealth = await checkServiceHealth();
-    const aiCompanionServiceHealth = await checkServiceHealth();
+    const notificationServiceHealth = await checkServiceHealth(NOTIFICATION_SERVICE_URL, 'notification-service');
+    
+    // Define AI companion service URL from environment or default
+    const AI_COMPANION_SERVICE_URL = process.env.AI_COMPANION_SERVICE_URL || 
+      'http://ai-companion-service:4015';
+    
+    const aiCompanionServiceHealth = await checkServiceHealth(
+      AI_COMPANION_SERVICE_URL, 
+      'ai-companion-service'
+    );
 
     const services = [
       {
@@ -2493,7 +2502,7 @@ app.get('/health/services', async (req, res) => {
         status: aiCompanionServiceHealth.status,
         uptime: aiCompanionServiceHealth.status === 'online' ? uptimePercentage : 0,
         responseTime: aiCompanionServiceHealth.responseTime,
-        endpoint: process.env.AI_COMPANION_SERVICE_URL,
+        endpoint: AI_COMPANION_SERVICE_URL,
         lastChecked: new Date().toISOString(),
         details: aiCompanionServiceHealth.details || { error: aiCompanionServiceHealth.error }
       }
