@@ -103,7 +103,7 @@ deploy-all-delete:
 	$(MAKE) api-deploy-delete
 	$(MAKE) games-service-deploy-delete
 	$(MAKE) ai-companion-deploy-delete
-	$(MAKE) push-notification-deploy-delete
+# 	$(MAKE) push-notification-deploy-delete
 	$(MAKE) notification-deploy-delete
 	$(MAKE) hivemq-deploy-delete
 	$(MAKE) mongo-deploy-delete
@@ -174,20 +174,20 @@ notification-deploy-delete:
 
 
 # Push Notification Service (Firebase FCM)
-push-notification-deploy:
-	$(call ensure-namespace,$(NOTIF_NS))
+# push-notification-deploy:
+# 	$(call ensure-namespace,$(NOTIF_NS))
 
-	# Make firebase-sa secret idempotent
-	kubectl create secret generic firebase-sa \
-		--from-file=firebase-sa.json=$(FIREBASE_SA_PATH) \
-		-n $(NOTIF_NS) \
-		--dry-run=client -o yaml | kubectl apply -f -
+# 	# Make firebase-sa secret idempotent
+# 	kubectl create secret generic firebase-sa \
+# 		--from-file=firebase-sa.json=$(FIREBASE_SA_PATH) \
+# 		-n $(NOTIF_NS) \
+# 		--dry-run=client -o yaml | kubectl apply -f -
 
-	kubectl apply -f ./notifications/push-notification
+# 	kubectl apply -f ./notifications/push-notification
 
-push-notification-deploy-delete:
-	- kubectl delete -f ./notifications/push-notification -n $(NOTIF_NS) --ignore-not-found=true
-	- kubectl delete secret firebase-sa -n $(NOTIF_NS) --ignore-not-found=true
+# push-notification-deploy-delete:
+# 	- kubectl delete -f ./notifications/push-notification -n $(NOTIF_NS) --ignore-not-found=true
+# 	- kubectl delete secret firebase-sa -n $(NOTIF_NS) --ignore-not-found=true
 
 
 # AI Companion
