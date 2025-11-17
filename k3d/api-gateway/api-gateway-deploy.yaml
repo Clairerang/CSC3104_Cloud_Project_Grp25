@@ -35,6 +35,8 @@ spec:
               value: "http://games-service.senior-care-games.svc.cluster.local:8081"
             - name: NOTIFICATION_SERVICE_URL
               value: "http://notification-service.senior-care-notification.svc.cluster.local:4002"
+            - name: AI_COMPANION_SERVICE_URL
+              value: "http://ai-companion-service.senior-care-ai-companion.svc.cluster.local:4015"
             - name: SERVICE_AUTH_TOKEN
               value: "games-service-secret"
             - name: JWT_SECRET

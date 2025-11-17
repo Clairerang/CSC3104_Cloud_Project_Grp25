@@ -82,8 +82,8 @@ deploy-all:
 	@$(MAKE) notification-deploy
 	$(call wait-for,$(NOTIF_NS))
 
-	@$(MAKE) push-notification-deploy
-	$(call wait-for,$(NOTIF_NS))
+# 	@$(MAKE) push-notification-deploy
+# 	$(call wait-for,$(NOTIF_NS))
 
 	@$(MAKE) ai-companion-deploy
 	$(call wait-for,$(AI_NS))
@@ -158,6 +158,12 @@ notification-deploy:
 	# Make backend-env secret idempotent
 	kubectl create secret generic backend-env \
 		--from-env-file=$(BACKEND_ENV_PATH) \
+		-n $(NOTIF_NS) \
+		--dry-run=client -o yaml | kubectl apply -f -
+
+	# Make firebase-sa secret idempotent
+	kubectl create secret generic firebase-sa \
+		--from-file=firebase-sa.json=$(FIREBASE_SA_PATH) \
 		-n $(NOTIF_NS) \
 		--dry-run=client -o yaml | kubectl apply -f -
 

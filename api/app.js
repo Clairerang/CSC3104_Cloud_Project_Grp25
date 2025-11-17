@@ -78,6 +78,7 @@ mqttClient.on('error', (error) => {
 function publishEvent(eventType, eventData) {
   const event = {
     type: eventType,
+    messageId: eventData.messageId || `${eventType}_${eventData.userId || 'system'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     ...eventData,
     timestamp: new Date().toISOString()
   };
@@ -278,16 +279,6 @@ app.post('/login', async (req, res) => {
 
     // Publish login event for real-time updates (especially for seniors)
     if (user.role === 'senior') {
-      // Publish event to senior's dashboard
-      publishEvent('login', {
-        userId: user.userId,
-        username: user.username,
-        name: user.profile?.name || user.username,
-        role: user.role,
-        title: 'Senior Login',
-        body: `${user.profile?.name || user.username} has logged in`
-      });
-
       // Notify caregivers that senior has logged in
       try {
         const relationships = await Relationship.find({ seniorId: user.userId }).lean();
@@ -348,6 +339,53 @@ app.get('/user/me', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update user profile
+app.put('/user/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { profile } = req.body;
+
+    const user = await User.findOne({ userId });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update profile fields
+    if (profile) {
+      if (profile.name) user.profile.name = profile.name;
+      if (profile.age !== undefined) user.profile.age = profile.age;
+      if (profile.contact) user.profile.contact = profile.contact;
+      if (profile.email) {
+        // Validate email not taken by another user
+        const existing = await User.findOne({
+          "profile.email": profile.email,
+          userId: { $ne: userId }
+        });
+        if (existing) {
+          return res.status(400).json({ error: 'Email already in use' });
+        }
+        user.profile.email = profile.email;
+      }
+    }
+
+    user.updatedAt = new Date();
+    await user.save();
+
+    res.status(200).json({
+      message: 'Profile updated successfully',
+      user: {
+        userId: user.userId,
+        username: user.username,
+        role: user.role,
+        profile: user.profile
+      }
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1019,6 +1057,38 @@ app.post('/add-task', authenticateHybrid, async (req, res) => {
       body: `Earned ${cappedPoints} points from ${gameNames[type] || type}`
     });
 
+    // Notify linked caregivers about game completion
+    try {
+      const seniorUser = await User.findOne({ userId }).select('profile username role').lean();
+      if (seniorUser && seniorUser.role === 'senior') {
+        const relationships = await Relationship.find({ seniorId: userId }).lean();
+        const caregiverIds = relationships.map(r => r.linkAccId).filter(Boolean);
+
+        if (caregiverIds.length > 0) {
+          const seniorName = seniorUser.profile?.name || seniorUser.username || userId;
+
+          for (const caregiverId of caregiverIds) {
+            publishEvent('caregiver_game_notification', {
+              userId: caregiverId,  // Notify the CAREGIVER
+              seniorId: userId,
+              seniorName,
+              gameType: type,
+              gameName: gameNames[type] || type,
+              points: cappedPoints,
+              dailyTotal: newDailyTotal,
+              timestamp: new Date().toISOString(),
+              title: `${seniorName} Completed ${gameNames[type] || type}`,
+              body: `${seniorName} earned ${cappedPoints} points!`,
+              target: ['mobile', 'dashboard']
+            });
+          }
+          console.log(`[GAME-COMPLETE] Notified ${caregiverIds.length} caregiver(s) about ${seniorName}'s game completion`);
+        }
+      }
+    } catch (err) {
+      console.error('[GAME-COMPLETE] Error notifying caregivers:', err);
+    }
+
     const response = {
       message: `Task added successfully for ${session} session on ${engagementDate}`,
       engagement,
@@ -1689,25 +1759,8 @@ app.post('/caregiver/reminders', authenticateToken, async (req, res) => {
     // Get senior details for response
     const senior = await User.findOne({ userId: seniorId }, '-passwordHash').lean();
 
-    // Publish a push/mobile event so the senior gets notified
-    try {
-      publishEvent('reminder_created', {
-        userId: seniorId,
-        title: 'New Reminder',
-        body: `${(req.user && req.user.username) || 'Your caregiver'} scheduled: ${title}`,
-        reminder: {
-          reminderId,
-          title,
-          description: newReminder.description || '',
-          time,
-          type,
-          frequency: newReminder.frequency
-        },
-        target: ['mobile','dashboard']
-      });
-    } catch (e) {
-      console.warn('Failed to publish reminder_created event', e && e.message ? e.message : e);
-    }
+    // NOTE: Do NOT publish immediate event - the reminder will be sent by the
+    // notification service scheduler at the specified time
 
     res.status(201).json({
       message: 'Reminder created successfully',
@@ -2382,11 +2435,8 @@ app.get('/health/services', async (req, res) => {
 
     // Check all microservices
     const gamesServiceHealth = await checkGamesServiceHealth();
-    const notificationServiceHealth = await checkServiceHealth('http://notification-service:4002', 'notification-service');
-    const pushNotificationServiceHealth = await checkServiceHealth('http://push-notification-service:4020', 'push-notification-service');
-    const aiCompanionServiceHealth = await checkServiceHealth('http://ai-companion-service:4015', 'ai-companion-service');
-    const smsServiceHealth = await checkServiceHealth('http://sms-service:4004', 'sms-service');
-    const emailServiceHealth = await checkServiceHealth('http://email-service:4003', 'email-service');
+    const notificationServiceHealth = await checkServiceHealth();
+    const aiCompanionServiceHealth = await checkServiceHealth();
 
     const services = [
       {
@@ -2433,19 +2483,9 @@ app.get('/health/services', async (req, res) => {
         status: notificationServiceHealth.status,
         uptime: notificationServiceHealth.status === 'online' ? uptimePercentage : 0,
         responseTime: notificationServiceHealth.responseTime,
-        endpoint: 'http://notification-service:4002',
+        endpoint: NOTIFICATION_SERVICE_URL,
         lastChecked: new Date().toISOString(),
         details: notificationServiceHealth.details || { error: notificationServiceHealth.error }
-      },
-      {
-        id: 'push-notification-service',
-        name: 'Push Notification Service',
-        status: pushNotificationServiceHealth.status,
-        uptime: pushNotificationServiceHealth.status === 'online' ? uptimePercentage : 0,
-        responseTime: pushNotificationServiceHealth.responseTime,
-        endpoint: 'http://push-notification-service:4020',
-        lastChecked: new Date().toISOString(),
-        details: pushNotificationServiceHealth.details || { error: pushNotificationServiceHealth.error }
       },
       {
         id: 'ai-companion-service',
@@ -2453,29 +2493,9 @@ app.get('/health/services', async (req, res) => {
         status: aiCompanionServiceHealth.status,
         uptime: aiCompanionServiceHealth.status === 'online' ? uptimePercentage : 0,
         responseTime: aiCompanionServiceHealth.responseTime,
-        endpoint: 'http://ai-companion-service:4015',
+        endpoint: process.env.AI_COMPANION_SERVICE_URL,
         lastChecked: new Date().toISOString(),
         details: aiCompanionServiceHealth.details || { error: aiCompanionServiceHealth.error }
-      },
-      {
-        id: 'sms-service',
-        name: 'SMS Service',
-        status: smsServiceHealth.status,
-        uptime: smsServiceHealth.status === 'online' ? uptimePercentage : 0,
-        responseTime: smsServiceHealth.responseTime,
-        endpoint: 'http://sms-service:4004',
-        lastChecked: new Date().toISOString(),
-        details: smsServiceHealth.details || { error: smsServiceHealth.error }
-      },
-      {
-        id: 'email-service',
-        name: 'Email Service',
-        status: emailServiceHealth.status,
-        uptime: emailServiceHealth.status === 'online' ? uptimePercentage : 0,
-        responseTime: emailServiceHealth.responseTime,
-        endpoint: 'http://email-service:4003',
-        lastChecked: new Date().toISOString(),
-        details: emailServiceHealth.details || { error: emailServiceHealth.error }
       }
     ];
 

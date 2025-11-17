@@ -41,7 +41,7 @@ async function startDashboardConsumer() {
     // Handle incoming MQTT messages
     mqttClient.on('message', async (topic, message) => {
       if (topic !== 'notification/events') return;
-      
+
       let event = null;
       try {
         event = JSON.parse(message.toString());
@@ -49,7 +49,26 @@ async function startDashboardConsumer() {
         console.warn('⚠️ dashboardConsumer: invalid JSON message');
         return;
       }
-      
+
+      // MESSAGE DEDUPLICATION: Check if already processed
+      const messageId = event.messageId || `dash_${event.type}_${event.userId}_${event.timestamp || ''}`;
+      try {
+        const existing = await models.ProcessedMessage.findOne({ messageId }).lean();
+        if (existing) {
+          console.log(`⏭️  Dashboard: Skipping already processed message: ${messageId}`);
+          return; // Already processed by another replica
+        }
+        // Mark as processed
+        await models.ProcessedMessage.create({ messageId, processedAt: new Date() });
+      } catch (err) {
+        if (err.code === 11000) {
+          // Duplicate key error - another replica is processing this
+          console.log(`⏭️  Dashboard: Another replica is processing message: ${messageId}`);
+          return;
+        }
+        console.error('Error checking processed messages (dashboard):', err);
+      }
+
       // persist to Mongo for durability
       try {
         await models.NotificationEvent.create({ eventType: event.type || '', payload: event, sourceTopic: 'notification/events', receivedAt: new Date() });

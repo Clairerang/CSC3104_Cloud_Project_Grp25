@@ -141,10 +141,33 @@ const Settings: React.FC = () => {
 
   const handleSaveProfile = async () => {
     try {
-      // TODO: Add API endpoint to update user profile
-      console.log('Profile saved:', profile);
+      const response = await fetch('/api/user/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          profile: {
+            name: profile.fullName,
+            email: profile.email,
+            contact: profile.phone
+          }
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Settings] Profile updated successfully:', data);
+        setIsEditing(false);
+      } else {
+        const error = await response.json();
+        console.error('[Settings] Failed to update profile:', error);
+        alert(`Failed to update profile: ${error.error || 'Unknown error'}`);
+      }
     } catch (error) {
-      console.error('Error saving profile:', error);
+      console.error('[Settings] Error saving profile:', error);
+      alert('Error saving profile. Please try again.');
     }
   };
 

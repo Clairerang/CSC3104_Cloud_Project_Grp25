@@ -39,6 +39,13 @@ spec:
           envFrom:
             - secretRef:
                 name: backend-env
+
+          # Firebase Service Account mount
+          volumeMounts:
+          - name: firebase-sa-volume
+            mountPath: /app/config/secrets
+            readOnly: true
+
           livenessProbe:
             httpGet:
               path: /health
@@ -56,3 +63,8 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
+
+      volumes:
+        - name: firebase-sa-volume
+          secret:
+            secretName: firebase-sa

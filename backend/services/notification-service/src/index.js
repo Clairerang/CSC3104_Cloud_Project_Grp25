@@ -3,6 +3,7 @@ const express = require("express");
 const path = require('path');
 const { startMqttConsumer, publishEvent, mqttClient } = require("./mqttClient");
 const { startDashboardConsumer, emitter, getRecent } = require('./dashboardConsumer');
+const { startMobileConsumer } = require('./mobileConsumer');
 const { connectMongo, models } = require('./models');
 // Prometheus metrics
 const client = require('prom-client');
@@ -302,6 +303,63 @@ async function hasTodayCheckin(userId, todayStart) {
   return docs && docs.length > 0;
 }
 
+// Check for scheduled reminders and send them at the specified time
+async function checkScheduledReminders() {
+  try {
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Find active reminders matching current time
+    const reminders = await models.Reminder.find({
+      isActive: true,
+      time: currentTime
+    }).lean().exec();
+
+    for (const reminder of reminders) {
+      // Check if already sent today (for daily/recurring reminders)
+      if (reminder.lastSentAt) {
+        const lastSent = new Date(reminder.lastSentAt);
+        if (lastSent >= todayStart) {
+          // Already sent today, skip
+          continue;
+        }
+      }
+
+      // Send reminder notification to senior
+      await publishEvent({
+        type: 'reminder_notification',
+        userId: reminder.seniorId,
+        reminderId: reminder.reminderId,
+        title: reminder.title,
+        body: reminder.description || reminder.title,
+        reminderType: reminder.type,
+        timestamp: now.toISOString(),
+        targets: ['mobile', 'dashboard']
+      });
+
+      // Update lastSentAt
+      await models.Reminder.updateOne(
+        { reminderId: reminder.reminderId },
+        { $set: { lastSentAt: now } }
+      );
+
+      console.log(`🔔 Sent reminder "${reminder.title}" to ${reminder.seniorId} at ${currentTime}`);
+
+      // If it's a 'once' frequency reminder, deactivate it
+      if (reminder.frequency === 'once') {
+        await models.Reminder.updateOne(
+          { reminderId: reminder.reminderId },
+          { $set: { isActive: false } }
+        );
+        console.log(`✓ Deactivated one-time reminder: ${reminder.reminderId}`);
+      }
+    }
+  } catch (e) {
+    console.error('⚠️ checkScheduledReminders error:', e && e.message ? e.message : e);
+  }
+}
+
 async function checkForMissedCheckins() {
   try {
     const users = await models.User.find().lean().exec();
@@ -328,12 +386,14 @@ async function checkForMissedCheckins() {
       const relations = await models.Relationship.find({ seniorId: u.userId }).lean().exec();
       const caregiverIds = (relations || []).map(r => r.linkAccId).filter(Boolean);
 
+      const seniorName = u.profile?.name || u.username || 'Senior';
+
       if (caregiverIds.length === 0) {
         // Fallback: still publish an alert tagged to the senior (dashboard visibility)
         const alert = {
           type: 'missed_checkin_alert',
           userId: u.userId,
-          name: u.name || u.userId,
+          name: seniorName,
           windowMs: MISSED_CHECKIN_WINDOW_MS,
           targets: ['dashboard']
         };
@@ -345,8 +405,8 @@ async function checkForMissedCheckins() {
             type: 'missed_checkin_alert',
             userId: caregiverId,
             seniorId: u.userId,
-            seniorName: u.name || u.userId,
-            message: `No check-in from ${u.name || u.userId} within the first 3 hours`,
+            seniorName: seniorName,
+            message: `No check-in from ${seniorName} within the first 3 hours`,
             targets: ['dashboard','mobile']
           };
           await publishEvent(alert);
@@ -506,7 +566,8 @@ async function start() {
   // Start dashboard consumer for notification/events -> SSE
   startDashboardConsumer().catch(e => console.error('startDashboardConsumer error', e));
 
-  // NOTE: Mobile push notifications moved to push-notification-service
+  // Start mobile consumer for Firebase push notifications
+  startMobileConsumer().catch(e => console.error('startMobileConsumer error', e));
 
   // Start gRPC server with full RPC support
   try {
@@ -516,8 +577,11 @@ async function start() {
     console.warn('gRPC server failed to start (missing deps?):', e && e.message ? e.message : e);
   }
 
-  // start periodic checker
+  // start periodic checkers
   setInterval(checkForMissedCheckins, CHECK_PERIOD_MS);
+  // Check for scheduled reminders every minute
+  setInterval(checkScheduledReminders, 60000);
+  console.log('⏰ Reminder scheduler started (checking every minute)');
 }
 
 start().catch(e => {

@@ -52,11 +52,7 @@ http.createServer(async (req, res) => {
     res.end(await client.register.metrics());
     return;
   }
-  if (req.url === '/health') {
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ ok: true }));
-    return;
-  }
+  // Health endpoint removed for email-service (metrics remain)
   res.statusCode = 404; res.end('not found');
 }).listen(METRICS_PORT, () => logger.info(`Metrics server listening on ${METRICS_PORT}`));
 

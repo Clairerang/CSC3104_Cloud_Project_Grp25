@@ -40,24 +40,3 @@ target "ai-companion" {
     tags = ["${DOCKER_USERNAME}/senior-care:ai-companion-service-latest"]
     platforms = ["linux/amd64"]
 }
-
-target "push-notification" {
-    context = "./backend"
-    dockerfile = "./services/push-notification-service/Dockerfile"
-    tags = ["${DOCKER_USERNAME}/senior-care:push-notification-service-latest"]
-    platforms = ["linux/amd64"]
-}
-
-target "sms" {
-    context = "./backend"
-    dockerfile = "./services/sms-service/Dockerfile"
-    tags = ["${DOCKER_USERNAME}/senior-care:sms-service-latest"]
-    platforms = ["linux/amd64"]
-}
-
-target "email" {
-    context = "./backend"
-    dockerfile = "./services/email-service/Dockerfile"
-    tags = ["${DOCKER_USERNAME}/senior-care:email-service-latest"]
-    platforms = ["linux/amd64"]
-}

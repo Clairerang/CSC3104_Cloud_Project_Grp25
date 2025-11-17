@@ -12,14 +12,21 @@ async function connectMongo() {
   console.log('🗄️ Connected to MongoDB (models)');
 }
 
-// User model for test caretakers / seniors
+// User model - synced with API gateway schema
 const userSchema = new mongoose.Schema({
   userId: { type: String, unique: true },
-  name: String,
-  email: String,
+  username: String,
+  role: String,
+  profile: {
+    name: String,
+    age: Number,
+    email: String,
+    contact: String
+  },
   createdAt: { type: Date, default: Date.now },
   lastCheckInAt: Date,
   lastReminderAt: Date,
+  updatedAt: Date
 });
 
 // CheckIn records
@@ -117,6 +124,22 @@ verifiedPhoneSchema.index({ userId: 1, phoneNumber: 1 });
 
 const VerifiedPhone = mongoose.models.VerifiedPhone || mongoose.model('VerifiedPhone', verifiedPhoneSchema);
 
+// Reminder schema - synced with API gateway
+const reminderSchema = new mongoose.Schema({
+  reminderId: { type: String, required: true, unique: true },
+  seniorId: { type: String, required: true },
+  familyId: { type: String, required: true },
+  title: { type: String, required: true },
+  description: { type: String, default: '' },
+  time: { type: String, required: true }, // HH:MM format
+  type: { type: String, enum: ['call', 'task', 'medication'], required: true },
+  frequency: { type: String, enum: ['once', 'daily', 'weekly', 'monthly'], default: 'once' },
+  isActive: { type: Boolean, default: true },
+  lastSentAt: { type: Date } // Track when reminder was last sent
+}, { timestamps: true });
+
+const Reminder = mongoose.models.Reminder || mongoose.model('Reminder', reminderSchema);
+
 module.exports = {
   connectMongo,
   models: {
@@ -128,5 +151,6 @@ module.exports = {
     DeviceToken,
     Relationship,
     VerifiedPhone,
+    Reminder,
   }
 };

@@ -50,7 +50,7 @@ const NotificationDropdown: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:4002/api/notifications', {
+      const response = await fetch('/api/notification/dashboard/history?limit=10&page=1', {
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem('token')}`,
         },
@@ -58,7 +58,17 @@ const NotificationDropdown: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data.notifications || []);
+        // Map the response format from notification service
+        const mappedNotifications = (data.items || []).map((item: any) => ({
+          id: item._id || item.id,
+          type: item.payload?.type || 'info',
+          title: item.payload?.title || 'Notification',
+          message: item.payload?.body || item.payload?.message || '',
+          read: false,
+          createdAt: item.receivedAt || item.createdAt,
+          priority: item.payload?.priority || 'low'
+        }));
+        setNotifications(mappedNotifications);
       } else {
         throw new Error('Failed to fetch notifications');
       }

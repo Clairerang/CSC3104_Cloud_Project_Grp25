@@ -71,7 +71,6 @@ app.use(express.json());
 // parse urlencoded bodies for Twilio webhook callbacks (application/x-www-form-urlencoded)
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/metrics', async (req, res) => { res.set('Content-Type', client.register.contentType); res.end(await client.register.metrics()); });
 
 // Manual test endpoint (PoC) — send an SMS immediately (uses configured adapter; mock by default)

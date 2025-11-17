@@ -2,43 +2,51 @@
 
 var now = new Date();
 
+// Helper function to generate string UUIDs (not binary)
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // define variables for cross db reference
-var seniorId1 = UUID().toString();
-var seniorId2 = UUID().toString();
-var familyId1 = UUID().toString();
-var familyId2 = UUID().toString();
-var adminId = UUID().toString();
+var seniorId1 = generateUUID();
+var seniorId2 = generateUUID();
+var familyId1 = generateUUID();
+var familyId2 = generateUUID();
+var adminId = generateUUID();
 
 // Game-related ID
-var triviaGameId = UUID().toString();
-var memoryGameId = UUID().toString();
-var stretchGameId = UUID().toString();
-var towerGameId = UUID().toString();
+var triviaGameId = generateUUID();
+var memoryGameId = generateUUID();
+var stretchGameId = generateUUID();
+var towerGameId = generateUUID();
 
-var triviaSessionId = UUID().toString();
-var memorySessionId = UUID().toString();
+var triviaSessionId = generateUUID();
+var memorySessionId = generateUUID();
 
-var exerciseId1 = UUID().toString();
-var exerciseId2 = UUID().toString();
-var exerciseId3 = UUID().toString();
-var exerciseId4 = UUID().toString();
-var exerciseId5 = UUID().toString();
+var exerciseId1 = generateUUID();
+var exerciseId2 = generateUUID();
+var exerciseId3 = generateUUID();
+var exerciseId4 = generateUUID();
+var exerciseId5 = generateUUID();
 
-var triviaQ1Id = UUID().toString();
-var triviaQ2Id = UUID().toString();
-var triviaQ3Id = UUID().toString();
-var triviaQ4Id = UUID().toString();
-var triviaQ5Id = UUID().toString();
+var triviaQ1Id = generateUUID();
+var triviaQ2Id = generateUUID();
+var triviaQ3Id = generateUUID();
+var triviaQ4Id = generateUUID();
+var triviaQ5Id = generateUUID();
 
-var memorySet1Id = UUID().toString();
-var memorySet2Id = UUID().toString();
-var memorySet3Id = UUID().toString();
+var memorySet1Id = generateUUID();
+var memorySet2Id = generateUUID();
+var memorySet3Id = generateUUID();
 
-var invitation1Id = UUID().toString();
-var invitation2Id = UUID().toString();
+var invitation1Id = generateUUID();
+var invitation2Id = generateUUID();
 
-var medicine1Id = UUID().toString();
-var medicine2Id = UUID().toString();
+var medicine1Id = generateUUID();
+var medicine2Id = generateUUID();
 
 // Switch to / Create desired database
 db = db.getSiblingDB('senior_care');
@@ -67,7 +75,7 @@ db.users.insertMany([
         profile: {
             name: "Mary Smith",
             age: 72,
-            email: "cloudproject6769@gmail.com",
+            email: "cloudproject6769+mary@gmail.com",
             contact: "+6598765787"
         },
         createdAt: new Date("2025-01-15T10:30:00.000Z"),
@@ -95,7 +103,7 @@ db.users.insertMany([
         profile: {
             name: "Anna Smith",
             age: 40,
-            email: "cloudproject6769@gmail.com",
+            email: "cloudproject6769+anna@gmail.com",
             contact: "+6598765787"
         },
         createdAt: new Date("2025-01-15T10:30:00.000Z"),

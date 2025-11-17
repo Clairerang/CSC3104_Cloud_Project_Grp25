@@ -149,9 +149,28 @@ async function startMobileConsumer() {
   // Handle incoming MQTT messages
   mqttClient.on('message', async (topic, mqttMessage) => {
     if (topic !== 'notification/events') return;
-    
+
     let event = null;
     try { event = JSON.parse(mqttMessage.toString()); } catch (e) { console.warn('mobileConsumer: invalid JSON'); return; }
+
+    // MESSAGE DEDUPLICATION: Check if already processed
+    const messageId = event.messageId || `${event.type}_${event.userId}_${event.timestamp || ''}`;
+    try {
+      const existing = await models.ProcessedMessage.findOne({ messageId }).lean();
+      if (existing) {
+        console.log(`⏭️  Skipping already processed message: ${messageId}`);
+        return; // Already processed by another replica
+      }
+      // Mark as processed (with 5-second timeout to handle race conditions)
+      await models.ProcessedMessage.create({ messageId, processedAt: new Date() });
+    } catch (err) {
+      if (err.code === 11000) {
+        // Duplicate key error - another replica is processing this
+        console.log(`⏭️  Another replica is processing message: ${messageId}`);
+        return;
+      }
+      console.error('Error checking processed messages:', err);
+    }
 
     // only deliver to mobile targets
     const targets = event.target || event.targets || [];
