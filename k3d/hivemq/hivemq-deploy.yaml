@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hivemq
+  namespace: senior-care-hivemq
+  labels:
+    app: hivemq
+spec:
+  selector:
+    matchLabels:
+      app: hivemq
+  template:
+    metadata:
+      labels:
+        app: hivemq
+    spec:
+      containers:
+        - name: hivemq
+          image: hivemq/hivemq-ce:latest
+          ports:
+            - name: mqtt
+              containerPort: 1883      # MQTT
+            - name: websocket
+              containerPort: 8000      # WebSocket
+          # Health checks
+          livenessProbe:
+            exec:
+              command: ["pgrep", "-f", "hivemq.jar"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 1883
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          volumeMounts:
+            - name: hivemq-data
+              mountPath: /opt/hivemq/data
+
+      volumes:
+        - name: hivemq-data
+          persistentVolumeClaim:
+            claimName: hivemq-data
