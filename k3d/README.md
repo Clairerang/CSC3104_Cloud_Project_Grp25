@@ -138,6 +138,16 @@ watch kubectl get pods -n <namespace>
 
 Before using `docker buildx`, ensure the builder is installed and created.
 
+### Check login status
+
+```bash
+docker login
+```
+
+If you are already logged in, it will confirm your username. If not, it will prompt for credentials.
+
+Before using `docker buildx`, ensure the builder is installed and created.
+
 ### Build & Push Using buildx bake
 
 ```bash
