@@ -15,6 +15,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PersonIcon from '@mui/icons-material/Person';
+import seniorApi from '../api/client';
 
 interface Message {
   id: string;
@@ -54,10 +55,10 @@ const ChatModal: React.FC<ChatModalProps> = ({ open, onClose, userId }) => {
   }, [open, userId]);
 
   const loadChatHistory = async () => {
-    try {
-      const response = await fetch(`http://localhost:4015/history/${userId}`);
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const data = await seniorApi.getChatHistory(userId);
+        
+        // Check if data has conversation (single conversation)
         if (data.conversation && data.conversation.messages) {
           const historicalMessages: Message[] = data.conversation.messages.map((msg: any, index: number) => [
             {
@@ -76,80 +77,87 @@ const ChatModal: React.FC<ChatModalProps> = ({ open, onClose, userId }) => {
           ]).flat();
           setMessages(historicalMessages);
         }
+        // Or check if data has conversations (multiple conversations)
+        else if (data.conversations && data.conversations.length > 0) {
+          // Get the most recent conversation
+          const recentConversation = data.conversations[0];
+          if (recentConversation.messages) {
+            const historicalMessages: Message[] = recentConversation.messages.map((msg: any, index: number) => [
+              {
+                id: `${msg.timestamp}-user-${index}`,
+                text: msg.userMessage,
+                sender: 'user' as const,
+                timestamp: new Date(msg.timestamp),
+              },
+              {
+                id: `${msg.timestamp}-bot-${index}`,
+                text: msg.botResponse,
+                sender: 'bot' as const,
+                timestamp: new Date(msg.timestamp),
+                intent: msg.intent,
+              },
+            ]).flat();
+            setMessages(historicalMessages);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load chat history:', err);
+        // Don't show error for history load failure
       }
-    } catch (err) {
-      console.error('Failed to load chat history:', err);
-      // Don't show error for history load failure
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || loading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputMessage,
-      sender: 'user',
-      timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputMessage('');
-    setLoading(true);
-    setError(null);
+    const sendMessage = async () => {
+      if (!inputMessage.trim() || loading) return;
 
-    try {
-      const response = await fetch('http://localhost:4015/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          message: inputMessage,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from AI');
-      }
-
-      const data = await response.json();
-
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: data.response,
-        sender: 'bot',
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        text: inputMessage,
+        sender: 'user',
         timestamp: new Date(),
-        intent: data.intent,
       };
 
-      setMessages((prev) => [...prev, botMessage]);
-    } catch (err: any) {
-      setError(err.message || 'Failed to send message. Please try again.');
-      console.error('Chat error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setMessages((prev) => [...prev, userMessage]);
+      const messageToSend = inputMessage; // Save the message before clearing
+      setInputMessage('');
+      setLoading(true);
+      setError(null);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+      try {
+        const data = await seniorApi.sendChatMessage(userId, messageToSend);
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: data.response,
+          sender: 'bot',
+          timestamp: new Date(),
+          intent: data.intent,
+        };
+        setMessages((prev) => [...prev, botMessage]);
+      } catch (err: any) {
+        setError(err.message || 'Failed to send message. Please try again.');
+        console.error('Chat error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const quickActions = [
-    { label: 'Weather', message: "What's the weather today?" },
-    { label: 'Medications', message: 'What medicines should I take today?' },
-    { label: 'Community Events', message: 'Find community events near me' },
-    { label: 'Play Game', message: "I want to play a game" },
-  ];
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
 
-  const handleQuickAction = (message: string) => {
-    setInputMessage(message);
-  };
+    const quickActions = [
+      { label: 'Weather', message: "What's the weather today?" },
+      { label: 'Medications', message: 'What medicines should I take today?' },
+      { label: 'Community Events', message: 'Find community events near me' },
+      { label: 'Play Game', message: "I want to play a game" },
+    ];
+
+    const handleQuickAction = (message: string) => {
+      setInputMessage(message);
+    };
+
 
   return (
     <Dialog

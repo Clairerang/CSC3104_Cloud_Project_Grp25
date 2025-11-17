@@ -48,6 +48,24 @@ app.use('/notification', createProxyMiddleware({
   }
 }));
 
+// Proxy /ai-companion requests to ai-companion-service
+const AI_COMPANION_SERVICE_URL = process.env.AI_COMPANION_SERVICE_URL || 'http://ai-companion-service:4015';
+
+app.use('/ai-companion', createProxyMiddleware({
+  target: AI_COMPANION_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/ai-companion': '', // Remove /ai-companion prefix when forwarding
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Proxy] ${req.method} ${req.path} -> ${AI_COMPANION_SERVICE_URL}${req.path}`);
+  },
+  onError: (err, req, res) => {
+    console.error('[Proxy Error]', err);
+    res.status(500).json({ error: 'AI Companion service unavailable' });
+  }
+}));
+
 // Apply express.json() AFTER proxy middleware so body isn't consumed before proxying
 app.use(express.json());
 

@@ -98,6 +98,31 @@ export const seniorApi = {
       console.error('[Senior API] Error marking notifications as read:', error);
     }
   },
+
+    // Get chat history
+  async getChatHistory(userId: string): Promise<any> {
+    try {
+      const response = await apiClient.get(`/ai-companion/history/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('[Senior API] Error fetching chat history:', error);
+      return { conversation: { messages: [] } };
+    }
+  },
+
+  // Send chat message
+  async sendChatMessage(userId: string, message: string): Promise<any> {
+    try {
+      const response = await apiClient.post('/ai-companion/chat', {
+        userId,
+        message,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[Senior API] Error sending chat message:', error);
+      throw error;
+    }
+  }
 };
 
 export default seniorApi;
