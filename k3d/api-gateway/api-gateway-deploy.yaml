@@ -30,7 +30,7 @@ spec:
               value: "mongodb://mongodb.senior-care-db.svc.cluster.local:27017/senior_care"
             - name: MQTT_BROKER_URL
               value: "mqtt://hivemq.senior-care-hivemq.svc.cluster.local:1883"
-            - name: GAME_SERVICE_URL
+            - name: GAMES_SERVICE_URL
               value: "http://games-service.senior-care-games.svc.cluster.local:8081"
             - name: NOTIFICATION_SERVICE_URL
               value: "http://notification-service.senior-care-notification.svc.cluster.local:4002"
