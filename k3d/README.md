@@ -65,6 +65,31 @@ qemu-img convert -f vdi -O qcow2 /path/to/your/file.vdi /path/to/output/file.qco
 
 ## Kubernetes Cluster Setup
 
+### If `make create` fails (ports already in use / cluster exists)
+If you encounter errors such as:
+- Port already in use
+- Cluster cannot be created
+- Node conflicts
+
+It usually means a **previous k3d cluster is still running**.
+
+#### Check existing clusters
+```bash
+k3d cluster list
+```
+
+#### If a cluster exists, delete it
+```bash
+k3d cluster delete <cluster_name>
+```
+
+Then re-run:
+```bash
+make create
+```
+
+---
+
 ### Start the cluster
 1. Clone the repository
 ```bash
@@ -96,12 +121,15 @@ kubectl get pods -A
 
 To avoid dependency and connection issues, deploy services in the following order — **wait for each to be fully Running before deploying the next**:
 
-1. **MongoDB / HiveMQ**
-2. **Notification Services**
-3. **AI Companion Service**
-4. **Game Services**
-5. **API Gateway**
-6. **Frontend Application**
+1. **MongoDB**
+2. **HiveMQ**
+3. **Notification Services**
+    * Notification Service
+    * Push Notification Service
+4. **AI Companion Service**
+5. **Game Services**
+6. **API Gateway**
+7. **Frontend Application**
 
 Refer to Makefile for spin up commands
 ---
