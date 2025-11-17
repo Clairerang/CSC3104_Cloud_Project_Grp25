@@ -34,11 +34,17 @@ spec:
               value: "hivemq.senior-care-hivemq.svc.cluster.local"
             - name: MQTT_PORT
               value: "1883"
-            - name: FIREBASE_SERVICE_ACCOUNT_PATH
-              value: "/app/config/secrets/firebase-sa.json"
           envFrom:
             - secretRef:
                 name: backend-env
+
+          # Firebase Service Account mount
+          volumeMounts:
+          - name: firebase-sa-volume
+            mountPath: /app/config/secrets
+            readOnly: true
+          
+          # Health Checks
           livenessProbe:
             httpGet:
               path: /health
@@ -56,3 +62,8 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
+      
+      volumes:  
+        - name: firebase-sa-volume
+          secret:
+            secretName: firebase-sa

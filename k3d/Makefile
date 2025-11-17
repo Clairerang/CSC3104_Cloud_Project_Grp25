@@ -3,6 +3,7 @@ CONFIG_FILE := ./k3d-config.yaml
 
 MONGODB_INIT_PATH := ../database/mongo-init/01-init-all.js
 BACKEND_ENV_PATH := ../backend/config/secrets/.env
+FIREBASE_SA_PATH := ../backend/config/secrets/firebase-sa.json
 
 .PHONY: create delete restart status
 
@@ -76,6 +77,10 @@ notification-deploy-delete:
 	kubectl delete namespace senior-care-notification
 
 push-notification-deploy:
+
+	kubectl create secret generic firebase-sa \
+	--from-file=${FIREBASE_SA_PATH} \
+  	-n senior-care-notification
 
 	kubectl apply -f ./notifications/push-notification
 
