@@ -89,6 +89,8 @@ push-notification-deploy-delete:
 	kubectl delete service push-notification-service -n senior-care-notification
 
 	kubectl delete deployment push-notification-service -n senior-care-notification
+	
+	kubectl delete secrets firebase-sa -n senior-care-notification
 
 ai-companion-deploy:
 	kubectl create namespace senior-care-ai-companion
