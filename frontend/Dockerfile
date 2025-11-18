@@ -33,8 +33,10 @@ COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
 # Copy entrypoint script for runtime configuration
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 
-# Make entrypoint executable
-RUN chmod +x /docker-entrypoint.sh
+# Normalize line endings (CRLF -> LF) and make executable to avoid exec errors on Linux
+RUN sed -i 's/\r$//' /docker-entrypoint.sh \
+  && chmod +x /docker-entrypoint.sh \
+  && sed -i 's/\r$//' /etc/nginx/conf.d/default.conf.template
 
 # Expose port 80
 EXPOSE 80
